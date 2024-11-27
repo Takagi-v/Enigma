@@ -1,0 +1,140 @@
+.sidebar {
+  width: 60px;
+  background-color: #1e1e1e;
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  padding-top: 60px;
+}
+
+.sidebar.active {
+  width: 200px;
+}
+
+/* 导航菜单样式 */
+.sidebar nav ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar nav ul li {
+  margin: 0;
+  padding: 0;
+}
+
+/* 链接样式 */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  color: #fff;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #1890ff;
+}
+
+.sidebar-link:hover::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background-color: #1890ff;
+  transform: scaleY(1);
+  transition: transform 0.2s ease;
+}
+
+/* 图标样式 */
+.sidebar-link .icon {
+  font-size: 20px;
+  min-width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.sidebar:not(.active) .sidebar-link .icon {
+  transform: scale(1.2);
+}
+
+/* 文字样式 */
+.sidebar-link .text {
+  margin-left: 15px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  transform: translateX(-10px);
+}
+
+.sidebar.active .sidebar-link .text {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* 切换按钮样式 */
+.toggle-button {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  width: 40px;
+  height: 40px;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 20px;
+  transition: all 0.3s ease;
+}
+
+.toggle-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .sidebar.active {
+    transform: translateX(0);
+  }
+  
+  .content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* 点击区域扩大 */
+.sidebar-link {
+  position: relative;
+}
+
+.sidebar-link::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
