@@ -13,6 +13,8 @@ import Header from './components/Header';
 import ParkingDetail from './components/ParkingDetail';
 import { searchParking } from "./services/parkingService";
 import ParkingSearch from "./components/ParkingSearch";
+import AdminLogin from './components/admin/AdminLogin';
+import AdminDashboard from './components/admin/AdminDashboard';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -62,6 +64,8 @@ function App() {
                 <Route path="/publish" element={<ParkingSpotForm />} />
                 <Route path="/parking/:id" element={<ParkingDetail />} />
                 <Route path="/search" element={<ParkingSearch />} />
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
               </Routes>
             </main>
           </div>

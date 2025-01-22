@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import './styles/Auth.css';
+import config from '../config';
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
 
 function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -34,7 +38,7 @@ function Auth() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/login', {
+      const response = await fetch(`${config.API_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +77,7 @@ function Auth() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/register', {
+      const response = await fetch(`${config.API_URL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +123,7 @@ function Auth() {
       const decoded = jwtDecode(credentialResponse.credential);
       const googleUsername = decoded.email.split('@')[0];
       
-      const response = await fetch('http://localhost:3000/google-login', {
+      const response = await fetch(`${config.API_URL}/google-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,6 +162,58 @@ function Auth() {
     } catch (err) {
       console.error('Google login error:', err);
       setError(err.message || 'Google 登录失败');
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // 验证文件大小
+    if (file.size > MAX_FILE_SIZE) {
+      setError('文件大小不能超过5MB');
+      return;
+    }
+
+    // 验证文件类型
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('只支持 JPG、PNG 和 GIF 格式的图片');
+      return;
+    }
+
+    try {
+      // 创建预览
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({
+          ...prev,
+          avatar: reader.result
+        }));
+      };
+      reader.readAsDataURL(file);
+
+      // 创建 FormData 用于文件上传
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      // 上传到服务器（需要后端支持）
+      const response = await fetch(`${config.API_URL}/upload-avatar`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || '头像上传失败');
+      }
+
+      // 更新表单数据中的头像URL
+      setFormData(prev => ({
+        ...prev,
+        avatar: data.avatarUrl // 使用服务器返回的URL
+      }));
+    } catch (err) {
+      setError(err.message || '头像上传失败，请重试');
     }
   };
 
@@ -211,23 +267,21 @@ function Auth() {
         return (
           <>
             <h3>第 3 步：补充信息</h3>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    setFormData(prev => ({
-                      ...prev,
-                      avatar: reader.result
-                    }));
-                  };
-                  reader.readAsDataURL(file);
-                }
-              }}
-            />
+            <div className="avatar-upload">
+              {formData.avatar && (
+                <img 
+                  src={formData.avatar} 
+                  alt="头像预览" 
+                  className="avatar-preview"
+                />
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif"
+                onChange={handleFileUpload}
+              />
+              <small>支持 JPG、PNG 和 GIF 格式，最大5MB</small>
+            </div>
             <textarea
               name="bio"
               placeholder="个人简介（选填）"

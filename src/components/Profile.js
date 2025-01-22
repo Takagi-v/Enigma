@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './styles/Profile.css';
 import defaultAvatar from '../images/default-avatar.jpg'; // 请确保有默认头像图片
+import config from '../config';
 
 function Profile() {
   const [userInfo, setUserInfo] = useState(null);
@@ -21,7 +22,7 @@ function Profile() {
 
   const fetchUserInfo = async () => {
     try {
-      const response = await fetch(`http://localhost:3000/user-info/${username}`);
+      const response = await fetch(`${config.API_URL}/user-info/${username}`);
       if (!response.ok) {
         throw new Error('获取用户信息失败');
       }

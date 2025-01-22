@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './styles/ParkingSpotForm.css';
 import Map from './Map';
+import config from '../config';
 
 function ParkingSpotForm() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ function ParkingSpotForm() {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/parking-spots', {
+      const response = await fetch(`${config.API_URL}/parking-spots`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

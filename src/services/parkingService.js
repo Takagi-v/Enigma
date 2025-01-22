@@ -1,17 +1,11 @@
-import axios from 'axios';
+import config from '../config';
 
-const API_BASE_URL = 'http://localhost:3000';
-
-export const searchParking = async (searchType, keyword) => {
+export const searchParking = async (type, keyword) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/parking/search`, {
-      params: {
-        type: searchType,
-        keyword: keyword
-      }
-    });
-    return response.data;
+    const response = await fetch(`${config.API_URL}/parking/search?type=${type}&keyword=${keyword}`);
+    return await response.json();
   } catch (error) {
+    console.error('搜索错误:', error);
     throw error;
   }
 }; 

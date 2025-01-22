@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./styles/Map.css";
+import config from '../config';
 
 function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
   const mapRef = useRef(null);
@@ -34,7 +35,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
   useEffect(() => {
     const fetchParkingSpots = async () => {
       try {
-        const response = await fetch('http://localhost:3000/parking-spots');
+        const response = await fetch(`${config.API_URL}/parking-spots`);
         const data = await response.json();
         setParkingSpots(data);
       } catch (error) {
@@ -49,6 +50,15 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
 
   // 获取用户位置
   useEffect(() => {
+    // 添加调试信息
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Geolocation available:', 'geolocation' in navigator);
+    console.log('Protocol:', window.location.protocol);
+    
+    if (window.location.protocol !== 'https:') {
+      console.warn('Geolocation may not work without HTTPS');
+    }
+    
     if (mode === 'detail' && initialSpot) {
       const [lat, lng] = initialSpot.coordinates.split(',');
       setUserLocation({ lat: parseFloat(lat), lng: parseFloat(lng) });
@@ -59,11 +69,31 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
       if ("geolocation" in navigator) {
         try {
           const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 0
-            });
+            navigator.geolocation.getCurrentPosition(
+              resolve,
+              (error) => {
+                console.error('Geolocation error:', error);
+                // 根据具体错误类型给出提示
+                switch(error.code) {
+                  case error.PERMISSION_DENIED:
+                    reject(new Error('用户拒绝了位置请求'));
+                    break;
+                  case error.POSITION_UNAVAILABLE:
+                    reject(new Error('位置信息不可用'));
+                    break;
+                  case error.TIMEOUT:
+                    reject(new Error('请求位置超时'));
+                    break;
+                  default:
+                    reject(error);
+                }
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+              }
+            );
           });
           
           setUserLocation({
@@ -71,16 +101,21 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
             lng: position.coords.longitude
           });
         } catch (error) {
+          console.error('获取位置失败:', error);
+          // 使用默认位置（北京）
           setUserLocation({
             lat: 39.915,
             lng: 116.404
           });
+          setError(error.message);
         }
       } else {
+        console.warn('浏览器不支持地理位置');
         setUserLocation({
           lat: 39.915,
           lng: 116.404
         });
+        setError('浏览器不支持地理位置');
       }
     };
 

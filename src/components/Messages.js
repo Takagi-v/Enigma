@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./styles/Messages.css";
+import config from '../config';
 
 function Messages() {
   const [messages, setMessages] = useState([]);
@@ -22,7 +23,7 @@ function Messages() {
     const connectWebSocket = () => {
       if (wsRef.current) return;
 
-      const socket = new WebSocket("ws://localhost:3000");
+      const socket = new WebSocket(config.WS_URL);
 
       socket.onopen = () => {
         console.log("WebSocket已连接");
@@ -70,7 +71,7 @@ function Messages() {
 
     const fetchMessages = async () => {
       try {
-        const response = await fetch("http://localhost:3000/messages");
+        const response = await fetch(`${config.API_URL}/messages`);
         if (!response.ok) throw new Error("获取消息失败");
         const data = await response.json();
         if (mounted) {
@@ -97,7 +98,7 @@ function Messages() {
     if (!newMessage.trim()) return;
 
     try {
-      const response = await fetch("http://localhost:3000/messages", {
+      const response = await fetch(`${config.API_URL}/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

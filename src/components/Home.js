@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './styles/Home.css';
+import config from '../config';
 
 function Home() {
   const [parkingSpots, setParkingSpots] = useState([]);
@@ -13,7 +14,7 @@ function Home() {
 
   const fetchParkingSpots = async () => {
     try {
-      const response = await fetch('http://localhost:3000/parking-spots');
+      const response = await fetch(`${config.API_URL}/parking-spots`);
       const data = await response.json();
       setParkingSpots(data);
     } catch (error) {

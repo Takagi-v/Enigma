@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import './styles/ParkingDetail.css';
 import Map from './Map';
+import config from '../config';
 
 function ParkingDetail() {
   const { id } = useParams();
@@ -14,7 +15,7 @@ function ParkingDetail() {
     const fetchParkingDetail = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(`http://localhost:3000/parking-spots/${id}`);
+        const response = await fetch(`${config.API_URL}/parking-spots/${id}`);
         if (!response.ok) throw new Error('获取停车位详情失败');
         const data = await response.json();
         setParkingSpot(data);
