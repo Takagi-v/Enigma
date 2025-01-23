@@ -474,22 +474,28 @@ app.post("/api/google-login", async (req, res) => {
   }
 });
 
-// 修改获取停车位的路由，添加坐标验证
+// 修改获取停车位的路由，统一返回格式
 app.get("/api/parking-spots", (req, res) => {
-  db.all(
-    `SELECT 
+  const { page, limit, sort = 'created_at', order = 'DESC' } = req.query;
+  
+  // 基础查询
+  const baseQuery = `
+    SELECT 
       p.*,
       u.full_name as owner_full_name,
       u.phone as owner_phone
-     FROM parking_spots p
-     LEFT JOIN users u ON p.owner_username = u.username
-     WHERE p.coordinates IS NOT NULL
-     ORDER BY p.created_at DESC`,
-    [],
-    (err, rows) => {
+    FROM parking_spots p
+    LEFT JOIN users u ON p.owner_username = u.username
+    WHERE p.coordinates IS NOT NULL
+  `;
+
+  // 如果没有提供分页参数，返回所有数据，但保持相同的返回格式
+  if (!page || !limit) {
+    db.all(`${baseQuery} ORDER BY p.${sort} ${order}`, [], (err, rows) => {
       if (err) {
         return res.status(500).json({ message: "获取停车位信息失败" });
       }
+      
       // 验证坐标格式
       const validSpots = rows.filter(spot => {
         const coords = spot.coordinates.split(',');
@@ -497,100 +503,117 @@ app.get("/api/parking-spots", (req, res) => {
                !isNaN(coords[0]) && 
                !isNaN(coords[1]);
       });
-      res.json(validSpots);
-    }
-  );
-});
 
-// 修改添加停车位的路由，添加坐标验证
-app.post("/api/parking-spots", (req, res) => {
-  const { owner_username, location, price, contact, coordinates, description } = req.body;
-
-  // 验证坐标格式
-  if (!coordinates || typeof coordinates !== 'string') {
-    return res.status(400).json({ message: "坐标格式不正确" });
-  }
-
-  const [lat, lng] = coordinates.split(',');
-  if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-    return res.status(400).json({ message: "坐标格式不正确" });
-  }
-
-  // 验证其他必填字段
-  if (!owner_username || !location || !price || !contact) {
-    return res.status(400).json({ message: "必填信息不能为空" });
-  }
-
-  db.run(
-    `INSERT INTO parking_spots (
-      owner_username, 
-      location, 
-      price, 
-      contact, 
-      coordinates, 
-      description,
-      created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
-    [owner_username, location, price, contact, coordinates, description],
-    function(err) {
-      if (err) {
-        console.error("添加停车位错误:", err);
-        return res.status(500).json({ message: "创建停车位失败" });
-      }
-      
-      // 返���新创建的停车位信息
-      db.get(
-        `SELECT 
-          p.*,
-          u.full_name as owner_full_name,
-          u.phone as owner_phone
-         FROM parking_spots p
-         LEFT JOIN users u ON p.owner_username = u.username
-         WHERE p.id = ?`,
-        [this.lastID],
-        (err, spot) => {
-          if (err) {
-            return res.status(500).json({ message: "获取新创建的停车位信息失败" });
-          }
-          res.status(201).json(spot);
+      // 统一返回格式
+      res.json({
+        spots: validSpots,
+        pagination: {
+          total: validSpots.length,
+          current_page: 1,
+          per_page: validSpots.length,
+          total_pages: 1
         }
-      );
+      });
+    });
+    return;
+  }
+
+  // 带分页的查询
+  const offset = (page - 1) * limit;
+  const validSortFields = ['created_at', 'price', 'location'];
+  const validOrders = ['ASC', 'DESC'];
+  const sortField = validSortFields.includes(sort) ? sort : 'created_at';
+  const orderBy = validOrders.includes(order.toUpperCase()) ? order.toUpperCase() : 'DESC';
+
+  // 获取总数
+  db.get('SELECT COUNT(*) as total FROM parking_spots WHERE coordinates IS NOT NULL', [], (err, count) => {
+    if (err) {
+      return res.status(500).json({ message: "获取停车位信息失败" });
     }
-  );
+
+    // 获取分页数据
+    db.all(
+      `${baseQuery} ORDER BY p.${sortField} ${orderBy} LIMIT ? OFFSET ?`,
+      [limit, offset],
+      (err, rows) => {
+        if (err) {
+          return res.status(500).json({ message: "获取停车位信息失败" });
+        }
+        
+        // 验证坐标格式
+        const validSpots = rows.filter(spot => {
+          const coords = spot.coordinates.split(',');
+          return coords.length === 2 && 
+                 !isNaN(coords[0]) && 
+                 !isNaN(coords[1]);
+        });
+
+        res.json({
+          spots: validSpots,
+          pagination: {
+            total: count.total,
+            current_page: parseInt(page),
+            per_page: parseInt(limit),
+            total_pages: Math.ceil(count.total / limit)
+          }
+        });
+      }
+    );
+  });
 });
 
-// 修改获取单个停车位详情的路由
-app.get("/api/parking-spots/:id", (req, res) => {
-  const { id } = req.params;
+// 添加获取附近停车位的路由
+app.get("/api/parking-spots/nearby", (req, res) => {
+  const { lat, lng, radius = 2 } = req.query; // radius in kilometers
 
-  db.get(
-    `SELECT 
+  if (!lat || !lng) {
+    return res.status(400).json({ message: "需要提供位置坐标" });
+  }
+
+  // 使用简单的距离计算（这里可以根据需要使用更复杂的地理空间计算）
+  const query = `
+    SELECT 
       p.*,
       u.full_name as owner_full_name,
       u.phone as owner_phone
-     FROM parking_spots p
-     LEFT JOIN users u ON p.owner_username = u.username
-     WHERE p.id = ? AND p.coordinates IS NOT NULL`,
-    [id],
-    (err, spot) => {
-      if (err) {
-        console.error("获取停车位详情错误:", err);
-        return res.status(500).json({ message: "获取停车位详情失败" });
-      }
-      
-      if (!spot) {
-        return res.status(404).json({ message: "停车位信息不存在" });
-      }
+    FROM parking_spots p
+    LEFT JOIN users u ON p.owner_username = u.username
+    WHERE p.coordinates IS NOT NULL
+    ORDER BY p.created_at DESC
+  `;
 
-      // 验证坐标格式
-      const coords = spot.coordinates.split(',');
-      if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
-        return res.status(400).json({ message: "停车位坐标格式不正确" });
-      }
-
-      res.json(spot);
+  db.all(query, [], (err, spots) => {
+    if (err) {
+      return res.status(500).json({ message: "获取附近停车位失败" });
     }
-  );
+
+    // 过滤并计算距离
+    const nearbySpots = spots
+      .map(spot => {
+        if (!spot.coordinates) return null;
+        const [spotLat, spotLng] = spot.coordinates.split(',').map(Number);
+        
+        // 使用 Haversine 公式计算距离
+        const R = 6371; // 地球半径（公里）
+        const dLat = (spotLat - lat) * Math.PI / 180;
+        const dLng = (spotLng - lng) * Math.PI / 180;
+        const a = 
+          Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat * Math.PI / 180) * Math.cos(spotLat * Math.PI / 180) * 
+          Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+
+        return {
+          ...spot,
+          distance: distance.toFixed(2)
+        };
+      })
+      .filter(spot => spot && spot.distance <= radius)
+      .sort((a, b) => a.distance - b.distance);
+
+    res.json(nearbySpots);
+  });
 });
 
 // 添加获取用户信息的路由
@@ -893,6 +916,43 @@ app.delete("/api/admin/parking-spots/:id", (req, res) => {
 // 添加测试路由
 app.get("/api/admin/test", (req, res) => {
   res.json({ message: "Admin API is working" });
+});
+
+// 添加获取单个停车位详情的路由
+app.get("/api/parking-spots/:id", (req, res) => {
+  const { id } = req.params;
+  
+  const query = `
+    SELECT 
+      p.*,
+      u.full_name as owner_full_name,
+      u.phone as owner_phone
+    FROM parking_spots p
+    LEFT JOIN users u ON p.owner_username = u.username
+    WHERE p.id = ?
+  `;
+
+  db.get(query, [id], (err, spot) => {
+    if (err) {
+      return res.status(500).json({ message: "获取停车位信息失败" });
+    }
+    
+    if (!spot) {
+      return res.status(404).json({ message: "未找到该停车位" });
+    }
+
+    // 验证坐标格式
+    if (spot.coordinates) {
+      const coords = spot.coordinates.split(',');
+      if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+        res.json(spot);
+      } else {
+        res.status(400).json({ message: "停车位坐标格式无效" });
+      }
+    } else {
+      res.status(400).json({ message: "停车位缺少坐标信息" });
+    }
+  });
 });
 
 // 处理前端路由 - 移到最后

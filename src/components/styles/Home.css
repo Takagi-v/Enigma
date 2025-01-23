@@ -68,26 +68,6 @@
   line-height: 1.5;
 }
 
-.publish-button {
-  position: fixed;
-  bottom: 32px;
-  right: 32px;
-  padding: 16px 32px;
-  border-radius: 28px;
-  background-color: var(--primary-color);
-  color: white;
-  font-size: 16px;
-  border: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.publish-button:hover {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-  transform: translateY(-2px);
-}
-
 /* 添加卡片动画效果 */
 @keyframes fadeIn {
   from {
@@ -102,4 +82,36 @@
 
 .parking-card {
   animation: fadeIn 0.5s ease-out;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+  gap: 10px;
+}
+
+.pagination-button {
+  padding: 8px 16px;
+  background-color: #1890ff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.pagination-button:hover {
+  background-color: #40a9ff;
+}
+
+.pagination-button:disabled {
+  background-color: #d9d9d9;
+  cursor: not-allowed;
+}
+
+.page-info {
+  margin: 0 10px;
+  color: #666;
 }

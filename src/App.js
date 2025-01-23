@@ -56,11 +56,11 @@ function App() {
             <Sidebar />
             <main className="content">
               <Routes>
-                <Route path="/" element={<Home />} />
+                <Route path="/" element={<Map />} />
+                <Route path="/parking-lots" element={<Home />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/messages" element={<Messages token={token} />} />
                 <Route path="/auth" element={<Auth />}/>
-                <Route path="/map" element={<Map />} />
                 <Route path="/publish" element={<ParkingSpotForm />} />
                 <Route path="/parking/:id" element={<ParkingDetail />} />
                 <Route path="/search" element={<ParkingSearch />} />

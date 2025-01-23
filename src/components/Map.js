@@ -37,7 +37,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
       try {
         const response = await fetch(`${config.API_URL}/parking-spots`);
         const data = await response.json();
-        setParkingSpots(data);
+        setParkingSpots(data.spots || []);
       } catch (error) {
         console.error('获取停车位失败:', error);
       }

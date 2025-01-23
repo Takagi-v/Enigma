@@ -5,30 +5,38 @@ import config from '../config';
 
 function Home() {
   const [parkingSpots, setParkingSpots] = useState([]);
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    per_page: 10,
+    total: 0,
+    total_pages: 0
+  });
   const navigate = useNavigate();
-  const username = localStorage.getItem('username');
 
   useEffect(() => {
-    fetchParkingSpots();
+    fetchParkingSpots(1);
   }, []);
 
-  const fetchParkingSpots = async () => {
+  const fetchParkingSpots = async (page) => {
     try {
-      const response = await fetch(`${config.API_URL}/parking-spots`);
+      const response = await fetch(
+        `${config.API_URL}/parking-spots?page=${page}&limit=10&sort=created_at&order=DESC`
+      );
       const data = await response.json();
-      setParkingSpots(data);
+      setParkingSpots(data.spots);
+      setPagination(data.pagination);
     } catch (error) {
       console.error('Error fetching parking spots:', error);
     }
   };
 
-  const handlePublish = () => {
-    navigate('/publish');
+  const handlePageChange = (page) => {
+    fetchParkingSpots(page);
   };
 
   return (
     <div className="home-container">
-      <h1 className="home-title">停车位信息</h1>
+      <h1 className="home-title">所有停车场</h1>
 
       <div className="parking-spots-grid">
         {parkingSpots.map((spot) => (
@@ -46,9 +54,29 @@ function Home() {
         ))}
       </div>
 
-      <button className="publish-button" onClick={handlePublish}>
-        发布停车位
-      </button>
+      {pagination.total_pages > 1 && (
+        <div className="pagination">
+          {pagination.current_page > 1 && (
+            <button 
+              onClick={() => handlePageChange(pagination.current_page - 1)}
+              className="pagination-button"
+            >
+              上一页
+            </button>
+          )}
+          <span className="page-info">
+            第 {pagination.current_page} 页，共 {pagination.total_pages} 页
+          </span>
+          {pagination.current_page < pagination.total_pages && (
+            <button 
+              onClick={() => handlePageChange(pagination.current_page + 1)}
+              className="pagination-button"
+            >
+              下一页
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

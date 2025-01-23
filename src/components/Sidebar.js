@@ -38,9 +38,9 @@ function Sidebar() {
   }, [isActive]);
 
   const menuItems = [
-    { path: "/", icon: <HomeOutlined />, text: "首页" },
+    { path: "/", icon: <EnvironmentOutlined />, text: "地图" },
+    { path: "/parking-lots", icon: <HomeOutlined />, text: "停车场" },
     { path: "/messages", icon: <MessageOutlined />, text: "消息" },
-    { path: "/map", icon: <EnvironmentOutlined />, text: "地图" },
     { path: "/profile", icon: <UserOutlined />, text: "个人" },
     { path: "/search", icon: <SearchOutlined />, text: "搜索停车位" },
   ];
