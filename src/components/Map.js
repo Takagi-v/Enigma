@@ -1,15 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./styles/Map.css";
 import config from '../config';
+import { Input } from 'antd';
 
-function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
+const { Search } = Input;
+
+function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch = false }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const localSearchRef = useRef(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [parkingSpots, setParkingSpots] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
 
   // 确保百度地图 API 已加载
   useEffect(() => {
@@ -222,6 +227,35 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
         }
       }
 
+      // 初始化地点搜索服务
+      localSearchRef.current = new window.BMap.LocalSearch(map, {
+        onSearchComplete: (results) => {
+          if (results && results.getNumPois()) {
+            const searchPois = [];
+            for (let i = 0; i < results.getCurrentNumPois(); i++) {
+              const poi = results.getPoi(i);
+              searchPois.push({
+                location: poi.title,
+                coordinates: `${poi.point.lat},${poi.point.lng}`,
+                address: poi.address
+              });
+            }
+            setSearchResults(searchPois);
+            
+            // 获取第一个结果的位置并搜索附近停车位
+            const firstPoi = results.getPoi(0);
+            if (firstPoi) {
+              searchNearbyParkingSpots(firstPoi.point.lat, firstPoi.point.lng);
+            }
+          }
+        },
+        renderOptions: {
+          map: map,
+          autoViewport: true,
+          selectFirstResult: true
+        }
+      });
+
       // 强制重新计算地图大小
       setTimeout(() => {
         map.setCenter(map.getCenter());
@@ -242,6 +276,25 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
     };
   }, [userLocation, parkingSpots, mode, onLocationSelect, initialSpot, loading]);
 
+  // 搜索附近停车位
+  const searchNearbyParkingSpots = async (lat, lng) => {
+    try {
+      const response = await fetch(`${config.API_URL}/parking/nearby?lat=${lat}&lng=${lng}&radius=2`);
+      const spots = await response.json();
+      setParkingSpots(spots);
+    } catch (error) {
+      console.error('获取附近停车位失败:', error);
+    }
+  };
+
+  // 处理地点搜索
+  const handleSearch = (value) => {
+    if (!value) return;
+    if (localSearchRef.current) {
+      localSearchRef.current.search(value);
+    }
+  };
+
   if (loading) {
     return <div className="map-loading">正在加载地图...</div>;
   }
@@ -252,6 +305,18 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null }) {
 
   return (
     <div className="map-container">
+      {!hideSearch && (
+        <div className="map-search">
+          <Search
+            placeholder="搜索地点（如：万达广场）"
+            allowClear
+            enterButton="搜索"
+            size="large"
+            onSearch={handleSearch}
+            style={{ width: '100%', marginBottom: '10px' }}
+          />
+        </div>
+      )}
       <div className="map-wrapper">
         <div ref={mapRef} className="map" />
         {mode === "select" && selectedLocation && (

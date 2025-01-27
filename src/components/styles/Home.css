@@ -1,71 +1,87 @@
 /* Home page layout */
 .home-container {
-  padding: 80px 20px 20px;
-  max-width: 1400px;
+  padding: 20px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
-.home-title {
-  font-size: 28px;
-  font-weight: 400;
-  color: var(--text-primary);
+.home-header {
   margin-bottom: 24px;
-  padding-left: 8px;
+}
+
+.home-title {
+  margin-bottom: 16px;
+  color: #1a1a1a;
+  font-size: 24px;
+}
+
+.search-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.search-type {
+  min-width: 120px;
+}
+
+.sort-select {
+  min-width: 120px;
 }
 
 .parking-spots-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 24px;
-  padding: 8px;
-  margin-bottom: 80px;
+  margin-bottom: 24px;
 }
 
 /* 修改链接样式 */
 .parking-link {
   text-decoration: none; /* 去掉链接下划线 */
   color: inherit; /* 继承父元素的文字颜色 */
-  display: block; /* 让链接占满整个卡片区域 */
 }
 
 .parking-card {
-  background: var(--surface-color);
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* 添加阴影 */
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid #e0e0e0; /* 添加边框 */
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: fadeIn 0.5s ease-out;
 }
 
 .parking-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transform: translateY(-2px);
-  border-color: #d0d0d0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .parking-card h2 {
-  font-size: 20px;
-  font-weight: 500;
+  margin: 0 0 10px 0;
+  font-size: 18px;
   color: #333;
-  margin-bottom: 16px;
 }
 
 .price {
-  color: #e74c3c; /* 价格使用醒目的红色 */
-  font-size: 24px;
-  font-weight: 600;
-  margin: 16px 0;
+  color: #f5222d;
+  font-size: 18px;
+  font-weight: bold;
+  margin: 8px 0;
+}
+
+.distance {
+  color: #52c41a;
+  margin-bottom: 8px;
 }
 
 .spot-details {
   color: #666;
+  font-size: 14px;
 }
 
 .spot-details p {
-  margin: 8px 0;
-  line-height: 1.5;
+  margin: 4px 0;
 }
 
 /* 添加卡片动画效果 */
@@ -80,38 +96,77 @@
   }
 }
 
-.parking-card {
-  animation: fadeIn 0.5s ease-out;
-}
-
 .pagination {
   display: flex;
   justify-content: center;
-  align-items: center;
-  margin: 20px 0;
-  gap: 10px;
+  margin-top: 24px;
 }
 
-.pagination-button {
-  padding: 8px 16px;
-  background-color: #1890ff;
-  color: white;
-  border: none;
+/* 自定义 Ant Design 分页组件样式 */
+.ant-pagination {
+  text-align: center;
+}
+
+.ant-pagination-item {
   border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.3s;
 }
 
-.pagination-button:hover {
-  background-color: #40a9ff;
+.ant-pagination-item-active {
+  background-color: #1890ff;
+  border-color: #1890ff;
 }
 
-.pagination-button:disabled {
-  background-color: #d9d9d9;
-  cursor: not-allowed;
+.ant-pagination-item-active a {
+  color: #fff;
 }
 
-.page-info {
-  margin: 0 10px;
-  color: #666;
+.ant-pagination-item:hover {
+  border-color: #1890ff;
+}
+
+.ant-pagination-item:hover a {
+  color: #1890ff;
+}
+
+.ant-pagination-prev:hover button,
+.ant-pagination-next:hover button {
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.ant-pagination-jump-prev .ant-pagination-item-container .ant-pagination-item-link-icon,
+.ant-pagination-jump-next .ant-pagination-item-container .ant-pagination-item-link-icon {
+  color: #1890ff;
+}
+
+.ant-pagination-options {
+  margin-left: 16px;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .home-container {
+    padding: 16px;
+  }
+
+  .home-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .sort-select {
+    width: 100%;
+  }
+
+  .parking-spots-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,0 +1,174 @@
+.search-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.search-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back-button {
+  padding: 4px;
+  height: 32px;
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #1a1a1a;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.back-button:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: #1a1a1a;
+}
+
+.search-header h1 {
+  margin: 0;
+  color: #1a1a1a;
+  font-size: 24px;
+}
+
+.sort-select {
+  min-width: 120px;
+}
+
+.error-message {
+  color: #ff4d4f;
+  text-align: center;
+  padding: 16px;
+  margin-bottom: 24px;
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 4px;
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.no-results {
+  text-align: center;
+  padding: 48px 0;
+}
+
+.no-results p {
+  color: #666;
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+
+.no-results button {
+  padding: 8px 24px;
+  background: #1890ff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.no-results button:hover {
+  background: #40a9ff;
+}
+
+.parking-spots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.parking-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.parking-card {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.parking-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.parking-card h2 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.price {
+  color: #f5222d;
+  font-size: 18px;
+  font-weight: bold;
+  margin: 8px 0;
+}
+
+.distance {
+  color: #52c41a;
+  margin-bottom: 8px;
+}
+
+.spot-details {
+  color: #666;
+  font-size: 14px;
+}
+
+.spot-details p {
+  margin: 4px 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .search-container {
+    padding: 16px;
+  }
+
+  .search-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .sort-select {
+    width: 100%;
+  }
+
+  .parking-spots-grid {
+    grid-template-columns: 1fr;
+  }
+} 

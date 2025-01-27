@@ -22,7 +22,7 @@ function Profile() {
 
   const fetchUserInfo = async () => {
     try {
-      const response = await fetch(`${config.API_URL}/user-info/${username}`);
+      const response = await fetch(`${config.API_URL}/users/${username}`);
       if (!response.ok) {
         throw new Error('获取用户信息失败');
       }

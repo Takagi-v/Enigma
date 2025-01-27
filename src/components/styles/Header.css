@@ -1,124 +1,70 @@
-.floating-search {
+.header {
   position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  right: 0;
+  padding: 16px;
   z-index: 1000;
   display: flex;
-  gap: 20px;
-  align-items: center;
-  max-width: 800px;
-  width: calc(100% - 40px);
-}
-
-.global-search {
-  width: 500px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.global-search .ant-input {
-  height: 40px;
-  border-radius: 20px 0 0 20px;
-  border: none;
-  font-size: 20px;
-  padding: 4px 15px;
-  color: #333;
-}
-
-.global-search .ant-input::placeholder {
-  color: #999;
-  font-size: 14px;
-}
-
-.global-search .ant-input-search-button {
-  height: 40px;
-  width: 50px;
-  border: none;
-  background-color: #1890ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.global-search .anticon-search {
-  font-size: 18px;
-}
-
-.global-search .ant-input-affix-wrapper {
-  padding: 0;
-  border: none;
-  border-radius: 20px 0 0 20px;
-}
-
-.global-search .ant-input-affix-wrapper:focus,
-.global-search .ant-input-affix-wrapper-focused {
-  box-shadow: none;
-}
-
-.global-search .ant-input-affix-wrapper:hover {
-  border-color: transparent;
-}
-
-.global-search .ant-input-search-button:hover {
-  background-color: #40a9ff;
+  justify-content: flex-end;
 }
 
 .user-controls {
   display: flex;
   align-items: center;
+  gap: 16px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background-color: white;
+  gap: 12px;
+  background: white;
   padding: 8px 16px;
   border-radius: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .user-info span {
-  color: #333;
+  color: #1a1a1a;
+  font-weight: 500;
 }
 
 .user-info button {
-  padding: 4px 12px;
+  background: none;
   border: none;
-  border-radius: 15px;
-  background-color: #ff4d4f;
-  color: white;
+  color: #f5222d;
   cursor: pointer;
-  transition: all 0.3s ease;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
 }
 
 .user-info button:hover {
-  background-color: #ff7875;
+  background-color: rgba(245, 34, 45, 0.1);
 }
 
 .auth-link {
+  color: #1890ff;
   text-decoration: none;
-  color: #333;
   padding: 8px 16px;
+  background: white;
   border-radius: 20px;
-  background-color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .auth-link:hover {
-  background-color: #f5f5f5;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .floating-search {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+  .header {
+    padding: 12px;
   }
 
-  .global-search {
-    width: 100%;
+  .user-info {
+    padding: 6px 12px;
   }
 } 
