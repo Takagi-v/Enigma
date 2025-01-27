@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
+import { Button } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import './styles/Auth.css';
 import config from '../config';
 
@@ -38,7 +40,7 @@ function Auth() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${config.API_URL}/login`, {
+      const response = await fetch(`${config.API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +79,7 @@ function Auth() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${config.API_URL}/register`, {
+      const response = await fetch(`${config.API_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -123,7 +125,7 @@ function Auth() {
       const decoded = jwtDecode(credentialResponse.credential);
       const googleUsername = decoded.email.split('@')[0];
       
-      const response = await fetch(`${config.API_URL}/google-login`, {
+      const response = await fetch(`${config.API_URL}/auth/google-login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +135,10 @@ function Auth() {
           email: decoded.email,
           username: googleUsername,
           full_name: decoded.name,
-          avatar: decoded.picture
+          avatar: decoded.picture,
+          phone: '',
+          bio: `Google用户 - ${decoded.name}`,
+          address: ''
         }),
       });
 
@@ -144,15 +149,15 @@ function Auth() {
       }
 
       if (data.needsRegistration) {
-        // 设置初始表单数据
         setFormData(prev => ({
           ...prev,
           username: googleUsername,
           fullName: decoded.name,
-          avatar: decoded.picture
+          avatar: decoded.picture,
+          bio: `Google用户 - ${decoded.name}`
         }));
         setIsLogin(false);
-        setRegistrationStep(2); // 跳过用户名密码步骤
+        setRegistrationStep(2);
         return;
       }
 
@@ -196,8 +201,8 @@ function Auth() {
       const formData = new FormData();
       formData.append('avatar', file);
 
-      // 上传到服务器（需要后端支持）
-      const response = await fetch(`${config.API_URL}/upload-avatar`, {
+      // 上传到服务器
+      const response = await fetch(`${config.API_URL}/auth/upload-avatar`, {
         method: 'POST',
         body: formData,
       });
@@ -210,7 +215,7 @@ function Auth() {
       // 更新表单数据中的头像URL
       setFormData(prev => ({
         ...prev,
-        avatar: data.avatarUrl // 使用服务器返回的URL
+        avatar: data.avatarUrl
       }));
     } catch (err) {
       setError(err.message || '头像上传失败，请重试');
@@ -343,13 +348,12 @@ function Auth() {
         </button>
 
         {registrationStep > 1 && !isLogin && (
-          <button 
-            type="button" 
+          <Button 
+            type="link" 
+            icon={<ArrowLeftOutlined />} 
             onClick={() => setRegistrationStep(prev => prev - 1)}
             className="back-button"
-          >
-            返回上一步
-          </button>
+          />
         )}
 
         {registrationStep === 1 && (

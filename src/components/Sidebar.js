@@ -6,7 +6,6 @@ import {
   MessageOutlined, 
   EnvironmentOutlined, 
   UserOutlined,
-  SearchOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined
 } from "@ant-design/icons";
@@ -41,8 +40,7 @@ function Sidebar() {
     { path: "/", icon: <EnvironmentOutlined />, text: "地图" },
     { path: "/parking-lots", icon: <HomeOutlined />, text: "停车场" },
     { path: "/messages", icon: <MessageOutlined />, text: "消息" },
-    { path: "/profile", icon: <UserOutlined />, text: "个人" },
-    { path: "/search", icon: <SearchOutlined />, text: "搜索停车位" },
+    { path: "/profile", icon: <UserOutlined />, text: "个人" }
   ];
 
   return (

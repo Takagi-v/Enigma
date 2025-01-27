@@ -104,8 +104,9 @@ function Messages() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username,
-          text: newMessage.trim(),
+          sender_username: username,
+          receiver_username: "admin",
+          content: newMessage.trim(),
         }),
       });
 

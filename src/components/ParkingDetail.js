@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Button } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import './styles/ParkingDetail.css';
 import Map from './Map';
 import config from '../config';
 
 function ParkingDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [parkingSpot, setParkingSpot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +39,12 @@ function ParkingDetail() {
 
   return (
     <div className="parking-detail-container">
-      <Link to="/" className="back-button">返回首页</Link>
+      <Button 
+        type="link" 
+        icon={<ArrowLeftOutlined />} 
+        onClick={() => navigate('/parking-lots')}
+        className="back-button"
+      />
       
       <div className="parking-detail">
         <h1>{parkingSpot.location}</h1>
@@ -79,6 +87,7 @@ function ParkingDetail() {
                   price: parkingSpot.price,
                   contact: parkingSpot.contact
                 }}
+                hideSearch={true}
               />
             </div>
           </div>

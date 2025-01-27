@@ -1,38 +1,40 @@
 .parking-detail-container {
-  padding: 80px 20px 20px;
-  max-width: 1400px;
+  padding: 20px;
+  max-width: 1200px;
   margin: 0 auto;
+  position: relative;
 }
 
 .back-button {
-  display: inline-block;
-  padding: 8px 16px;
-  margin-bottom: 20px;
-  background-color: var(--primary-color);
-  color: white;
-  text-decoration: none;
-  border-radius: 6px;
-  transition: all 0.3s ease;
+  padding: 4px;
+  height: 32px;
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #1a1a1a;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  margin-bottom: 16px;
 }
 
 .back-button:hover {
-  opacity: 0.9;
-  transform: translateY(-2px);
+  background-color: rgba(0, 0, 0, 0.04);
+  color: #1a1a1a;
 }
 
 .parking-detail {
   background: white;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 24px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .parking-detail h1 {
+  margin: 0 0 24px 0;
+  color: #1a1a1a;
   font-size: 24px;
-  color: #333;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #eee;
 }
 
 .detail-content {
@@ -50,9 +52,10 @@
 }
 
 .price {
-  color: #e74c3c;
-  font-size: 32px;
-  font-weight: 600;
+  color: #f5222d;
+  font-size: 28px;
+  font-weight: bold;
+  margin: 0;
 }
 
 .info-items {
@@ -60,54 +63,62 @@
 }
 
 .info-item {
-  margin: 12px 0;
-  display: flex;
-  align-items: center;
+  margin-bottom: 12px;
 }
 
 .info-item label {
   color: #666;
-  width: 80px;
-  flex-shrink: 0;
-}
-
-.info-item span {
-  color: #333;
-}
-
-.description-section {
-  margin-top: 24px;
+  margin-right: 8px;
 }
 
 .description-section h3 {
-  color: #333;
+  margin: 0 0 12px 0;
+  color: #1a1a1a;
   font-size: 18px;
-  margin-bottom: 12px;
 }
 
 .description-section p {
   color: #666;
   line-height: 1.6;
-}
-
-.map-section {
-  height: 100%;
+  margin: 0;
 }
 
 .map-section h3 {
-  color: #333;
+  margin: 0 0 12px 0;
+  color: #1a1a1a;
   font-size: 18px;
-  margin-bottom: 12px;
 }
 
 .map-container {
   height: 400px;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  font-size: 16px;
+  color: #666;
+}
+
+.error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  color: #ff4d4f;
+  font-size: 16px;
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
+  .parking-detail-container {
+    padding: 16px;
+  }
+
   .detail-content {
     grid-template-columns: 1fr;
   }
@@ -119,17 +130,4 @@
   .map-container {
     height: 300px;
   }
-}
-
-.loading, .error {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
-  color: #666;
-  font-size: 16px;
-}
-
-.error {
-  color: #e74c3c;
 } 
