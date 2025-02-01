@@ -91,54 +91,32 @@ router.get("/", (req, res) => {
 
 // 获取附近的停车位
 router.get("/nearby", (req, res) => {
-  const { lat, lng, radius = 2 } = req.query; // radius in kilometers
-
-  if (!lat || !lng) {
-    return res.status(400).json({ message: "需要提供位置坐标" });
-  }
-
-  const query = `
+  // 直接复用现有的获取所有停车位的逻辑
+  const baseQuery = `
     SELECT 
       p.*,
+      u.username as owner_username,
       u.full_name as owner_full_name,
       u.phone as owner_phone
     FROM parking_spots p
     LEFT JOIN users u ON p.owner_username = u.username
     WHERE p.coordinates IS NOT NULL
-    ORDER BY p.created_at DESC
   `;
 
-  db().all(query, [], (err, spots) => {
+  db().all(baseQuery, [], (err, rows) => {
     if (err) {
-      return res.status(500).json({ message: "获取附近停车位失败" });
+      return res.status(500).json({ message: "获取停车位信息失败" });
     }
+    
+    // 验证坐标格式
+    const validSpots = rows.filter(spot => {
+      const coords = spot.coordinates.split(',');
+      return coords.length === 2 && 
+             !isNaN(coords[0]) && 
+             !isNaN(coords[1]);
+    });
 
-    // 过滤并计算距离
-    const nearbySpots = spots
-      .map(spot => {
-        if (!spot.coordinates) return null;
-        const [spotLat, spotLng] = spot.coordinates.split(',').map(Number);
-        
-        // 使用 Haversine 公式计算距离
-        const R = 6371; // 地球半径（公里）
-        const dLat = (spotLat - lat) * Math.PI / 180;
-        const dLng = (spotLng - lng) * Math.PI / 180;
-        const a = 
-          Math.sin(dLat/2) * Math.sin(dLat/2) +
-          Math.cos(lat * Math.PI / 180) * Math.cos(spotLat * Math.PI / 180) * 
-          Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c;
-
-        return {
-          ...spot,
-          distance: distance.toFixed(2)
-        };
-      })
-      .filter(spot => spot && spot.distance <= radius)
-      .sort((a, b) => a.distance - b.distance);
-
-    res.json(nearbySpots);
+    res.json(validSpots);
   });
 });
 
@@ -268,6 +246,168 @@ router.delete("/:id", (req, res) => {
       }
 
       res.json({ message: "停车位删除成功" });
+    }
+  );
+});
+
+// 开始使用停车场
+router.post("/:id/start", (req, res) => {
+  const { id } = req.params;
+  const { user_id } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: "用户ID不能为空" });
+  }
+
+  db().serialize(() => {
+    // 检查停车场状态
+    db().get(
+      "SELECT * FROM parking_spots WHERE id = ? AND status = 'available'",
+      [id],
+      (err, spot) => {
+        if (err) {
+          return res.status(500).json({ message: "查询停车场状态失败" });
+        }
+
+        if (!spot) {
+          return res.status(400).json({ message: "停车场不可用" });
+        }
+
+        // 开启事务
+        db().run("BEGIN TRANSACTION");
+
+        // 更新停车场状态
+        db().run(
+          "UPDATE parking_spots SET status = 'in_use', current_user_id = ? WHERE id = ?",
+          [user_id, id],
+          (err) => {
+            if (err) {
+              db().run("ROLLBACK");
+              return res.status(500).json({ message: "更新停车场状态失败" });
+            }
+
+            // 创建使用记录
+            db().run(
+              `INSERT INTO parking_usage (
+                parking_spot_id, user_id, start_time, status
+              ) VALUES (?, ?, DATETIME('now'), 'active')`,
+              [id, user_id],
+              function(err) {
+                if (err) {
+                  db().run("ROLLBACK");
+                  return res.status(500).json({ message: "创建使用记录失败" });
+                }
+
+                db().run("COMMIT");
+                res.json({
+                  message: "停车场使用开始",
+                  usage_id: this.lastID
+                });
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
+
+// 结束使用停车场
+router.post("/:id/end", (req, res) => {
+  const { id } = req.params;
+  const { user_id } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: "用户ID不能为空" });
+  }
+
+  db().serialize(() => {
+    // 检查停车场状态和使用记录
+    db().get(
+      `SELECT u.*, p.hourly_rate 
+       FROM parking_usage u
+       JOIN parking_spots p ON u.parking_spot_id = p.id
+       WHERE p.id = ? AND u.user_id = ? AND u.status = 'active'
+       ORDER BY u.start_time DESC LIMIT 1`,
+      [id, user_id],
+      (err, usage) => {
+        if (err) {
+          return res.status(500).json({ message: "查询使用记录失败" });
+        }
+
+        if (!usage) {
+          return res.status(400).json({ message: "未找到有效的使用记录" });
+        }
+
+        // 计算费用
+        const start = new Date(usage.start_time);
+        const end = new Date();
+        const hours = (end - start) / (1000 * 60 * 60); // 转换为小时
+        const total_amount = Math.ceil(hours * usage.hourly_rate); // 向上取整
+
+        // 开启事务
+        db().run("BEGIN TRANSACTION");
+
+        // 更新使用记录
+        db().run(
+          `UPDATE parking_usage 
+           SET end_time = DATETIME('now'), 
+               total_amount = ?,
+               status = 'completed'
+           WHERE id = ?`,
+          [total_amount, usage.id],
+          (err) => {
+            if (err) {
+              db().run("ROLLBACK");
+              return res.status(500).json({ message: "更新使用记录失败" });
+            }
+
+            // 更新停车场状态
+            db().run(
+              "UPDATE parking_spots SET status = 'available', current_user_id = NULL WHERE id = ?",
+              [id],
+              (err) => {
+                if (err) {
+                  db().run("ROLLBACK");
+                  return res.status(500).json({ message: "更新停车场状态失败" });
+                }
+
+                db().run("COMMIT");
+                res.json({
+                  message: "停车场使用结束",
+                  total_amount,
+                  usage_id: usage.id
+                });
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
+
+// 支付停车费用
+router.post("/:id/payment", (req, res) => {
+  const { usage_id } = req.body;
+
+  if (!usage_id) {
+    return res.status(400).json({ message: "使用记录ID不能为空" });
+  }
+
+  db().run(
+    "UPDATE parking_usage SET payment_status = 'paid' WHERE id = ?",
+    [usage_id],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ message: "更新支付状态失败" });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ message: "未找到使用记录" });
+      }
+
+      res.json({ message: "支付成功" });
     }
   );
 });

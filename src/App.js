@@ -11,6 +11,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import ParkingSpotForm from "./components/ParkingSpotForm";
 import Header from './components/Header';
 import ParkingDetail from './components/ParkingDetail';
+import ParkingUsage from './components/ParkingUsage';
 import { searchParking } from "./services/parkingService";
 import ParkingSearch from "./components/ParkingSearch";
 import AdminLogin from './components/admin/AdminLogin';
@@ -63,6 +64,7 @@ function App() {
                 <Route path="/auth" element={<Auth />}/>
                 <Route path="/publish" element={<ParkingSpotForm />} />
                 <Route path="/parking/:id" element={<ParkingDetail />} />
+                <Route path="/parking/:id/use" element={<ParkingUsage />} />
                 <Route path="/search" element={<ParkingSearch />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
