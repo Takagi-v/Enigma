@@ -1,20 +1,48 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./styles/Map.css";
 import config from '../config';
-import { Input } from 'antd';
+import { Input, Drawer, Select, Card, Empty, Spin } from 'antd';
 
 const { Search } = Input;
+const { Option } = Select;
+
+// 错误边界组件
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('地图组件错误:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="map-error">地图加载失败，请刷新页面重试</div>;
+    }
+    return this.props.children;
+  }
+}
 
 function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch = false }) {
+  const navigate = useNavigate();
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  const localSearchRef = useRef(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [parkingSpots, setParkingSpots] = useState([]);
-  const [searchResults, setSearchResults] = useState([]);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [sortType, setSortType] = useState('distance');
+  const [nearbySpots, setNearbySpots] = useState([]);
+  const [spotsLoading, setSpotsLoading] = useState(false);
 
   // 确保百度地图 API 已加载
   useEffect(() => {
@@ -134,10 +162,6 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     try {
       // 确保地图容器有正确的尺寸
       const container = mapRef.current;
-      if (container.offsetHeight === 0) {
-        container.style.height = '400px';
-      }
-
       // 如果已经有地图实例，先销毁
       if (mapInstanceRef.current) {
         mapInstanceRef.current.clearOverlays();
@@ -227,40 +251,6 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         }
       }
 
-      // 初始化地点搜索服务
-      localSearchRef.current = new window.BMap.LocalSearch(map, {
-        onSearchComplete: (results) => {
-          if (results && results.getNumPois()) {
-            const searchPois = [];
-            for (let i = 0; i < results.getCurrentNumPois(); i++) {
-              const poi = results.getPoi(i);
-              searchPois.push({
-                location: poi.title,
-                coordinates: `${poi.point.lat},${poi.point.lng}`,
-                address: poi.address
-              });
-            }
-            setSearchResults(searchPois);
-            
-            // 获取第一个结果的位置并搜索附近停车位
-            const firstPoi = results.getPoi(0);
-            if (firstPoi) {
-              searchNearbyParkingSpots(firstPoi.point.lat, firstPoi.point.lng);
-            }
-          }
-        },
-        renderOptions: {
-          map: map,
-          autoViewport: true,
-          selectFirstResult: true
-        }
-      });
-
-      // 强制重新计算地图大小
-      setTimeout(() => {
-        map.setCenter(map.getCenter());
-      }, 0);
-
     } catch (err) {
       console.error('地图初始化错误:', err);
       setError('地图加载失败，请刷新重试');
@@ -279,21 +269,222 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   // 搜索附近停车位
   const searchNearbyParkingSpots = async (lat, lng) => {
     try {
-      const response = await fetch(`${config.API_URL}/parking/nearby?lat=${lat}&lng=${lng}&radius=2`);
-      const spots = await response.json();
-      setParkingSpots(spots);
+      setSpotsLoading(true);
+      setDrawerVisible(true); // 立即显示抽屉，不等待数据
+      
+      // 检查 parkingSpots 是否有效
+      if (!Array.isArray(parkingSpots)) {
+        console.error('停车位数据无效:', parkingSpots);
+        setNearbySpots([]);
+        return;
+      }
+
+      // 使用已有的 parkingSpots 数据
+      const spotsWithDistance = parkingSpots
+        .filter(spot => spot && typeof spot === 'object') // 确保每个spot是有效的对象
+        .map(spot => {
+          try {
+            if (!spot.coordinates || typeof spot.coordinates !== 'string') {
+              console.log('无效的坐标数据:', spot);
+              return null;
+            }
+
+            const coords = spot.coordinates.split(',');
+            if (coords.length !== 2) {
+              console.log('坐标格式错误:', spot.coordinates);
+              return null;
+            }
+
+            const [spotLat, spotLng] = coords.map(coord => parseFloat(coord.trim()));
+            
+            if (isNaN(spotLat) || isNaN(spotLng)) {
+              console.log('无效的坐标值:', spot.coordinates);
+              return null;
+            }
+
+            // 使用 Haversine 公式计算距离
+            const R = 6371; // 地球半径（公里）
+            const dLat = (spotLat - parseFloat(lat)) * Math.PI / 180;
+            const dLng = (spotLng - parseFloat(lng)) * Math.PI / 180;
+            const a = 
+              Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(parseFloat(lat) * Math.PI / 180) * Math.cos(spotLat * Math.PI / 180) * 
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c;
+
+            return {
+              ...spot,
+              distance: parseFloat(distance.toFixed(2))
+            };
+          } catch (error) {
+            console.error('处理停车位数据错误:', error);
+            return null;
+          }
+        })
+        .filter(spot => spot !== null)
+        .sort((a, b) => {
+          try {
+            switch(sortType) {
+              case 'price':
+                return parseFloat(a.price || 0) - parseFloat(b.price || 0);
+              case 'name':
+                return (a.location || '').localeCompare(b.location || '');
+              case 'distance':
+              default:
+                return (a.distance || 0) - (b.distance || 0);
+            }
+          } catch (error) {
+            console.error('排序错误:', error);
+            return 0;
+          }
+        });
+
+      console.log('处理后的数据:', spotsWithDistance);
+      setNearbySpots(spotsWithDistance);
     } catch (error) {
-      console.error('获取附近停车位失败:', error);
+      console.error('处理停车位数据失败:', error);
+      setNearbySpots([]); // 确保在错误情况下也设置为空数组
+    } finally {
+      setSpotsLoading(false);
     }
   };
 
-  // 处理地点搜索
-  const handleSearch = (value) => {
-    if (!value) return;
-    if (localSearchRef.current) {
-      localSearchRef.current.search(value);
-    }
+  // 处理排序方式变更
+  const handleSortChange = (value) => {
+    setSortType(value);
+    // 重新排序现有数据
+    setNearbySpots(prevSpots => {
+      if (!Array.isArray(prevSpots)) return [];
+      
+      return [...prevSpots].sort((a, b) => {
+        try {
+          switch(value) {
+            case 'price':
+              return parseFloat(a.price || 0) - parseFloat(b.price || 0);
+            case 'name':
+              return (a.location || '').localeCompare(b.location || '');
+            case 'distance':
+            default:
+              return (a.distance || 0) - (b.distance || 0);
+          }
+        } catch (error) {
+          console.error('排序错误:', error);
+          return 0;
+        }
+      });
+    });
   };
+
+  // 处理停车位点击
+  const handleSpotClick = (spotId) => {
+    navigate(`/parking/${spotId}`);
+  };
+
+  useEffect(() => {
+    console.log('Drawer 可见性状态:', drawerVisible);
+  }, [drawerVisible]);
+
+  // 渲染停车位列表
+  const renderParkingSpots = () => {
+    console.log('渲染停车位列表:', nearbySpots);
+    if (spotsLoading) {
+      return (
+        <div className="spots-loading">
+          <Spin size="large" />
+        </div>
+      );
+    }
+
+    if (!nearbySpots.length) {
+      return (
+        <Empty 
+          description="附近10公里内暂无停车位" 
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
+      );
+    }
+
+    return nearbySpots.map((spot) => (
+      <Card 
+        key={spot.id}
+        className="parking-spot-card"
+        onClick={() => handleSpotClick(spot.id)}
+      >
+        <h3>{spot.location}</h3>
+        <p>价格: ¥{spot.price}/小时</p>
+        <p>距离: {spot.distance}公里</p>
+        <p>联系方式: {spot.contact}</p>
+      </Card>
+    ));
+  };
+
+  // 包装返回的 JSX 使用错误边界
+  const content = (
+    <div className="fullscreen-map-container">
+      {!hideSearch && (
+        <div className="map-search">
+          <Search
+            placeholder="搜索地点（如：万达广场）"
+            allowClear
+            enterButton="搜索"
+            size="large"
+            style={{ width: '100%', marginBottom: '10px' }}
+            onSearch={value => {
+              if (!value) return;
+              const localSearch = new window.BMap.LocalSearch(mapInstanceRef.current, {
+                onSearchComplete: results => {
+                  if (!results?.getCurrentNumPois()) return;
+                  
+                  const poi = results.getPoi(0);
+                  if (!poi?.point) return;
+
+                  // 更新地图
+                  mapInstanceRef.current.clearOverlays();
+                  mapInstanceRef.current.centerAndZoom(poi.point, 16);
+                  mapInstanceRef.current.addOverlay(new window.BMap.Marker(poi.point));
+
+                  // 搜索附近停车位
+                  searchNearbyParkingSpots(poi.point.lat, poi.point.lng);
+                }
+              });
+              localSearch.search(value);
+            }}
+          />
+        </div>
+      )}
+      <div className="map-wrapper">
+        <div ref={mapRef} className="map" />
+      </div>
+      
+      <Drawer
+        title={
+          <div className="drawer-header">
+            <span>附近停车位</span>
+            <Select
+              value={sortType}
+              style={{ width: 120 }}
+              onChange={handleSortChange}
+            >
+              <Option value="distance">按距离排序</Option>
+              <Option value="price">按价格排序</Option>
+              <Option value="name">按名称排序</Option>
+            </Select>
+          </div>
+        }
+        placement="bottom"
+        height={400}
+        onClose={() => setDrawerVisible(false)}
+        open={drawerVisible}
+        className="parking-spots-drawer"
+        destroyOnClose={true}
+      >
+        <div className="parking-spots-list">
+          {renderParkingSpots()}
+        </div>
+      </Drawer>
+    </div>
+  );
 
   if (loading) {
     return <div className="map-loading">正在加载地图...</div>;
@@ -303,32 +494,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     return <div className="map-error">{error}</div>;
   }
 
-  return (
-    <div className="map-container">
-      {!hideSearch && (
-        <div className="map-search">
-          <Search
-            placeholder="搜索地点（如：万达广场）"
-            allowClear
-            enterButton="搜索"
-            size="large"
-            onSearch={handleSearch}
-            style={{ width: '100%', marginBottom: '10px' }}
-          />
-        </div>
-      )}
-      <div className="map-wrapper">
-        <div ref={mapRef} className="map" />
-        {mode === "select" && selectedLocation && (
-          <div className="location-info">
-            <h3>选中的位置</h3>
-            <p>纬度: {selectedLocation.lat}</p>
-            <p>经度: {selectedLocation.lng}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <ErrorBoundary>{content}</ErrorBoundary>;
 }
 
 export default Map;

@@ -53,6 +53,21 @@ function ParkingDetail() {
           <div className="info-section">
             <div className="price-section">
               <h2 className="price">¥{parkingSpot.price}/小时</h2>
+              <div className="status-section">
+                <span className={`status ${parkingSpot.status}`}>
+                  {parkingSpot.status === 'available' ? '空闲' : '使用中'}
+                </span>
+                {parkingSpot.status === 'available' && (
+                  <Button
+                    type="primary"
+                    size="large"
+                    className="use-button"
+                    onClick={() => navigate(`/parking/${id}/use`)}
+                  >
+                    立即使用
+                  </Button>
+                )}
+              </div>
             </div>
             
             <div className="info-items">
