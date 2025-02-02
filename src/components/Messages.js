@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import "./styles/Messages.css";
 import config from '../config';
 
 function Messages() {
+  const { user, authFetch } = useAuth();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const wsRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const navigate = useNavigate();
 
   const [username, setUsername] = useState(() => {
@@ -65,56 +68,61 @@ function Messages() {
     };
   }, []);
 
-  // 获取历史消息
   useEffect(() => {
-    let mounted = true;
-
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch(`${config.API_URL}/messages`);
-        if (!response.ok) throw new Error("获取消息失败");
-        const data = await response.json();
-        if (mounted) {
-          setMessages(data);
-          setIsLoading(false);
-        }
-      } catch (error) {
-        if (mounted) {
-          setError(error.message);
-          setIsLoading(false);
-        }
-      }
-    };
-
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
     fetchMessages();
+    const interval = setInterval(fetchMessages, 5000);
+    return () => clearInterval(interval);
+  }, [user, navigate]);
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const fetchMessages = async () => {
+    try {
+      const response = await authFetch(`${config.API_URL}/messages`);
+      if (!response.ok) {
+        throw new Error('获取消息失败');
+      }
+      const data = await response.json();
+      setMessages(data.messages);
+      setLoading(false);
+      scrollToBottom();
+    } catch (error) {
+      console.error('获取消息失败:', error);
+    }
+  };
 
-  // 发送消息
-  const sendMessage = async () => {
-    if (!newMessage.trim()) return;
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !user) return;
 
     try {
-      const response = await fetch(`${config.API_URL}/messages`, {
-        method: "POST",
+      const response = await authFetch(`${config.API_URL}/messages`, {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          sender_username: username,
-          receiver_username: "admin",
-          content: newMessage.trim(),
-        }),
+          content: newMessage,
+          sender: user.username
+        })
       });
 
-      if (!response.ok) throw new Error("发送失败");
-      setNewMessage("");
+      if (!response.ok) {
+        throw new Error('发送消息失败');
+      }
+
+      setNewMessage('');
+      await fetchMessages();
     } catch (error) {
-      setError(error.message);
+      console.error('发送消息失败:', error);
+      alert('发送消息失败，请重试');
     }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleLogout = () => {
@@ -125,7 +133,7 @@ function Messages() {
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      handleSend(e);
     }
   };
 
@@ -136,8 +144,12 @@ function Messages() {
     setNewMessage(e.target.value);
   };
 
-  if (isLoading) return <div className="loading">加载中...</div>;
+  if (loading) return <div className="loading">加载中...</div>;
   if (error) return <div className="error">错误: {error}</div>;
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="chat-container">
@@ -163,18 +175,21 @@ function Messages() {
               </small>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
         <div className="send-message">
-          <textarea
-            value={newMessage}
-            onChange={handleInput}
-            onKeyPress={handleKeyPress}
-            placeholder="输入消息..."
-            className="message-input"
-          />
-          <button onClick={sendMessage} className="send-button">
-            发送
-          </button>
+          <form onSubmit={handleSend} className="message-form">
+            <textarea
+              value={newMessage}
+              onChange={handleInput}
+              onKeyPress={handleKeyPress}
+              placeholder="输入消息..."
+              className="message-input"
+            />
+            <button type="submit" disabled={!newMessage.trim()} className="send-button">
+              发送
+            </button>
+          </form>
         </div>
       </div>
     </div>

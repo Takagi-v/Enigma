@@ -80,4 +80,51 @@ export const payParking = async (parkingId, usageId) => {
     console.error('Error:', error);
     throw error;
   }
+};
+
+export const parkingService = {
+  async getParkingSpots() {
+    try {
+      const response = await fetch(`${config.API_URL}/parking-spots`, {
+        credentials: 'include'
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('获取停车位失败:', error);
+      throw error;
+    }
+  },
+
+  async reserveParkingSpot(spotId, vehiclePlate) {
+    try {
+      const response = await fetch(`${config.API_URL}/parking-spots/${spotId}/reserve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ vehicle_plate: vehiclePlate })
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('预约停车位失败:', error);
+      throw error;
+    }
+  },
+
+  async endParking(spotId) {
+    try {
+      const response = await fetch(`${config.API_URL}/parking-spots/${spotId}/end`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('结束停车失败:', error);
+      throw error;
+    }
+  }
 }; 

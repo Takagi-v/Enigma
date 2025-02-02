@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { startParking, endParking, payParking } from '../services/parkingService';
+import { useAuth } from '../contexts/AuthContext';
 import config from '../config';
 import './styles/ParkingUsage.css';
 
@@ -12,46 +13,16 @@ const ParkingUsage = () => {
   const [timer, setTimer] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [userId, setUserId] = useState(null);
+  const { user, authFetch } = useAuth();
+  const [parkingRecords, setParkingRecords] = useState([]);
 
   useEffect(() => {
-    // 获取用户信息
-    const username = localStorage.getItem('username');
-    const token = localStorage.getItem('token');
-    
-    if (!username || !token) {
+    if (!user) {
       navigate('/auth');
       return;
     }
-
-    const fetchUserInfo = async () => {
-      try {
-        const response = await fetch(`${config.API_URL}/users/${username}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || '获取用户信息失败');
-        }
-        
-        const data = await response.json();
-        setUserId(data.id);
-      } catch (error) {
-        console.error('获取用户信息失败:', error);
-        if (error.message.includes('请先登录') || error.message.includes('无权访问')) {
-          navigate('/auth');
-        } else {
-          setError(error.message || '获取用户信息失败');
-        }
-      }
-    };
-
-    fetchUserInfo();
-  }, [navigate]);
+    fetchParkingRecords();
+  }, [user, navigate]);
 
   useEffect(() => {
     // 获取停车场信息
@@ -86,13 +57,13 @@ const ParkingUsage = () => {
   }, [usage]);
 
   const handleStart = async () => {
-    if (!userId) {
+    if (!user) {
       setError('用户信息未加载');
       return;
     }
 
     try {
-      const result = await startParking(id, userId);
+      const result = await startParking(id, user.id);
       setUsage({
         id: result.usage_id,
         start_time: new Date(),
@@ -104,13 +75,13 @@ const ParkingUsage = () => {
   };
 
   const handleEnd = async () => {
-    if (!userId) {
+    if (!user) {
       setError('用户信息未加载');
       return;
     }
 
     try {
-      const result = await endParking(id, userId);
+      const result = await endParking(id, user.id);
       setUsage(prev => ({
         ...prev,
         end_time: new Date(),
@@ -127,6 +98,20 @@ const ParkingUsage = () => {
       navigate('/payment-success');
     } catch (error) {
       setError('支付失败');
+    }
+  };
+
+  const fetchParkingRecords = async () => {
+    try {
+      const response = await authFetch(`${config.API_URL}/parking-spots/usage/my`);
+      if (!response.ok) {
+        throw new Error('获取停车记录失败');
+      }
+      const data = await response.json();
+      setParkingRecords(data.records || []);
+    } catch (error) {
+      console.error('获取停车记录失败:', error);
+      alert('获取停车记录失败，请重试');
     }
   };
 

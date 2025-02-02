@@ -11,6 +11,15 @@ const serverConfig = require('../config/server');
 // JWT密钥
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+// Cookie 配置
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  maxAge: 24 * 60 * 60 * 1000, // 24小时
+  path: '/'
+};
+
 // 配置文件上传
 const storage = multer.diskStorage({
   destination: async function (req, file, cb) {
@@ -128,10 +137,25 @@ router.post("/login", (req, res) => {
             { expiresIn: '24h' }
           );
 
+          // 设置 HttpOnly Cookie
+          res.cookie('token', token, COOKIE_OPTIONS);
+
+          // 返回用户信息（不包含密码）
+          const { password: _, ...userWithoutPassword } = user;
+          
           res.json({ 
             message: "登录成功",
-            username: user.username,
-            token: token
+            isAuthenticated: true,
+            user: {
+              id: user.id,
+              username: user.username,
+              fullName: user.full_name,
+              phone: user.phone,
+              avatar: user.avatar,
+              bio: user.bio,
+              address: user.address,
+              email: user.email
+            }
           });
         } else {
           res.status(401).json({ message: "用户名或密码错误" });
@@ -166,135 +190,89 @@ router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
   }
 });
 
-// Google 登录路由
-router.post("/google-login", async (req, res) => {
-  const { googleId, email, username, full_name, avatar, phone, bio, address } = req.body;
-
-  // 验证必要的字段
-  if (!googleId || !email || !username || !full_name) {
-    return res.status(400).json({ message: "缺少必要的用户信息" });
-  }
-
+// 验证登录状态的路由
+router.get('/status', async (req, res) => {
   try {
-    // 首先检查用户名是否存在
+    const token = req.cookies.token;
+    
+    if (!token) {
+      return res.status(401).json({ isAuthenticated: false });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // 从数据库获取最新的用户信息
     db().get(
-      "SELECT * FROM users WHERE username = ?",
-      [username],
-      async (err, userByUsername) => {
-        if (err) {
-          console.error('查询用户名错误:', err);
-          return res.status(500).json({ message: "查询用户信息时出错" });
+      "SELECT id, username, full_name, phone, avatar, bio, address, email FROM users WHERE id = ?",
+      [decoded.id],
+      (err, user) => {
+        if (err || !user) {
+          return res.status(401).json({ isAuthenticated: false });
         }
 
-        let user = userByUsername;
-
-        // 如果用户名不存在，检查邮箱
-        if (!user) {
-          db().get(
-            "SELECT * FROM users WHERE email = ?",
-            [email],
-            async (emailErr, userByEmail) => {
-              if (emailErr) {
-                console.error('查询邮箱错误:', emailErr);
-                return res.status(500).json({ message: "查询用户信息时出错" });
-              }
-
-              user = userByEmail;
-
-              if (!user) {
-                // 用户不存在，创建新用户
-                try {
-                  const hashedPassword = await bcrypt.hash(googleId, 10);
-                  
-                  db().run(
-                    `INSERT INTO users (
-                      username, 
-                      password, 
-                      email,
-                      full_name, 
-                      phone, 
-                      avatar, 
-                      bio, 
-                      address
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                      username,
-                      hashedPassword,
-                      email,
-                      full_name,
-                      phone || '',
-                      avatar || '',
-                      bio || `Google用户 - ${full_name}`,
-                      address || ''
-                    ],
-                    function(insertErr) {
-                      if (insertErr) {
-                        console.error('创建用户错误:', insertErr);
-                        return res.status(500).json({ message: "创建用户失败，请重试" });
-                      }
-
-                      // 生成JWT token
-                      const token = jwt.sign(
-                        { 
-                          id: this.lastID,
-                          username: username
-                        },
-                        JWT_SECRET,
-                        { expiresIn: '24h' }
-                      );
-
-                      res.json({ 
-                        message: "Google 登录成功",
-                        username: username,
-                        token: token
-                      });
-                    }
-                  );
-                } catch (hashErr) {
-                  console.error('密码加密错误:', hashErr);
-                  return res.status(500).json({ message: "用户创建过程中出错" });
-                }
-              } else {
-                // 邮箱已存在，使用现有账户
-                const token = jwt.sign(
-                  { 
-                    id: user.id,
-                    username: user.username
-                  },
-                  JWT_SECRET,
-                  { expiresIn: '24h' }
-                );
-
-                res.json({ 
-                  message: "Google 登录成功",
-                  username: user.username,
-                  token: token
-                });
-              }
-            }
-          );
-        } else {
-          // 用户名已存在，直接登录
-          const token = jwt.sign(
-            { 
-              id: user.id,
-              username: user.username
-            },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-          );
-
-          res.json({ 
-            message: "Google 登录成功",
+        res.json({
+          isAuthenticated: true,
+          user: {
+            id: user.id,
             username: user.username,
-            token: token
-          });
-        }
+            fullName: user.full_name,
+            phone: user.phone,
+            avatar: user.avatar,
+            bio: user.bio,
+            address: user.address,
+            email: user.email
+          }
+        });
       }
     );
   } catch (error) {
-    console.error('Google 登录错误:', error);
-    res.status(500).json({ message: "登录过程中出错，请重试" });
+    res.status(401).json({ isAuthenticated: false });
+  }
+});
+
+// 登出路由
+router.post('/logout', (req, res) => {
+  res.clearCookie('token', {
+    ...COOKIE_OPTIONS,
+    maxAge: 0
+  });
+  res.json({ message: '登出成功' });
+});
+
+// Token 检查路由
+router.get('/check-token', (req, res) => {
+  try {
+    const token = req.cookies.token;
+    console.log('收到的 token:', token);
+    
+    if (!token) {
+      console.log('没有收到 token');
+      return res.status(401).json({ 
+        status: 'error',
+        message: 'No token found',
+        cookiesReceived: req.cookies 
+      });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log('解码后的 token 信息:', decoded);
+
+    res.json({ 
+      status: 'success',
+      tokenInfo: {
+        userId: decoded.id,
+        username: decoded.username,
+        expiresAt: new Date(decoded.exp * 1000).toISOString()
+      },
+      cookiesReceived: req.cookies
+    });
+  } catch (error) {
+    console.error('Token 验证错误:', error);
+    res.status(401).json({ 
+      status: 'error',
+      message: error.message,
+      cookiesReceived: req.cookies 
+    });
   }
 });
 
