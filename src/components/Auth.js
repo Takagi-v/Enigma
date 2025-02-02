@@ -57,7 +57,10 @@ function Auth() {
         throw new Error(data.message || '登录失败');
       }
 
-      localStorage.setItem('username', formData.username);
+      // 保存用户信息和token
+      localStorage.setItem('username', data.username);
+      localStorage.setItem('token', data.token);
+      
       alert('登录成功！');
       navigate('/messages');
     } catch (err) {
@@ -161,7 +164,8 @@ function Auth() {
         return;
       }
 
-      localStorage.setItem('username', googleUsername);
+      localStorage.setItem('username', data.username);
+      localStorage.setItem('token', data.token);
       alert('Google 登录成功！');
       navigate('/messages');
     } catch (err) {

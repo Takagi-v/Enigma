@@ -1,11 +1,15 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const { db } = require('../models/db');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const serverConfig = require('../config/server');
+
+// JWT密钥
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -114,9 +118,20 @@ router.post("/login", (req, res) => {
       try {
         const match = await bcrypt.compare(password, user.password);
         if (match) {
+          // 生成JWT token
+          const token = jwt.sign(
+            { 
+              id: user.id,
+              username: user.username
+            },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+          );
+
           res.json({ 
             message: "登录成功",
-            username: user.username
+            username: user.username,
+            token: token
           });
         } else {
           res.status(401).json({ message: "用户名或密码错误" });
@@ -171,8 +186,10 @@ router.post("/google-login", async (req, res) => {
           return res.status(500).json({ message: "查询用户信息时出错" });
         }
 
+        let user = userByUsername;
+
         // 如果用户名不存在，检查邮箱
-        if (!userByUsername) {
+        if (!user) {
           db().get(
             "SELECT * FROM users WHERE email = ?",
             [email],
@@ -182,7 +199,9 @@ router.post("/google-login", async (req, res) => {
                 return res.status(500).json({ message: "查询用户信息时出错" });
               }
 
-              if (!userByEmail) {
+              user = userByEmail;
+
+              if (!user) {
                 // 用户不存在，创建新用户
                 try {
                   const hashedPassword = await bcrypt.hash(googleId, 10);
@@ -208,15 +227,26 @@ router.post("/google-login", async (req, res) => {
                       bio || `Google用户 - ${full_name}`,
                       address || ''
                     ],
-                    (insertErr) => {
+                    function(insertErr) {
                       if (insertErr) {
                         console.error('创建用户错误:', insertErr);
                         return res.status(500).json({ message: "创建用户失败，请重试" });
                       }
 
+                      // 生成JWT token
+                      const token = jwt.sign(
+                        { 
+                          id: this.lastID,
+                          username: username
+                        },
+                        JWT_SECRET,
+                        { expiresIn: '24h' }
+                      );
+
                       res.json({ 
                         message: "Google 登录成功",
-                        username: username
+                        username: username,
+                        token: token
                       });
                     }
                   );
@@ -226,18 +256,38 @@ router.post("/google-login", async (req, res) => {
                 }
               } else {
                 // 邮箱已存在，使用现有账户
+                const token = jwt.sign(
+                  { 
+                    id: user.id,
+                    username: user.username
+                  },
+                  JWT_SECRET,
+                  { expiresIn: '24h' }
+                );
+
                 res.json({ 
                   message: "Google 登录成功",
-                  username: userByEmail.username
+                  username: user.username,
+                  token: token
                 });
               }
             }
           );
         } else {
           // 用户名已存在，直接登录
+          const token = jwt.sign(
+            { 
+              id: user.id,
+              username: user.username
+            },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+          );
+
           res.json({ 
             message: "Google 登录成功",
-            username: userByUsername.username
+            username: user.username,
+            token: token
           });
         }
       }
