@@ -412,4 +412,61 @@ router.post("/:id/payment", (req, res) => {
   );
 });
 
+// 获取用户的停车记录
+router.get("/usage/my", (req, res) => {
+  const user_id = req.user?.id; // 假设通过认证中间件获取用户ID
+
+  if (!user_id) {
+    return res.status(401).json({ message: "请先登录" });
+  }
+
+  const query = `
+    SELECT 
+      u.*,
+      p.location,
+      p.hourly_rate,
+      p.owner_username,
+      owner.full_name as owner_full_name,
+      owner.phone as owner_phone
+    FROM parking_usage u
+    JOIN parking_spots p ON u.parking_spot_id = p.id
+    LEFT JOIN users owner ON p.owner_username = owner.username
+    WHERE u.user_id = ?
+    ORDER BY u.created_at DESC
+  `;
+
+  db().all(query, [user_id], (err, records) => {
+    if (err) {
+      console.error("获取停车记录失败:", err);
+      return res.status(500).json({ message: "获取停车记录失败" });
+    }
+
+    res.json({
+      records: records.map(record => ({
+        id: record.id,
+        parking_spot_id: record.parking_spot_id,
+        location: record.location,
+        start_time: record.start_time,
+        end_time: record.end_time,
+        total_amount: record.total_amount,
+        payment_status: record.payment_status,
+        status: record.status,
+        hourly_rate: record.hourly_rate,
+        owner_full_name: record.owner_full_name,
+        owner_phone: record.owner_phone,
+        vehicle_plate: record.vehicle_plate,
+        vehicle_type: record.vehicle_type,
+        payment_method: record.payment_method,
+        payment_time: record.payment_time,
+        transaction_id: record.transaction_id,
+        rating: record.rating,
+        review_comment: record.review_comment,
+        review_time: record.review_time,
+        created_at: record.created_at,
+        updated_at: record.updated_at
+      }))
+    });
+  });
+});
+
 module.exports = router; 
