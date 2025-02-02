@@ -1,79 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './styles/Profile.css';
 import defaultAvatar from '../images/default-avatar.jpg'; // 请确保有默认头像图片
 import config from '../config';
 
 function Profile() {
-  const [userInfo, setUserInfo] = useState(null);
+  const { user, authFetch } = useAuth();
   const [parkingRecords, setParkingRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const username = localStorage.getItem('username');
 
   useEffect(() => {
-    if (!username) {
-      alert('请先登录');
+    if (!user) {
       navigate('/auth');
       return;
     }
 
-    fetchUserInfo();
     fetchParkingRecords();
-  }, [username, navigate]);
-
-  const fetchUserInfo = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.error('未找到登录令牌');
-      alert('请重新登录');
-      navigate('/auth');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${config.API_URL}/users/${username}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '获取用户信息失败');
-      }
-
-      const data = await response.json();
-      setUserInfo(data);
-    } catch (error) {
-      console.error('获取用户信息失败:', error);
-      if (error.message.includes('请先登录') || error.message.includes('无权访问')) {
-        navigate('/auth');
-      } else {
-        alert(error.message || '获取用户信息失败');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user, navigate]);
 
   const fetchParkingRecords = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.error('未找到登录令牌');
-      alert('请重新登录');
-      navigate('/auth');
-      return;
-    }
+    if (!user) return;
 
     try {
-      const response = await fetch(`${config.API_URL}/parking-spots/usage/my`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await authFetch(`${config.API_URL}/parking-spots/usage/my`);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -85,6 +36,8 @@ function Profile() {
     } catch (error) {
       console.error('获取停车记录失败:', error);
       alert(error.message || '获取停车记录失败，请重试');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -118,7 +71,7 @@ function Profile() {
     return <div className="loading">加载中...</div>;
   }
 
-  if (!userInfo) {
+  if (!user) {
     return null;
   }
 
@@ -126,33 +79,33 @@ function Profile() {
     <div className="profile-container">
       <div className="profile-left">
         <img
-          src={userInfo.avatar || defaultAvatar}
-          alt={userInfo.username}
+          src={user.avatar || defaultAvatar}
+          alt={user.username}
           className="profile-avatar"
         />
       </div>
       <div className="profile-right">
-        <h1 className="profile-name">{userInfo.full_name}</h1>
-        <p className="profile-username">@{userInfo.username}</p>
-        {userInfo.address && (
-          <p className="profile-location">{userInfo.address}</p>
+        <h1 className="profile-name">{user.fullName}</h1>
+        <p className="profile-username">@{user.username}</p>
+        {user.address && (
+          <p className="profile-location">{user.address}</p>
         )}
         
         <div className="profile-info">
           <div className="info-section">
             <h3>个人简介</h3>
-            <p>{userInfo.bio}</p>
+            <p>{user.bio}</p>
           </div>
 
           <div className="info-section">
             <h3>联系方式</h3>
-            <p>电话：{userInfo.phone}</p>
-            <p>用户ID：{userInfo.id}</p>
+            <p>电话：{user.phone}</p>
+            <p>用户ID：{user.id}</p>
           </div>
 
           <button 
             className="edit-profile-btn"
-            onClick={() => navigate('/edit-profile')} // 需要创建编辑页面
+            onClick={() => navigate('/edit-profile')}
           >
             编辑资料
           </button>

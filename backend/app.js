@@ -1,10 +1,13 @@
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 
-app.use(cors());
+// 解析 cookies
+app.use(cookieParser());
+
+// 解析 JSON 请求体
 app.use(express.json());
 
 // 添加静态文件服务

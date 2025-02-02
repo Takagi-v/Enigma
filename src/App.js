@@ -6,8 +6,7 @@ import Profile from "./components/Profile";
 import Messages from "./components/Messages";
 import Sidebar from "./components/Sidebar";
 import Auth from "./components/Auth";
-import Map from "./components/Map"; // 导入新的 Map 组件
-import { GoogleOAuthProvider } from '@react-oauth/google';
+import Map from "./components/Map";
 import ParkingSpotForm from "./components/ParkingSpotForm";
 import Header from './components/Header';
 import ParkingDetail from './components/ParkingDetail';
@@ -16,6 +15,8 @@ import { searchParking } from "./services/parkingService";
 import ParkingSearch from "./components/ParkingSearch";
 import AdminLogin from './components/admin/AdminLogin';
 import AdminDashboard from './components/admin/AdminDashboard';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -50,29 +51,33 @@ function App() {
   const [token, setToken] = useState(null);
   
   return (
-    <GoogleOAuthProvider clientId="860966856382-u3nj7061n56h23agj3mvi0ntg72f13nn.apps.googleusercontent.com">
-        <Router>
-          <div className="App">
-            <Header />
-            <Sidebar />
-            <main className="content">
-              <Routes>
-                <Route path="/" element={<Map />} />
-                <Route path="/parking-lots" element={<Home />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/messages" element={<Messages token={token} />} />
-                <Route path="/auth" element={<Auth />}/>
-                <Route path="/publish" element={<ParkingSpotForm />} />
-                <Route path="/parking/:id" element={<ParkingDetail />} />
-                <Route path="/parking/:id/use" element={<ParkingUsage />} />
-                <Route path="/search" element={<ParkingSearch />} />
-                <Route path="/admin/login" element={<AdminLogin />} />
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              </Routes>
-            </main>
-          </div>
-        </Router>
-    </GoogleOAuthProvider>
+    <AuthProvider>
+      <Router>
+        <div className="App">
+          <Header />
+          <Sidebar />
+          <main className="content">
+            <Routes>
+              <Route path="/" element={<Map />} />
+              <Route path="/parking-lots" element={<Home />} />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/messages" element={<Messages token={token} />} />
+              <Route path="/auth" element={<Auth />}/>
+              <Route path="/publish" element={<ParkingSpotForm />} />
+              <Route path="/parking/:id" element={<ParkingDetail />} />
+              <Route path="/parking/:id/use" element={<ParkingUsage />} />
+              <Route path="/search" element={<ParkingSearch />} />
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            </Routes>
+          </main>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 

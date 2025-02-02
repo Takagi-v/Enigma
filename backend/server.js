@@ -5,6 +5,7 @@ const cors = require("cors");
 const WebSocket = require("ws");
 const path = require("path");
 const fs = require('fs');
+const cookieParser = require('cookie-parser');
 
 // 导入配置
 const serverConfig = require('./config/server');
@@ -22,12 +23,29 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// CORS 配置
+const corsOptions = {
+  origin: 'http://localhost:5050',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Allow-Headers',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 200
+};
+
 // 中间件配置
 app.use(bodyParser.json());
-app.use(cors({
-  origin: serverConfig.corsOrigin,
-  credentials: true,
-}));
+app.use(cors(corsOptions));
+app.use(cookieParser());
 
 // 静态文件服务 - 移到API路由之前
 app.use('/uploads', express.static(serverConfig.uploadDir));

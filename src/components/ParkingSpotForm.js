@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './styles/ParkingSpotForm.css';
 import Map from './Map';
 import config from '../config';
 
 function ParkingSpotForm() {
+  const { user, authFetch } = useAuth();
   const navigate = useNavigate();
-  const username = localStorage.getItem('username');
   const [formData, setFormData] = useState({
     location: '',
-    price: '',
-    contact: '',
-    coordinates: '',
+    status: 'available',
+    hourly_rate: '',
     description: ''
   });
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -26,31 +26,29 @@ function ParkingSpotForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedLocation) {
-      alert('请在地图上选择停车位位置！');
+    if (!user) {
+      navigate('/auth');
       return;
     }
 
     try {
-      const response = await fetch(`${config.API_URL}/parking-spots`, {
+      const response = await authFetch(`${config.API_URL}/parking-spots`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          ...formData,
-          owner_username: username
-        }),
+        body: JSON.stringify(formData)
       });
 
-      if (response.ok) {
-        alert('停车位发布成功！');
-        navigate('/');
-      } else {
-        throw new Error('发布失败');
+      if (!response.ok) {
+        throw new Error('创建停车位失败');
       }
+
+      alert('停车位创建成功！');
+      navigate('/parking-spots');
     } catch (error) {
-      alert('发布失败：' + error.message);
+      console.error('创建停车位失败:', error);
+      alert(error.message || '创建停车位失败，请重试');
     }
   };
 
@@ -86,24 +84,12 @@ function ParkingSpotForm() {
             <label>价格（元/小时）</label>
             <input
               type="number"
-              name="price"
-              value={formData.price}
+              name="hourly_rate"
+              value={formData.hourly_rate}
               onChange={handleChange}
               required
               min="0"
               step="0.1"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>联系方式</label>
-            <input
-              type="text"
-              name="contact"
-              value={formData.contact}
-              onChange={handleChange}
-              required
-              placeholder="请输入您的联系方式"
             />
           </div>
 

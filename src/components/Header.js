@@ -1,29 +1,37 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './styles/Header.css';
 
 function Header() {
-  const username = localStorage.getItem('username');
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem('username');
+  const handleLogout = async () => {
+    await logout();
     navigate('/auth');
   };
 
   return (
-    <div className="header">
-      <div className="user-controls">
-        {username ? (
-          <div className="user-info">
-            <span>{username}</span>
-            <button onClick={handleLogout}>退出</button>
-          </div>
-        ) : (
-          <Link to="/auth" className="auth-link">登录/注册</Link>
-        )}
+    <header className="header">
+      <div className="logo">
+        <Link to="/">智慧停车</Link>
       </div>
-    </div>
+      <nav className="nav-links">
+        <Link to="/parking-spots">停车位</Link>
+        {user ? (
+          <>
+            <Link to="/profile">个人中心</Link>
+            <Link to="/messages">消息</Link>
+            <button onClick={handleLogout} className="logout-btn">
+              登出
+            </button>
+          </>
+        ) : (
+          <Link to="/auth">登录</Link>
+        )}
+      </nav>
+    </header>
   );
 }
 

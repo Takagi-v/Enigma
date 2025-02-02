@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { GoogleLogin } from '@react-oauth/google';
-import { jwtDecode } from 'jwt-decode';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import './styles/Auth.css';
 import config from '../config';
+import { useAuth } from '../contexts/AuthContext';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
 
 function Auth() {
+  const { setUser, login, authFetch } = useAuth();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/profile';
   const [isLogin, setIsLogin] = useState(true);
   const [registrationStep, setRegistrationStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -40,29 +42,31 @@ function Auth() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${config.API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          password: formData.password
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || '登录失败');
-      }
-
-      // 保存用户信息和token
-      localStorage.setItem('username', data.username);
-      localStorage.setItem('token', data.token);
+      console.log('开始登录请求');
+      const response = await login(formData.username, formData.password);
+      console.log('登录响应:', response);
       
-      alert('登录成功！');
-      navigate('/messages');
+      // 获取并打印当前的 cookie
+      console.log('当前 document.cookie:', document.cookie);
+      
+      if (response.user) {
+        // 添加延迟检查
+        setTimeout(async () => {
+          const checkResponse = await fetch(`${config.API_URL}/auth/check-token`, {
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          const checkData = await checkResponse.json();
+          console.log('Token 检查结果:', checkData);
+        }, 1000);
+
+        alert('登录成功！');
+        navigate(from);
+      } else {
+        throw new Error('登录失败：未收到用户信息');
+      }
     } catch (err) {
       setError(err.message || '登录失败，请重试');
     } finally {
@@ -120,57 +124,6 @@ function Auth() {
       setError(err.message || '注册失败，请重试');
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleGoogleSuccess = async (credentialResponse) => {
-    try {
-      const decoded = jwtDecode(credentialResponse.credential);
-      const googleUsername = decoded.email.split('@')[0];
-      
-      const response = await fetch(`${config.API_URL}/auth/google-login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          googleId: decoded.sub,
-          email: decoded.email,
-          username: googleUsername,
-          full_name: decoded.name,
-          avatar: decoded.picture,
-          phone: '',
-          bio: `Google用户 - ${decoded.name}`,
-          address: ''
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Google 登录失败');
-      }
-
-      if (data.needsRegistration) {
-        setFormData(prev => ({
-          ...prev,
-          username: googleUsername,
-          fullName: decoded.name,
-          avatar: decoded.picture,
-          bio: `Google用户 - ${decoded.name}`
-        }));
-        setIsLogin(false);
-        setRegistrationStep(2);
-        return;
-      }
-
-      localStorage.setItem('username', data.username);
-      localStorage.setItem('token', data.token);
-      alert('Google 登录成功！');
-      navigate('/messages');
-    } catch (err) {
-      console.error('Google login error:', err);
-      setError(err.message || 'Google 登录失败');
     }
   };
 
@@ -358,24 +311,6 @@ function Auth() {
             onClick={() => setRegistrationStep(prev => prev - 1)}
             className="back-button"
           />
-        )}
-
-        {registrationStep === 1 && (
-          <>
-            <div className="divider">
-              <span>或</span>
-            </div>
-
-            <div className="google-login-container">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={() => setError('Google 登录失败，请重试')}
-                text="继续使用 Google"
-                shape="rectangular"
-                locale="zh_CN"
-              />
-            </div>
-          </>
         )}
 
         <p className="switch-mode">
