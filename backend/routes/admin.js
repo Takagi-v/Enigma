@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const router = express.Router();
 const { db } = require('../models/db');
+const { authenticateAdmin } = require('../middleware/auth');
 
 // 管理员登录
 router.post("/login", (req, res) => {
@@ -46,8 +47,43 @@ router.post("/login", (req, res) => {
   );
 });
 
+// 获取管理员统计信息
+router.get("/stats", authenticateAdmin, (req, res) => {
+  Promise.all([
+    new Promise((resolve, reject) => {
+      db().get("SELECT COUNT(*) as total FROM users", [], (err, result) => {
+        if (err) reject(err);
+        else resolve(result.total);
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db().get("SELECT COUNT(*) as total FROM parking_spots", [], (err, result) => {
+        if (err) reject(err);
+        else resolve(result.total);
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db().get("SELECT COUNT(*) as total FROM parking_usage", [], (err, result) => {
+        if (err) reject(err);
+        else resolve(result.total);
+      });
+    })
+  ])
+  .then(([userCount, spotCount, usageCount]) => {
+    res.json({
+      users: userCount,
+      spots: spotCount,
+      usages: usageCount
+    });
+  })
+  .catch(err => {
+    console.error('获取统计信息失败:', err);
+    res.status(500).json({ message: "获取统计信息失败" });
+  });
+});
+
 // 获取所有用户信息
-router.get("/users", (req, res) => {
+router.get("/users", authenticateAdmin, (req, res) => {
   db().all(
     "SELECT id, username, full_name, phone, avatar, bio, address, created_at FROM users",
     [],
@@ -60,28 +96,8 @@ router.get("/users", (req, res) => {
   );
 });
 
-// 获取所有停车位信息
-router.get("/parking-spots", (req, res) => {
-  db().all(
-    `SELECT 
-      p.*,
-      u.full_name as owner_full_name,
-      u.phone as owner_phone
-     FROM parking_spots p
-     LEFT JOIN users u ON p.owner_username = u.username
-     ORDER BY p.created_at DESC`,
-    [],
-    (err, spots) => {
-      if (err) {
-        return res.status(500).json({ message: "获取停车位列表失败" });
-      }
-      res.json(spots);
-    }
-  );
-});
-
 // 删除用户
-router.delete("/users/:id", (req, res) => {
+router.delete("/users/:id", authenticateAdmin, (req, res) => {
   const { id } = req.params;
   
   db().run("DELETE FROM users WHERE id = ?", [id], function(err) {
@@ -96,7 +112,7 @@ router.delete("/users/:id", (req, res) => {
 });
 
 // 修改用户信息
-router.put("/users/:id", (req, res) => {
+router.put("/users/:id", authenticateAdmin, (req, res) => {
   const { id } = req.params;
   const { full_name, phone, bio, address } = req.body;
 
@@ -117,46 +133,8 @@ router.put("/users/:id", (req, res) => {
   );
 });
 
-// 修改停车位信息
-router.put("/parking-spots/:id", (req, res) => {
-  const { id } = req.params;
-  const { location, price, status, description } = req.body;
-
-  db().run(
-    `UPDATE parking_spots 
-     SET location = ?, price = ?, status = ?, description = ?
-     WHERE id = ?`,
-    [location, price, status, description, id],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ message: "更新停车位信息失败" });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ message: "停车位不存在" });
-      }
-      res.json({ message: "停车位信息更新成功" });
-    }
-  );
-});
-
-// 删除停车位
-router.delete("/parking-spots/:id", (req, res) => {
-  const { id } = req.params;
-  
-  db().run("DELETE FROM parking_spots WHERE id = ?", [id], function(err) {
-    if (err) {
-      console.error("删除停车位错误:", err);
-      return res.status(500).json({ message: "删除停车位失败" });
-    }
-    if (this.changes === 0) {
-      return res.status(404).json({ message: "停车位不存在" });
-    }
-    res.json({ message: "停车位删除成功" });
-  });
-});
-
 // 测试路由
-router.get("/test", (req, res) => {
+router.get("/test", authenticateAdmin, (req, res) => {
   res.json({ message: "Admin API is working" });
 });
 

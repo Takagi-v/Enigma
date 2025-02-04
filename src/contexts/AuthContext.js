@@ -6,30 +6,40 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(null);
 
   // 创建带有认证头的 fetch 函数
   const authFetch = async (url, options = {}) => {
-    const headers = {
-      ...options.headers,
-      'Accept': 'application/json',
-    };
+    try {
+      const headers = {
+        ...options.headers,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      };
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: 'include'
-    });
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'include'
+      });
 
-    return response;
+      // 如果是 401，清除用户状态
+      if (response.status === 401) {
+        setUser(null);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('请求失败:', error);
+      throw error;
+    }
   };
 
   const checkAuthStatus = async () => {
     try {
       const response = await authFetch(`${config.API_URL}/auth/status`);
       const data = await response.json();
-      console.log(data);
-      if (data.isAuthenticated) {
+
+      if (response.ok && data.isAuthenticated) {
         setUser(data.user);
         return true;
       } else {
@@ -46,29 +56,29 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (username, password) => {
-    const response = await authFetch(`${config.API_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password })
-    });
+    try {
+      const response = await authFetch(`${config.API_URL}/auth/login`, {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.message || '登录失败');
+      if (!response.ok) {
+        throw new Error(data.message || '登录失败');
+      }
+
+      if (data.user) {
+        setUser(data.user);
+      } else {
+        throw new Error('登录失败：未收到完整的用户信息');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('登录失败:', error);
+      throw error;
     }
-
-    if (data.user) {
-      setUser(data.user);
-      // 不再立即检查认证状态
-    } else {
-      console.error('登录响应缺少用户信息:', data);
-      throw new Error('登录失败：未收到完整的用户信息');
-    }
-
-    return data;
   };
 
   const logout = async () => {
@@ -76,10 +86,10 @@ export const AuthProvider = ({ children }) => {
       await authFetch(`${config.API_URL}/auth/logout`, {
         method: 'POST'
       });
-      setUser(null);
-      setToken(null);
     } catch (error) {
       console.error('登出失败:', error);
+    } finally {
+      setUser(null);
     }
   };
 
@@ -95,12 +105,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let interval;
     if (user) {
-      interval = setInterval(async () => {
-        const isStillAuthenticated = await checkAuthStatus();
-        if (!isStillAuthenticated) {
-          clearInterval(interval);
-        }
-      }, 5 * 60 * 1000); // 每5分钟检查一次
+      interval = setInterval(checkAuthStatus, 5 * 60 * 1000); // 每5分钟检查一次
     }
     return () => {
       if (interval) {

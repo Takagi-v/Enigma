@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { startParking, endParking, payParking } from '../services/parkingService';
 import { useAuth } from '../contexts/AuthContext';
-import config from '../config';
+import parkingService from '../services/parkingService';
 import './styles/ParkingUsage.css';
 
 const ParkingUsage = () => {
@@ -24,27 +23,40 @@ const ParkingUsage = () => {
     fetchParkingRecords();
   }, [user, navigate]);
 
+  const fetchParkingRecords = async () => {
+    try {
+      setIsLoading(true);
+      const data = await parkingService.getParkingRecords(authFetch);
+      setParkingRecords(data.records || []);
+    } catch (error) {
+      console.error('获取停车记录失败:', error);
+      setError(error.message || '获取停车记录失败，请重试');
+      if (error.message.includes('401')) {
+        navigate('/auth');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // 获取停车场信息
     const fetchParkingSpot = async () => {
       try {
-        const response = await fetch(`${config.API_URL}/parking-spots/${id}`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || '获取停车场信息失败');
-        }
-        const data = await response.json();
+        const data = await parkingService.getParkingSpotDetail(id);
         setParkingSpot(data);
       } catch (error) {
         console.error('获取停车场信息失败:', error);
         setError(error.message || '获取停车场信息失败');
-      } finally {
-        setIsLoading(false);
+        if (error.message.includes('401')) {
+          navigate('/auth');
+        }
       }
     };
 
-    fetchParkingSpot();
-  }, [id]);
+    if (user) {
+      fetchParkingSpot();
+    }
+  }, [id, user, navigate]);
 
   useEffect(() => {
     let interval;
@@ -57,61 +69,52 @@ const ParkingUsage = () => {
   }, [usage]);
 
   const handleStart = async () => {
-    if (!user) {
-      setError('用户信息未加载');
-      return;
-    }
-
     try {
-      const result = await startParking(id, user.id);
+      const data = await parkingService.startParking(id, authFetch, 'TEST123');
       setUsage({
-        id: result.usage_id,
+        id: data.usage_id,
         start_time: new Date(),
         end_time: null
       });
+      await fetchParkingRecords();
     } catch (error) {
-      setError('开始使用停车场失败');
+      console.error('开始使用停车场失败:', error);
+      setError(error.message || '开始使用停车场失败');
+      if (error.message.includes('401')) {
+        navigate('/auth');
+      }
     }
   };
 
   const handleEnd = async () => {
-    if (!user) {
-      setError('用户信息未加载');
-      return;
-    }
-
     try {
-      const result = await endParking(id, user.id);
+      const data = await parkingService.endParking(id, authFetch);
       setUsage(prev => ({
         ...prev,
         end_time: new Date(),
-        total_amount: result.total_amount
+        total_amount: data.total_amount
       }));
+      await fetchParkingRecords();
     } catch (error) {
-      setError('结束使用停车场失败');
+      console.error('结束使用停车场失败:', error);
+      setError(error.message || '结束使用停车场失败');
+      if (error.message.includes('401')) {
+        navigate('/auth');
+      }
     }
   };
 
   const handlePayment = async () => {
     try {
-      await payParking(id, usage.id);
+      await parkingService.payParking(usage.id, authFetch);
+      await fetchParkingRecords();
       navigate('/payment-success');
     } catch (error) {
-      setError('支付失败');
-    }
-  };
-
-  const fetchParkingRecords = async () => {
-    try {
-      const response = await authFetch(`${config.API_URL}/parking-spots/usage/my`);
-      if (!response.ok) {
-        throw new Error('获取停车记录失败');
+      console.error('支付失败:', error);
+      setError(error.message || '支付失败');
+      if (error.message.includes('401')) {
+        navigate('/auth');
       }
-      const data = await response.json();
-      setParkingRecords(data.records || []);
-    } catch (error) {
-      console.error('获取停车记录失败:', error);
-      alert('获取停车记录失败，请重试');
     }
   };
 
@@ -120,7 +123,12 @@ const ParkingUsage = () => {
   }
 
   if (error) {
-    return <div className="parking-usage error">{error}</div>;
+    return (
+      <div className="parking-usage error">
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()}>重试</button>
+      </div>
+    );
   }
 
   if (!parkingSpot) {

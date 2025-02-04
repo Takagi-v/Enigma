@@ -14,23 +14,16 @@ function Header() {
 
   return (
     <header className="header">
-      <div className="logo">
-        <Link to="/">智慧停车</Link>
-      </div>
-      <nav className="nav-links">
-        <Link to="/parking-spots">停车位</Link>
+      <div className="user-controls">
         {user ? (
-          <>
-            <Link to="/profile">个人中心</Link>
-            <Link to="/messages">消息</Link>
-            <button onClick={handleLogout} className="logout-btn">
-              登出
-            </button>
-          </>
+          <div className="user-info">
+            <span>{user.username}</span>
+            <button onClick={handleLogout}>登出</button>
+          </div>
         ) : (
-          <Link to="/auth">登录</Link>
+          <Link to="/auth" className="auth-link">登录/注册</Link>
         )}
-      </nav>
+      </div>
     </header>
   );
 }

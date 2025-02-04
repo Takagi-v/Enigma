@@ -14,13 +14,19 @@ function Messages() {
   const messagesEndRef = useRef(null);
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState(() => {
-    const savedUsername = localStorage.getItem('username');
-    return savedUsername || "游客" + Math.floor(Math.random() * 1000);
-  });
-
-  // WebSocket连接
   useEffect(() => {
+    if (!user) {
+      navigate('/auth', { state: { from: { pathname: '/messages' } } });
+      return;
+    }
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 5000);
+    return () => clearInterval(interval);
+  }, [user, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+
     let mounted = true;
 
     const connectWebSocket = () => {
@@ -66,17 +72,7 @@ function Messages() {
         wsRef.current = null;
       }
     };
-  }, []);
-
-  useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
-    return () => clearInterval(interval);
-  }, [user, navigate]);
+  }, [user]);
 
   const fetchMessages = async () => {
     try {
@@ -85,11 +81,13 @@ function Messages() {
         throw new Error('获取消息失败');
       }
       const data = await response.json();
-      setMessages(data.messages);
+      setMessages(data.messages || []);
       setLoading(false);
       scrollToBottom();
     } catch (error) {
       console.error('获取消息失败:', error);
+      setError(error.message);
+      setMessages([]);
     }
   };
 
@@ -155,23 +153,21 @@ function Messages() {
     <div className="chat-container">
       <div className="chat-sidebar">
         <h2>聊天室</h2>
-        <p>当前用户：{username}</p>
-        {localStorage.getItem('username') && (
-          <button onClick={handleLogout} className="logout-button">
-            退出登录
-          </button>
-        )}
+        <p>当前用户：{user?.username}</p>
+        <button onClick={() => navigate('/profile')} className="profile-button">
+          个人资料
+        </button>
       </div>
       <div className="chat-window">
         <div className="message-list">
-          {messages.map((message, index) => (
+          {Array.isArray(messages) && messages.map((message, index) => (
             <div
               key={message.id || index}
-              className={`message ${message.username === username ? "sent" : "received"}`}
+              className={`message ${message.sender === user?.username ? "sent" : "received"}`}
             >
-              <p className="message-content">{message.text}</p>
+              <p className="message-content">{message.content}</p>
               <small className="message-info">
-                {message.username} • {new Date(message.created_at).toLocaleString()}
+                {message.sender} • {new Date(message.timestamp).toLocaleString()}
               </small>
             </div>
           ))}

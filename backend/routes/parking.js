@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { db } = require('../models/db');
+const { authenticateToken } = require('../middleware/auth');
 
 // 获取停车位列表
 router.get("/", (req, res) => {
@@ -206,7 +207,7 @@ router.get("/:id", (req, res) => {
 });
 
 // 更新停车位状态
-router.put("/:id", (req, res) => {
+router.put("/:id", authenticateToken, (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
@@ -229,7 +230,7 @@ router.put("/:id", (req, res) => {
 });
 
 // 删除停车位
-router.delete("/:id", (req, res) => {
+router.delete("/:id", authenticateToken, (req, res) => {
   const { id } = req.params;
 
   db().run(
@@ -248,225 +249,6 @@ router.delete("/:id", (req, res) => {
       res.json({ message: "停车位删除成功" });
     }
   );
-});
-
-// 开始使用停车场
-router.post("/:id/start", (req, res) => {
-  const { id } = req.params;
-  const { user_id } = req.body;
-
-  if (!user_id) {
-    return res.status(400).json({ message: "用户ID不能为空" });
-  }
-
-  db().serialize(() => {
-    // 检查停车场状态
-    db().get(
-      "SELECT * FROM parking_spots WHERE id = ? AND status = 'available'",
-      [id],
-      (err, spot) => {
-        if (err) {
-          return res.status(500).json({ message: "查询停车场状态失败" });
-        }
-
-        if (!spot) {
-          return res.status(400).json({ message: "停车场不可用" });
-        }
-
-        // 开启事务
-        db().run("BEGIN TRANSACTION");
-
-        // 更新停车场状态
-        db().run(
-          "UPDATE parking_spots SET status = 'in_use', current_user_id = ? WHERE id = ?",
-          [user_id, id],
-          (err) => {
-            if (err) {
-              db().run("ROLLBACK");
-              return res.status(500).json({ message: "更新停车场状态失败" });
-            }
-
-            // 创建使用记录
-            db().run(
-              `INSERT INTO parking_usage (
-                parking_spot_id, user_id, start_time, status
-              ) VALUES (?, ?, DATETIME('now'), 'active')`,
-              [id, user_id],
-              function(err) {
-                if (err) {
-                  db().run("ROLLBACK");
-                  return res.status(500).json({ message: "创建使用记录失败" });
-                }
-
-                db().run("COMMIT");
-                res.json({
-                  message: "停车场使用开始",
-                  usage_id: this.lastID
-                });
-              }
-            );
-          }
-        );
-      }
-    );
-  });
-});
-
-// 结束使用停车场
-router.post("/:id/end", (req, res) => {
-  const { id } = req.params;
-  const { user_id } = req.body;
-
-  if (!user_id) {
-    return res.status(400).json({ message: "用户ID不能为空" });
-  }
-
-  db().serialize(() => {
-    // 检查停车场状态和使用记录
-    db().get(
-      `SELECT u.*, p.hourly_rate 
-       FROM parking_usage u
-       JOIN parking_spots p ON u.parking_spot_id = p.id
-       WHERE p.id = ? AND u.user_id = ? AND u.status = 'active'
-       ORDER BY u.start_time DESC LIMIT 1`,
-      [id, user_id],
-      (err, usage) => {
-        if (err) {
-          return res.status(500).json({ message: "查询使用记录失败" });
-        }
-
-        if (!usage) {
-          return res.status(400).json({ message: "未找到有效的使用记录" });
-        }
-
-        // 计算费用
-        const start = new Date(usage.start_time);
-        const end = new Date();
-        const hours = (end - start) / (1000 * 60 * 60); // 转换为小时
-        const total_amount = Math.ceil(hours * usage.hourly_rate); // 向上取整
-
-        // 开启事务
-        db().run("BEGIN TRANSACTION");
-
-        // 更新使用记录
-        db().run(
-          `UPDATE parking_usage 
-           SET end_time = DATETIME('now'), 
-               total_amount = ?,
-               status = 'completed'
-           WHERE id = ?`,
-          [total_amount, usage.id],
-          (err) => {
-            if (err) {
-              db().run("ROLLBACK");
-              return res.status(500).json({ message: "更新使用记录失败" });
-            }
-
-            // 更新停车场状态
-            db().run(
-              "UPDATE parking_spots SET status = 'available', current_user_id = NULL WHERE id = ?",
-              [id],
-              (err) => {
-                if (err) {
-                  db().run("ROLLBACK");
-                  return res.status(500).json({ message: "更新停车场状态失败" });
-                }
-
-                db().run("COMMIT");
-                res.json({
-                  message: "停车场使用结束",
-                  total_amount,
-                  usage_id: usage.id
-                });
-              }
-            );
-          }
-        );
-      }
-    );
-  });
-});
-
-// 支付停车费用
-router.post("/:id/payment", (req, res) => {
-  const { usage_id } = req.body;
-
-  if (!usage_id) {
-    return res.status(400).json({ message: "使用记录ID不能为空" });
-  }
-
-  db().run(
-    "UPDATE parking_usage SET payment_status = 'paid' WHERE id = ?",
-    [usage_id],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ message: "更新支付状态失败" });
-      }
-
-      if (this.changes === 0) {
-        return res.status(404).json({ message: "未找到使用记录" });
-      }
-
-      res.json({ message: "支付成功" });
-    }
-  );
-});
-
-// 获取用户的停车记录
-router.get("/usage/my", (req, res) => {
-  const user_id = req.user?.id; // 假设通过认证中间件获取用户ID
-
-  if (!user_id) {
-    return res.status(401).json({ message: "请先登录" });
-  }
-
-  const query = `
-    SELECT 
-      u.*,
-      p.location,
-      p.hourly_rate,
-      p.owner_username,
-      owner.full_name as owner_full_name,
-      owner.phone as owner_phone
-    FROM parking_usage u
-    JOIN parking_spots p ON u.parking_spot_id = p.id
-    LEFT JOIN users owner ON p.owner_username = owner.username
-    WHERE u.user_id = ?
-    ORDER BY u.created_at DESC
-  `;
-
-  db().all(query, [user_id], (err, records) => {
-    if (err) {
-      console.error("获取停车记录失败:", err);
-      return res.status(500).json({ message: "获取停车记录失败" });
-    }
-
-    res.json({
-      records: records.map(record => ({
-        id: record.id,
-        parking_spot_id: record.parking_spot_id,
-        location: record.location,
-        start_time: record.start_time,
-        end_time: record.end_time,
-        total_amount: record.total_amount,
-        payment_status: record.payment_status,
-        status: record.status,
-        hourly_rate: record.hourly_rate,
-        owner_full_name: record.owner_full_name,
-        owner_phone: record.owner_phone,
-        vehicle_plate: record.vehicle_plate,
-        vehicle_type: record.vehicle_type,
-        payment_method: record.payment_method,
-        payment_time: record.payment_time,
-        transaction_id: record.transaction_id,
-        rating: record.rating,
-        review_comment: record.review_comment,
-        review_time: record.review_time,
-        created_at: record.created_at,
-        updated_at: record.updated_at
-      }))
-    });
-  });
 });
 
 module.exports = router; 

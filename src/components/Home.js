@@ -160,7 +160,7 @@ function Home() {
           />
           <Select
             value={sortBy}
-            style={{ width: 120 }}
+            style={{ minWidth: '160px' }}
             onChange={handleSortChange}
             className="sort-select"
           >
