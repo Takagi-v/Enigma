@@ -39,10 +39,25 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [parkingSpots, setParkingSpots] = useState([]);
-  const [drawerVisible, setDrawerVisible] = useState(false);
   const [sortType, setSortType] = useState('distance');
-  const [nearbySpots, setNearbySpots] = useState([]);
-  const [spotsLoading, setSpotsLoading] = useState(false);
+  const [sortedSpots, setSortedSpots] = useState([]);
+  const [currentPoint, setCurrentPoint] = useState(null);
+  const [searchValue, setSearchValue] = useState("");
+  const searchInputRef = useRef(null);
+  const autocompleteRef = useRef(null);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [drawerHeight, setDrawerHeight] = useState(400);
+  const drawerRef = useRef(null);
+  const [isDrawerMounted, setIsDrawerMounted] = useState(false);
+  let startY = 0;
+  let startHeight = 0;
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [initialTouchY, setInitialTouchY] = useState(null);
+  const [initialHeight, setInitialHeight] = useState(null);
+  const minHeight = 200;
+  const maxHeight = window.innerHeight * 0.8;
+  const [isLoadingSpots, setIsLoadingSpots] = useState(false);
 
   // 确保百度地图 API 已加载
   useEffect(() => {
@@ -67,19 +82,26 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   // 获取所有停车位信息
   useEffect(() => {
     const fetchParkingSpots = async () => {
+      setIsLoadingSpots(true);
       try {
         const response = await fetch(`${config.API_URL}/parking-spots`);
         const data = await response.json();
         setParkingSpots(data.spots || []);
+        // 如果当前有搜索点，重新计算距离
+        if (currentPoint) {
+          await updateSortedSpots(currentPoint.lat, currentPoint.lng);
+        }
       } catch (error) {
         console.error('获取停车位失败:', error);
+      } finally {
+        setIsLoadingSpots(false);
       }
     };
 
     if (mode !== 'detail') {
       fetchParkingSpots();
     }
-  }, [mode]);
+  }, [mode, currentPoint]);
 
   // 获取用户位置
   useEffect(() => {
@@ -155,19 +177,11 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     getLocation();
   }, [mode, initialSpot]);
 
-  // 初始化地图
+  // 初始化地图时添加所有停车位标记
   useEffect(() => {
     if (!userLocation || !mapRef.current || !window.BMap || loading) return;
 
     try {
-      // 确保地图容器有正确的尺寸
-      const container = mapRef.current;
-      // 如果已经有地图实例，先销毁
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.clearOverlays();
-        mapInstanceRef.current = null;
-      }
-
       const map = new window.BMap.Map(mapRef.current);
       mapInstanceRef.current = map;
 
@@ -176,6 +190,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         const point = new window.BMap.Point(lng, lat);
         map.centerAndZoom(point, 16);
         
+        // 使用默认标记
         const marker = new window.BMap.Marker(point);
         map.addOverlay(marker);
 
@@ -208,14 +223,25 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         });
         map.addControl(scaleControl);
         
-        const userMarker = new window.BMap.Marker(point);
+        // 使用自定义用户位置图标
+        const userIcon = new window.BMap.Icon(
+          "https://api.map.baidu.com/images/geolocation-control/point/position-icon-14x14.png",
+          new window.BMap.Size(14, 14),
+          {
+            anchor: new window.BMap.Size(7, 7)
+          }
+        );
+        const userMarker = new window.BMap.Marker(point, { icon: userIcon });
         map.addOverlay(userMarker);
         
+        // 添加所有停车位标记
         parkingSpots.forEach(spot => {
           if (!spot.coordinates) return;
           
           const [lat, lng] = spot.coordinates.split(',');
           const spotPoint = new window.BMap.Point(lng, lat);
+          
+          // 使用默认标记
           const marker = new window.BMap.Marker(spotPoint);
           map.addOverlay(marker);
 
@@ -243,8 +269,6 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
               onLocationSelect(newLocation);
             }
             
-            map.clearOverlays();
-            map.addOverlay(userMarker);
             const newMarker = new window.BMap.Marker(e.point);
             map.addOverlay(newMarker);
           });
@@ -255,50 +279,35 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
       console.error('地图初始化错误:', err);
       setError('地图加载失败，请刷新重试');
     }
-
-    return () => {
-      if (mapInstanceRef.current) {
-        const map = mapInstanceRef.current;
-        map.clearOverlays();
-        map.removeEventListener('click');
-        mapInstanceRef.current = null;
-      }
-    };
   }, [userLocation, parkingSpots, mode, onLocationSelect, initialSpot, loading]);
 
-  // 搜索附近停车位
-  const searchNearbyParkingSpots = async (lat, lng) => {
-    try {
-      setSpotsLoading(true);
-      setDrawerVisible(true); // 立即显示抽屉，不等待数据
-      
-      // 检查 parkingSpots 是否有效
-      if (!Array.isArray(parkingSpots)) {
-        console.error('停车位数据无效:', parkingSpots);
-        setNearbySpots([]);
-        return;
-      }
+  // 修改计算并排序停车位函数
+  const updateSortedSpots = async (lat, lng) => {
+    setIsCalculating(true); // 开始计算
+    if (!Array.isArray(parkingSpots)) {
+      console.error('停车位数据无效:', parkingSpots);
+      setSortedSpots([]);
+      setIsCalculating(false); // 计算结束
+      return;
+    }
 
-      // 使用已有的 parkingSpots 数据
+    try {
       const spotsWithDistance = parkingSpots
-        .filter(spot => spot && typeof spot === 'object') // 确保每个spot是有效的对象
+        .filter(spot => spot && typeof spot === 'object')
         .map(spot => {
           try {
             if (!spot.coordinates || typeof spot.coordinates !== 'string') {
-              console.log('无效的坐标数据:', spot);
               return null;
             }
 
             const coords = spot.coordinates.split(',');
             if (coords.length !== 2) {
-              console.log('坐标格式错误:', spot.coordinates);
               return null;
             }
 
             const [spotLat, spotLng] = coords.map(coord => parseFloat(coord.trim()));
             
             if (isNaN(spotLat) || isNaN(spotLng)) {
-              console.log('无效的坐标值:', spot.coordinates);
               return null;
             }
 
@@ -322,168 +331,311 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
             return null;
           }
         })
-        .filter(spot => spot !== null)
-        .sort((a, b) => {
-          try {
-            switch(sortType) {
-              case 'price':
-                return parseFloat(a.price || 0) - parseFloat(b.price || 0);
-              case 'name':
-                return (a.location || '').localeCompare(b.location || '');
-              case 'distance':
-              default:
-                return (a.distance || 0) - (b.distance || 0);
-            }
-          } catch (error) {
-            console.error('排序错误:', error);
-            return 0;
-          }
-        });
+        .filter(spot => spot !== null);
 
-      console.log('处理后的数据:', spotsWithDistance);
-      setNearbySpots(spotsWithDistance);
+      sortSpots(spotsWithDistance);
+      return true; // 返回成功标志
     } catch (error) {
-      console.error('处理停车位数据失败:', error);
-      setNearbySpots([]); // 确保在错误情况下也设置为空数组
+      console.error('计算距离时出错:', error);
+      setSortedSpots([]);
+      return false;
     } finally {
-      setSpotsLoading(false);
+      setIsCalculating(false); // 计算结束
     }
+  };
+
+  // 排序函数
+  const sortSpots = (spots) => {
+    const sorted = [...spots].sort((a, b) => {
+      try {
+        switch(sortType) {
+          case 'price':
+            return parseFloat(a.price || 0) - parseFloat(b.price || 0);
+          case 'name':
+            return (a.location || '').localeCompare(b.location || '');
+          case 'distance':
+          default:
+            return (a.distance || 0) - (b.distance || 0);
+        }
+      } catch (error) {
+        console.error('排序错误:', error);
+        return 0;
+      }
+    });
+    setSortedSpots(sorted);
   };
 
   // 处理排序方式变更
   const handleSortChange = (value) => {
     setSortType(value);
-    // 重新排序现有数据
-    setNearbySpots(prevSpots => {
-      if (!Array.isArray(prevSpots)) return [];
-      
-      return [...prevSpots].sort((a, b) => {
-        try {
-          switch(value) {
-            case 'price':
-              return parseFloat(a.price || 0) - parseFloat(b.price || 0);
-            case 'name':
-              return (a.location || '').localeCompare(b.location || '');
-            case 'distance':
-            default:
-              return (a.distance || 0) - (b.distance || 0);
-          }
-        } catch (error) {
-          console.error('排序错误:', error);
-          return 0;
-        }
-      });
+    sortSpots(sortedSpots);
+  };
+
+  // 处理抽屉拖动开始
+  const handleTouchStart = (e) => {
+    setIsDragging(true);
+    setInitialTouchY(e.touches[0].clientY);
+    setInitialHeight(drawerHeight);
+  };
+
+  // 处理抽屉拖动
+  const handleTouchMove = (e) => {
+    if (!isDragging || initialTouchY === null) return;
+    e.preventDefault();
+    
+    const currentTouchY = e.touches[0].clientY;
+    const deltaY = initialTouchY - currentTouchY;
+    const newHeight = Math.min(Math.max(initialHeight + deltaY, minHeight), maxHeight);
+    
+    setDrawerHeight(newHeight);
+  };
+
+  // 处理抽屉拖动结束
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    setInitialTouchY(null);
+  };
+
+  // 处理鼠标拖动开始
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setInitialTouchY(e.clientY);
+    setInitialHeight(drawerHeight);
+  };
+
+  // 处理鼠标拖动
+  const handleMouseMove = (e) => {
+    if (!isDragging || initialTouchY === null) return;
+    e.preventDefault();
+    
+    const deltaY = initialTouchY - e.clientY;
+    const newHeight = Math.min(Math.max(initialHeight + deltaY, minHeight), maxHeight);
+    
+    setDrawerHeight(newHeight);
+  };
+
+  // 处理鼠标拖动结束
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setInitialTouchY(null);
+  };
+
+  // 添加和移除鼠标事件监听器
+  useEffect(() => {
+    if (drawerVisible) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [drawerVisible, isDragging, initialTouchY, initialHeight]);
+
+  // 处理抽屉显示
+  const showDrawer = () => {
+    setIsDrawerMounted(true);
+    // 使用 requestAnimationFrame 确保挂载后再添加可见性，这样才能触发动画
+    requestAnimationFrame(() => {
+      setDrawerVisible(true);
     });
   };
 
-  // 处理停车位点击
-  const handleSpotClick = (spotId) => {
-    navigate(`/parking/${spotId}`);
+  // 处理抽屉隐藏
+  const hideDrawer = () => {
+    setDrawerVisible(false);
+    // 等待动画完成后再卸载组件
+    setTimeout(() => {
+      setIsDrawerMounted(false);
+    }, 300); // 与 CSS 动画时长相匹配
   };
 
+  // 修改搜索处理函数
+  const handleSearch = () => {
+    if (!searchValue) return;
+    const localSearch = new window.BMap.LocalSearch(mapInstanceRef.current, {
+      onSearchComplete: async results => {
+        if (!results?.getCurrentNumPois()) return;
+        
+        const poi = results.getPoi(0);
+        if (!poi?.point) return;
+
+        mapInstanceRef.current.centerAndZoom(poi.point, 16);
+        
+        const searchIcon = new window.BMap.Icon(
+          "https://api.map.baidu.com/images/marker_red_sprite.png",
+          new window.BMap.Size(39, 25),
+          { imageOffset: new window.BMap.Size(0, 0) }
+        );
+        const searchMarker = new window.BMap.Marker(poi.point, { icon: searchIcon });
+        mapInstanceRef.current.addOverlay(searchMarker);
+        
+        setCurrentPoint(poi.point);
+        showDrawer(); // 立即显示抽屉，但显示加载状态
+      }
+    });
+    localSearch.search(searchValue);
+  };
+
+  // 修改 onconfirm 事件处理
   useEffect(() => {
-    console.log('Drawer 可见性状态:', drawerVisible);
+    if (window.BMap && searchInputRef.current && !autocompleteRef.current) {
+      const ac = new window.BMap.Autocomplete({
+        input: searchInputRef.current,
+        location: mapInstanceRef.current
+      });
+
+      ac.addEventListener('onconfirm', function(e) {
+        const myValue = e.item.value;
+        setSearchValue(myValue.province + myValue.city + myValue.district + myValue.street + myValue.business);
+        
+        const localSearch = new window.BMap.LocalSearch(mapInstanceRef.current, {
+          onSearchComplete: async function(results) {
+            if (results && results.getPoi(0)) {
+              const poi = results.getPoi(0);
+              mapInstanceRef.current.centerAndZoom(poi.point, 16);
+              
+              const searchIcon = new window.BMap.Icon(
+                "https://api.map.baidu.com/images/marker_red_sprite.png",
+                new window.BMap.Size(39, 25),
+                { imageOffset: new window.BMap.Size(0, 0) }
+              );
+              const searchMarker = new window.BMap.Marker(poi.point, { icon: searchIcon });
+              mapInstanceRef.current.addOverlay(searchMarker);
+              
+              setCurrentPoint(poi.point);
+              // 等待数据计算完成后再显示抽屉
+              const success = await updateSortedSpots(poi.point.lat, poi.point.lng);
+              if (success) {
+                showDrawer();
+              }
+            }
+          }
+        });
+        localSearch.search(myValue.province + myValue.city + myValue.district + myValue.street + myValue.business);
+      });
+
+      autocompleteRef.current = ac;
+    }
+  }, [loading]);
+
+  // 处理点击外部关闭
+  const handleOutsideClick = (e) => {
+    if (drawerRef.current && !drawerRef.current.contains(e.target)) {
+      hideDrawer(); // 使用新的隐藏函数
+    }
+  };
+
+  // 添加点击外部关闭事件监听
+  useEffect(() => {
+    if (drawerVisible) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
   }, [drawerVisible]);
 
-  // 渲染停车位列表
-  const renderParkingSpots = () => {
-    console.log('渲染停车位列表:', nearbySpots);
-    if (spotsLoading) {
-      return (
-        <div className="spots-loading">
-          <Spin size="large" />
-        </div>
-      );
-    }
-
-    if (!nearbySpots.length) {
-      return (
-        <Empty 
-          description="附近10公里内暂无停车位" 
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
-      );
-    }
-
-    return nearbySpots.map((spot) => (
-      <Card 
-        key={spot.id}
-        className="parking-spot-card"
-        onClick={() => handleSpotClick(spot.id)}
-      >
-        <h3>{spot.location}</h3>
-        <p>价格: ¥{spot.price}/小时</p>
-        <p>距离: {spot.distance}公里</p>
-        <p>联系方式: {spot.contact}</p>
-      </Card>
-    ));
-  };
-
-  // 包装返回的 JSX 使用错误边界
   const content = (
-    <div className="fullscreen-map-container">
+    <>
       {!hideSearch && (
-        <div className="map-search">
-          <Search
-            placeholder="搜索地点（如：万达广场）"
-            allowClear
-            enterButton="搜索"
-            size="large"
-            style={{ width: '100%', marginBottom: '10px' }}
-            onSearch={value => {
-              if (!value) return;
-              const localSearch = new window.BMap.LocalSearch(mapInstanceRef.current, {
-                onSearchComplete: results => {
-                  if (!results?.getCurrentNumPois()) return;
-                  
-                  const poi = results.getPoi(0);
-                  if (!poi?.point) return;
-
-                  // 更新地图
-                  mapInstanceRef.current.clearOverlays();
-                  mapInstanceRef.current.centerAndZoom(poi.point, 16);
-                  mapInstanceRef.current.addOverlay(new window.BMap.Marker(poi.point));
-
-                  // 搜索附近停车位
-                  searchNearbyParkingSpots(poi.point.lat, poi.point.lng);
+        <div className="map-search-container">
+          <div className="search-box">
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="search-input"
+              placeholder="搜索地点（如：万达广场）"
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch();
                 }
-              });
-              localSearch.search(value);
-            }}
-          />
+              }}
+            />
+            <button 
+              className="search-button"
+              onClick={handleSearch}
+            >
+              搜索
+            </button>
+          </div>
         </div>
       )}
-      <div className="map-wrapper">
-        <div ref={mapRef} className="map" />
-      </div>
-      
-      <Drawer
-        title={
-          <div className="drawer-header">
-            <span>附近停车位</span>
-            <Select
-              value={sortType}
-              style={{ width: 120 }}
-              onChange={handleSortChange}
-            >
-              <Option value="distance">按距离排序</Option>
-              <Option value="price">按价格排序</Option>
-              <Option value="name">按名称排序</Option>
-            </Select>
-          </div>
-        }
-        placement="bottom"
-        height={400}
-        onClose={() => setDrawerVisible(false)}
-        open={drawerVisible}
-        className="parking-spots-drawer"
-        destroyOnClose={true}
-      >
-        <div className="parking-spots-list">
-          {renderParkingSpots()}
+      <div className="fullscreen-map-container">
+        <div className="map-wrapper">
+          <div ref={mapRef} className="map" />
         </div>
-      </Drawer>
-    </div>
+        
+        {isDrawerMounted && (
+          <>
+            <div 
+              className={`drawer-overlay ${drawerVisible ? 'visible' : ''}`}
+              onClick={hideDrawer}
+            />
+            <div 
+              ref={drawerRef}
+              className={`parking-spots-panel ${drawerVisible ? 'visible' : ''}`}
+              style={{ 
+                height: drawerHeight + 'px',
+                cursor: isDragging ? 'grabbing' : 'default'
+              }}
+            >
+              <div 
+                className="panel-header"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onMouseDown={handleMouseDown}
+                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+              >
+                <div className="drawer-handle"></div>
+                <h3>所有停车位</h3>
+                <select
+                  value={sortType}
+                  onChange={(e) => handleSortChange(e.target.value)}
+                  className="sort-select"
+                >
+                  <option value="distance">按距离排序</option>
+                  <option value="price">按价格排序</option>
+                  <option value="name">按名称排序</option>
+                </select>
+              </div>
+              <div className="parking-spots-list">
+                {!currentPoint ? (
+                  <div className="empty-state">
+                    <p>请先搜索位置</p>
+                  </div>
+                ) : isLoadingSpots || isCalculating ? (
+                  <div className="spots-loading">
+                    <div className="loading-spinner"></div>
+                    <p>正在加载附近停车位...</p>
+                  </div>
+                ) : sortedSpots.length === 0 ? (
+                  <div className="empty-state">
+                    <p>附近暂无停车位信息</p>
+                  </div>
+                ) : (
+                  sortedSpots.map((spot) => (
+                    <div 
+                      key={spot.id}
+                      className="parking-spot-card"
+                      onClick={() => navigate(`/parking/${spot.id}`)}
+                    >
+                      <h3>{spot.location}</h3>
+                      <p>价格: ¥{spot.price}/小时</p>
+                      <p>距离: {spot.distance}公里</p>
+                      <p>联系方式: {spot.contact}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 
   if (loading) {

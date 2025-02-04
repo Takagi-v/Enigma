@@ -27,7 +27,13 @@
 }
 
 .sort-select {
-  min-width: 120px;
+  min-width: 160px !important;
+  width: auto !important;
+}
+
+/* 确保下拉选项也能完整显示 */
+.ant-select-dropdown {
+  min-width: 160px !important;
 }
 
 .parking-spots-grid {

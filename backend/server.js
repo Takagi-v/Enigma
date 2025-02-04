@@ -1,68 +1,16 @@
 const http = require("http");
-const express = require("express");
-const bodyParser = require("body-parser");
-const cors = require("cors");
 const WebSocket = require("ws");
 const path = require("path");
 const fs = require('fs');
-const cookieParser = require('cookie-parser');
-
-// 导入配置
 const serverConfig = require('./config/server');
 const { connectDB, closeDB } = require('./models/db');
-
-// 导入路由
-const authRouter = require('./routes/auth');
-const adminRouter = require('./routes/admin');
-const parkingRouter = require('./routes/parking');
-const messagesRouter = require('./routes/messages');
-const usersRouter = require('./routes/users');
+const app = require('./app');
 
 // 创建应用
-const app = express();
 const server = http.createServer(app);
+
+// WebSocket 服务器配置
 const wss = new WebSocket.Server({ server });
-
-// CORS 配置
-const corsOptions = {
-  origin: 'http://localhost:5050',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Access-Control-Allow-Headers',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
-  exposedHeaders: ['Set-Cookie'],
-  optionsSuccessStatus: 200
-};
-
-// 中间件配置
-app.use(bodyParser.json());
-app.use(cors(corsOptions));
-app.use(cookieParser());
-
-// 静态文件服务 - 移到API路由之前
-app.use('/uploads', express.static(serverConfig.uploadDir));
-app.use(express.static(serverConfig.staticPath));
-
-// API 路由前缀
-app.use('/api', (req, res, next) => {
-  console.log(`API Request: ${req.method} ${req.url}`);
-  next();
-});
-
-// 注册API路由
-app.use('/api/auth', authRouter);
-app.use('/api/admin', adminRouter);
-app.use('/api/parking-spots', parkingRouter);
-app.use('/api/messages', messagesRouter);
-app.use('/api/users', usersRouter);
 
 // WebSocket 连接处理
 wss.on("connection", (ws) => {
@@ -83,29 +31,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-// 测试路由
-app.get("/test", (req, res) => {
-  res.json({ 
-    message: "Server is running",
-    env: process.env.NODE_ENV,
-    staticPath: serverConfig.staticPath
-  });
-});
-
-// 错误处理中间件
-app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ 
-    message: "服务器内部错误",
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
-
-// 处理前端路由 - 保持在最后
-app.get('*', (req, res) => {
-  res.sendFile(path.join(serverConfig.staticPath, 'index.html'));
-});
-
 // 确保上传目录存在
 fs.mkdir(serverConfig.uploadDir, { recursive: true }, (err) => {
   if (err) {
@@ -118,27 +43,25 @@ fs.mkdir(serverConfig.uploadDir, { recursive: true }, (err) => {
 connectDB();
 
 // 优雅关闭
-process.on('SIGTERM', () => {
-  console.info('SIGTERM signal received.');
+const gracefulShutdown = () => {
+  console.info('Received shutdown signal.');
   server.close(() => {
     console.log('Server closed.');
     closeDB();
     process.exit(0);
   });
-});
+};
 
-process.on('SIGINT', () => {
-  console.info('SIGINT signal received.');
-  server.close(() => {
-    console.log('Server closed.');
-    closeDB();
-    process.exit(0);
-  });
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 // 启动服务器
 server.listen(serverConfig.port, '0.0.0.0', () => {
-  console.log(`Server running on:\n- HTTP: http://localhost:${serverConfig.port}\n- WebSocket: ws://localhost:${serverConfig.port}`);
+  console.log(`Server running on:
+- HTTP: http://localhost:${serverConfig.port}
+- WebSocket: ws://localhost:${serverConfig.port}
+- Environment: ${process.env.NODE_ENV || 'development'}
+- Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5050'}`);
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${serverConfig.port} is already in use.`);

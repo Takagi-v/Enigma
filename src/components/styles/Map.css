@@ -1,27 +1,88 @@
-/* 全局设置，确保全屏显示 */
+/* 全局设置 */
 html, body {
   height: 100%;
   margin: 0;
   padding: 0;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  background: #f5f5f5; /* 页面背景 */
+  background: #f5f5f5;
 }
 
-/* 地图容器：增加圆角和现代阴影 */
-.fullscreen-map-container {
-  width: 95%;
-  height: 100%;
-  margin: 1% auto;
-  border-radius: 16px;
-  box-shadow: 
-    0 12px 24px rgba(0, 0, 0, 0.1),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+/* 主要布局容器 */
+.main-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* 搜索框容器 */
+.map-search-container {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto 20px;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+/* 搜索框 */
+.search-box {
+  display: flex;
+  width: 100%;
+  height: 48px;
+  background: #fff;
+  border-radius: 24px;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
 }
 
-/* 地图包装层与地图本身 */
+.search-box:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.search-input {
+  flex: 1;
+  height: 100%;
+  padding: 0 20px;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  color: #333;
+}
+
+.search-input::placeholder {
+  color: #999;
+}
+
+.search-button {
+  width: 80px;
+  height: 100%;
+  border: none;
+  background: linear-gradient(45deg, #6a11cb, #2575fc);
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.search-button:hover {
+  background: linear-gradient(45deg, #2575fc, #6a11cb);
+}
+
+/* 地图容器 */
+.fullscreen-map-container {
+  width: 100%;
+  height: calc(100vh - 120px);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+}
+
 .map-wrapper {
   width: 100%;
   height: 100%;
@@ -33,138 +94,95 @@ html, body {
   height: 100%;
 }
 
-/* Google 风格的搜索框 */
-.map-search {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 85%;
-  max-width: 580px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(223, 225, 229, 0.5);
-  border-radius: 28px;
-  padding: 6px 20px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: 
-    0 4px 6px rgba(32, 33, 36, 0.08),
-    0 1px 3px rgba(32, 33, 36, 0.12);
-  z-index: 1000;
-}
-
-/* 输入框细节优化 */
-.map-search .ant-input {
-  font-size: 16px;
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: #202124;
-}
-
-.map-search .ant-input::placeholder {
-  color: #70757a;
-}
-
-.map-search .ant-input-search-button {
-  width: 44px;
-  height: 44px;
-  border: none;
-  background: transparent;
-}
-
-.map-search .ant-input-search-button .anticon {
-  color: #4285f4;
-  font-size: 18px;
-  transition: transform 0.2s;
-}
-
-/* 交互状态 */
-.map-search:hover {
-  box-shadow: 
-    0 6px 12px rgba(32, 33, 36, 0.15),
-    0 2px 6px rgba(32, 33, 36, 0.18);
-}
-
-.map-search:focus-within {
-  background: rgba(255, 255, 255, 1);
-  box-shadow: 
-    0 8px 24px rgba(32, 33, 36, 0.2),
-    0 4px 12px rgba(32, 33, 36, 0.25);
-}
-
-/* 地图聚焦效果 */
-.fullscreen-map-container:hover {
-  box-shadow: 
-    0 16px 32px rgba(0, 0, 0, 0.15),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
-}
-
-/* 地图边界光效（伪元素实现） */
-.fullscreen-map-container::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-radius: 16px;
-  pointer-events: none;
-  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.3);
-}
-
-/* 地图加载和错误提示 */
-.map-loading, .map-error {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  font-size: 18px;
-}
-
-.map-error {
-  color: red;
-}
-
-/* 停车位抽屉样式 */
-.parking-spots-drawer {
-  position: absolute;
+/* 停车位面板 */
+.parking-spots-panel {
+  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 1000;
-}
-
-.parking-spots-drawer .ant-drawer-content-wrapper {
-  height: 400px !important;
-}
-
-.parking-spots-drawer .ant-drawer-content {
+  background: white;
   border-radius: 16px 16px 0 0;
-  overflow: hidden;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  touch-action: none;
 }
 
-.drawer-header {
+.parking-spots-panel.visible {
+  transform: translateY(0);
+}
+
+.drawer-handle {
+  width: 40px;
+  height: 4px;
+  background: #e0e0e0;
+  border-radius: 2px;
+  margin: 8px auto;
+  cursor: grab;
+}
+
+.panel-header {
+  padding: 0 20px 12px;
+  border-bottom: 1px solid #eee;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  touch-action: none;
 }
 
+.panel-header h3 {
+  margin: 8px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.sort-select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #666;
+  outline: none;
+  cursor: pointer;
+  background: #fff;
+  margin-top: 8px;
+}
+
+.close-button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.close-button:hover {
+  color: #666;
+}
+
+/* 停车位列表 */
 .parking-spots-list {
-  padding: 16px;
+  height: calc(100% - 100px);
   overflow-y: auto;
-  height: calc(100% - 55px);
+  padding: 16px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .parking-spot-card {
-  margin-bottom: 16px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   cursor: pointer;
-  transition: all 0.3s ease;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .parking-spot-card:hover {
@@ -173,39 +191,98 @@ html, body {
 }
 
 .parking-spot-card h3 {
-  margin-bottom: 8px;
-  color: #1890ff;
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 16px;
 }
 
 .parking-spot-card p {
-  margin-bottom: 4px;
+  margin: 4px 0;
   color: #666;
+  font-size: 14px;
 }
 
+/* 加载状态 */
 .spots-loading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #2575fc;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.spots-loading p {
+  color: #666;
+  font-size: 14px;
+  margin: 0;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 空状态 */
+.empty-state {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 200px;
+  height: 100%;
+  color: #999;
+  font-size: 16px;
 }
 
 /* 响应式调整 */
 @media (max-width: 768px) {
-  .map-search {
-    width: 90%;
-    padding: 6px 8px;
+  .map-search-container {
+    padding: 0 10px;
   }
   
-  .map-search .ant-input-search .ant-input,
-  .map-search .ant-input-search .ant-input-search-button {
-    height: 40px;
+  .fullscreen-map-container {
+    height: calc(100vh - 100px);
+    border-radius: 12px;
   }
-  
-  .parking-spots-drawer .ant-drawer-content-wrapper {
-    height: 70vh !important;
+
+  .parking-spots-panel {
+    height: 60vh;
   }
-  
-  .parking-spots-drawer .ant-drawer-content {
-    border-radius: 12px 12px 0 0;
-  }
+}
+
+/* 加载和错误状态 */
+.map-loading,
+.map-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  font-size: 16px;
+  color: #666;
+}
+
+/* 抽屉动画遮罩层 */
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0);
+  transition: background-color 0.3s ease;
+  pointer-events: none;
+  z-index: 999;
+}
+
+.drawer-overlay.visible {
+  background-color: rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
 }
