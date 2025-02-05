@@ -177,11 +177,16 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     getLocation();
   }, [mode, initialSpot]);
 
-  // 初始化地图时添加所有停车位标记
+  // 修改地图初始化的 useEffect
   useEffect(() => {
     if (!userLocation || !mapRef.current || !window.BMap || loading) return;
 
     try {
+      // 如果地图实例已经存在，不需要重新初始化
+      if (mapInstanceRef.current) {
+        return;
+      }
+
       const map = new window.BMap.Map(mapRef.current);
       mapInstanceRef.current = map;
 
@@ -190,7 +195,6 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         const point = new window.BMap.Point(lng, lat);
         map.centerAndZoom(point, 16);
         
-        // 使用默认标记
         const marker = new window.BMap.Marker(point);
         map.addOverlay(marker);
 
@@ -241,7 +245,6 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
           const [lat, lng] = spot.coordinates.split(',');
           const spotPoint = new window.BMap.Point(lng, lat);
           
-          // 使用默认标记
           const marker = new window.BMap.Marker(spotPoint);
           map.addOverlay(marker);
 
@@ -280,7 +283,45 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
       console.error('地图初始化错误:', err);
       setError('地图加载失败，请刷新重试');
     }
-  }, [userLocation, parkingSpots, mode, onLocationSelect, initialSpot, loading]);
+  // 移除 parkingSpots 依赖，因为它会在单独的 useEffect 中处理
+  }, [userLocation, mode, onLocationSelect, initialSpot, loading]);
+
+  // 添加新的 useEffect 来处理停车位更新
+  useEffect(() => {
+    if (!mapInstanceRef.current || mode === 'detail') return;
+
+    // 清除现有的停车位标记
+    const allOverlays = mapInstanceRef.current.getOverlays();
+    const parkingMarkers = allOverlays.filter(overlay => 
+      overlay instanceof window.BMap.Marker && 
+      (!overlay.getIcon() || overlay.getIcon().imageUrl !== "https://api.map.baidu.com/images/marker_red_sprite.png")
+    );
+    parkingMarkers.forEach(marker => mapInstanceRef.current.removeOverlay(marker));
+
+    // 添加新的停车位标记
+    parkingSpots.forEach(spot => {
+      if (!spot.coordinates) return;
+      
+      const [lat, lng] = spot.coordinates.split(',');
+      const spotPoint = new window.BMap.Point(lng, lat);
+      
+      const marker = new window.BMap.Marker(spotPoint);
+      mapInstanceRef.current.addOverlay(marker);
+
+      const infoWindow = new window.BMap.InfoWindow(`
+        <div style="padding: 8px;">
+          <h4>${spot.location}</h4>
+          <p>价格: ¥${spot.price}/小时</p>
+          <p>联系方式: ${spot.contact}</p>
+          ${spot.average_rating ? `<p>评分: ${spot.average_rating.toFixed(1)}分</p>` : ''}
+        </div>
+      `);
+
+      marker.addEventListener('click', () => {
+        mapInstanceRef.current.openInfoWindow(infoWindow, spotPoint);
+      });
+    });
+  }, [parkingSpots, mode]);
 
   // 修改 handleSortChange 函数
   const handleSortChange = (value) => {
@@ -317,42 +358,35 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     }
   };
 
-  // 修改 updateSortedSpots 函数，在设置数据后立即应用当前的排序方式
+  // 修改 updateSortedSpots 函数
   const updateSortedSpots = async (lat, lng) => {
     setIsCalculating(true);
-    if (!Array.isArray(parkingSpots)) {
-      console.error('停车位数据无效:', parkingSpots);
+    if (!Array.isArray(parkingSpots) || parkingSpots.length === 0) {
+      console.error('停车位数据无效或为空:', parkingSpots);
       setSortedSpots([]);
       setIsCalculating(false);
-      return;
+      return false;
     }
 
     try {
+      console.log('计算距离的停车场数据:', parkingSpots);
       const spotsWithDistance = parkingSpots
-        .filter(spot => spot && typeof spot === 'object')
+        .filter(spot => spot && typeof spot === 'object' && spot.coordinates)
         .map(spot => {
           try {
-            if (!spot.coordinates || typeof spot.coordinates !== 'string') {
-              return null;
-            }
-
-            const coords = spot.coordinates.split(',');
-            if (coords.length !== 2) {
-              return null;
-            }
-
-            const [spotLat, spotLng] = coords.map(coord => parseFloat(coord.trim()));
+            const [spotLat, spotLng] = spot.coordinates.split(',').map(coord => parseFloat(coord.trim()));
             
             if (isNaN(spotLat) || isNaN(spotLng)) {
+              console.error('无效的坐标:', spot.coordinates);
               return null;
             }
 
-            const R = 6371;
-            const dLat = (spotLat - parseFloat(lat)) * Math.PI / 180;
-            const dLng = (spotLng - parseFloat(lng)) * Math.PI / 180;
+            const R = 6371; // 地球半径（公里）
+            const dLat = (spotLat - lat) * Math.PI / 180;
+            const dLng = (spotLng - lng) * Math.PI / 180;
             const a = 
               Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(parseFloat(lat) * Math.PI / 180) * Math.cos(spotLat * Math.PI / 180) * 
+              Math.cos(lat * Math.PI / 180) * Math.cos(spotLat * Math.PI / 180) * 
               Math.sin(dLng/2) * Math.sin(dLng/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             const distance = R * c;
@@ -368,8 +402,34 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         })
         .filter(spot => spot !== null);
 
-      // 直接使用 handleSortChange 的排序逻辑
-      handleSortChange(sortType);
+      console.log('处理后的停车场数据:', spotsWithDistance);
+
+      if (spotsWithDistance.length === 0) {
+        console.warn('没有有效的停车场数据');
+        setSortedSpots([]);
+        return false;
+      }
+
+      // 根据当前排序类型进行排序
+      const sorted = [...spotsWithDistance].sort((a, b) => {
+        switch(sortType) {
+          case 'rating':
+            if (!a.average_rating && !b.average_rating) return a.distance - b.distance;
+            if (!a.average_rating) return 1;
+            if (!b.average_rating) return -1;
+            return b.average_rating - a.average_rating;
+          case 'price':
+            return parseFloat(a.price || 0) - parseFloat(b.price || 0);
+          case 'name':
+            return (a.location || '').localeCompare(b.location || '');
+          case 'distance':
+          default:
+            return (a.distance || 0) - (b.distance || 0);
+        }
+      });
+
+      console.log('排序后的停车场数据:', sorted);
+      setSortedSpots(sorted);
       return true;
     } catch (error) {
       console.error('计算距离时出错:', error);
@@ -494,26 +554,45 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         location: mapInstanceRef.current
       });
 
-      ac.addEventListener('onconfirm', function(e) {
+      ac.addEventListener('onconfirm', async function(e) {
         const myValue = e.item.value;
-        setSearchValue(myValue.province + myValue.city + myValue.district + myValue.street + myValue.business);
+        const searchAddress = myValue.province + myValue.city + myValue.district + myValue.street + myValue.business;
+        setSearchValue(searchAddress);
         
         const localSearch = new window.BMap.LocalSearch(mapInstanceRef.current, {
           onSearchComplete: async function(results) {
             if (results && results.getPoi(0)) {
               const poi = results.getPoi(0);
-              mapInstanceRef.current.centerAndZoom(poi.point, 16);
               
+              // 移除之前的搜索标记（如果存在）
+              const allOverlays = mapInstanceRef.current.getOverlays();
+              const searchMarkers = allOverlays.filter(overlay => 
+                overlay instanceof window.BMap.Marker && 
+                overlay.getIcon() && 
+                overlay.getIcon().imageUrl === "https://api.map.baidu.com/images/marker_red_sprite.png"
+              );
+              searchMarkers.forEach(marker => mapInstanceRef.current.removeOverlay(marker));
+              
+              // 设置地图中心点和缩放级别
+              const point = new window.BMap.Point(poi.point.lng, poi.point.lat);
+              mapInstanceRef.current.centerAndZoom(point, 16);
+              
+              // 添加新的搜索位置标记
               const searchIcon = new window.BMap.Icon(
                 "https://api.map.baidu.com/images/marker_red_sprite.png",
                 new window.BMap.Size(39, 25),
                 { imageOffset: new window.BMap.Size(0, 0) }
               );
-              const searchMarker = new window.BMap.Marker(poi.point, { icon: searchIcon });
+              const searchMarker = new window.BMap.Marker(point, { icon: searchIcon });
               mapInstanceRef.current.addOverlay(searchMarker);
               
-              setCurrentPoint(poi.point);
-              // 等待数据计算完成后再显示抽屉
+              // 更新当前点位置
+              setCurrentPoint({
+                lat: poi.point.lat,
+                lng: poi.point.lng
+              });
+
+              // 更新排序后的停车场列表
               const success = await updateSortedSpots(poi.point.lat, poi.point.lng);
               if (success) {
                 showDrawer();
@@ -521,7 +600,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
             }
           }
         });
-        localSearch.search(myValue.province + myValue.city + myValue.district + myValue.street + myValue.business);
+        localSearch.search(searchAddress);
       });
 
       autocompleteRef.current = ac;

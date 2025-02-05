@@ -46,6 +46,7 @@ const parkingRouter = require('./routes/parking');
 const parkingUsageRouter = require('./routes/parking-usage');
 const messagesRouter = require('./routes/messages');
 const adminRouter = require('./routes/admin');
+const couponsRouter = require('./routes/coupons');
 
 // API 路由注册
 app.use('/api/auth', authRouter);
@@ -54,6 +55,7 @@ app.use('/api/parking-spots/usage', parkingUsageRouter); // 注意：这个要�
 app.use('/api/parking-spots', parkingRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/coupons', couponsRouter);
 
 // 处理前端路由 - 保持在最后
 app.get('*', (req, res) => {

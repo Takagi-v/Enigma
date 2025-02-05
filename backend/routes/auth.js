@@ -88,14 +88,37 @@ router.post("/register", async (req, res) => {
       `INSERT INTO users (username, password, full_name, phone, avatar, bio, address) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [username, hashedPassword, full_name, phone, avatarUrl, bio || '该用户很神秘', address || ''],
-      (err) => {
+      async function(err) {
         if (err) {
           if (err.message.includes("UNIQUE constraint failed")) {
             return res.status(400).json({ message: "用户名已存在" });
           }
           return res.status(500).json({ message: "创建用户失败" });
         }
-        res.status(201).json({ message: "注册成功" });
+
+        // 为新用户创建优惠券
+        try {
+          const userId = this.lastID;
+          const expiryDate = new Date();
+          expiryDate.setMonth(expiryDate.getMonth() + 1);
+
+          await new Promise((resolve, reject) => {
+            db().run(
+              `INSERT INTO coupons (user_id, amount, status, expiry_date, description) 
+               VALUES (?, ?, ?, ?, ?)`,
+              [userId, 5.0, 'valid', expiryDate.toISOString(), '新用户注册优惠券'],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+
+          res.status(201).json({ message: "注册成功，已发放新用户优惠券" });
+        } catch (error) {
+          console.error('创建优惠券失败:', error);
+          res.status(201).json({ message: "注册成功，但优惠券创建失败" });
+        }
       }
     );
   } catch (error) {

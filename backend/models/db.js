@@ -114,6 +114,19 @@ async function createTables() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (parking_spot_id) REFERENCES parking_spots(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+
+    // 优惠券表
+    `CREATE TABLE IF NOT EXISTS coupons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      status TEXT DEFAULT 'valid',
+      expiry_date DATETIME,
+      used_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      description TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )`
   ];
 
