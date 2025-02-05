@@ -129,6 +129,8 @@ async function createTables() {
   await createDefaultAdmin();
   // 创建测试停车场数据
   await createTestParkingSpots();
+  // 创建测试评论数据
+  await createTestReviews();
 }
 
 // 执行SQL查询的辅助函数
@@ -274,6 +276,92 @@ async function createTestParkingSpots() {
     console.log(`成功创建${testSpots.length}个测试停车场数据`);
   } catch (error) {
     console.error("创建测试停车场数据失败:", error);
+  }
+}
+
+// 创建测试评论数据
+async function createTestReviews() {
+  try {
+    // 清空现有评论数据
+    await runQuery("DELETE FROM reviews");
+    await runQuery("DELETE FROM sqlite_sequence WHERE name='reviews'");
+
+    // 获取前10个停车场ID
+    const parkingSpots = await new Promise((resolve, reject) => {
+      db.all("SELECT id FROM parking_spots LIMIT 10", (err, rows) => {
+        if (err) reject(err);
+        resolve(rows);
+      });
+    });
+
+    // 获取用户列表（用于随机分配评论者）
+    const users = await new Promise((resolve, reject) => {
+      db.all("SELECT id FROM users", (err, rows) => {
+        if (err) reject(err);
+        resolve(rows);
+      });
+    });
+
+    if (users.length === 0) {
+      console.log("没有用户数据，跳过创建测试评论");
+      return;
+    }
+
+    const comments = [
+      '位置很好找，停车方便',
+      '价格合理，周边设施齐全',
+      '保安很负责，停车很安全',
+      '干净整洁，采光很好',
+      '位置很好，交通便利',
+      '服务态度很好，会再来',
+      '停车位宽敞，好停车',
+      '环境不错，性价比高',
+      '位置很好，下次还会选择',
+      '整体体验不错'
+    ];
+
+    const reviews = [];
+    // 为每个停车场创建1-2条评论
+    for (const spot of parkingSpots) {
+      const reviewCount = 1 + Math.floor(Math.random() * 2); // 1或2条评论
+      
+      for (let i = 0; i < reviewCount; i++) {
+        const userId = users[Math.floor(Math.random() * users.length)].id;
+        const rating = Math.floor(Math.random() * 3) + 3; // 3-5星
+        const comment = comments[Math.floor(Math.random() * comments.length)];
+        
+        reviews.push({
+          parking_spot_id: spot.id,
+          user_id: userId,
+          rating,
+          comment
+        });
+      }
+    }
+
+    // 批量插入评论
+    for (const review of reviews) {
+      await runQuery(
+        `INSERT INTO reviews (parking_spot_id, user_id, rating, comment) 
+         VALUES (?, ?, ?, ?)`,
+        [review.parking_spot_id, review.user_id, review.rating, review.comment]
+      );
+    }
+
+    // 更新停车场的平均评分
+    await runQuery(`
+      UPDATE parking_spots 
+      SET average_rating = (
+        SELECT AVG(rating) 
+        FROM reviews 
+        WHERE parking_spot_id = parking_spots.id
+      )
+      WHERE id IN (SELECT DISTINCT parking_spot_id FROM reviews)
+    `);
+
+    console.log(`成功创建${reviews.length}条测试评论数据`);
+  } catch (error) {
+    console.error("创建测试评论数据失败:", error);
   }
 }
 

@@ -250,6 +250,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
               <h4>${spot.location}</h4>
               <p>价格: ¥${spot.price}/小时</p>
               <p>联系方式: ${spot.contact}</p>
+              ${spot.average_rating ? `<p>评分: ${spot.average_rating.toFixed(1)}分</p>` : ''}
             </div>
           `);
 
@@ -281,13 +282,48 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     }
   }, [userLocation, parkingSpots, mode, onLocationSelect, initialSpot, loading]);
 
-  // 修改计算并排序停车位函数
+  // 修改 handleSortChange 函数
+  const handleSortChange = (value) => {
+    setSortType(value);
+    // 如果当前有数据，立即进行重新排序
+    if (sortedSpots.length > 0) {
+      const sorted = [...sortedSpots].sort((a, b) => {
+        try {
+          switch(value) { // 使用新的排序类型
+            case 'rating':
+              // 如果没有评分，则按距离排序
+              if (!a.average_rating && !b.average_rating) {
+                return (a.distance || 0) - (b.distance || 0);
+              }
+              // 如果只有一个有评分，有评分的排在前面
+              if (!a.average_rating) return 1;
+              if (!b.average_rating) return -1;
+              // 都有评分则按评分排序
+              return b.average_rating - a.average_rating;
+            case 'price':
+              return parseFloat(a.price || 0) - parseFloat(b.price || 0);
+            case 'name':
+              return (a.location || '').localeCompare(b.location || '');
+            case 'distance':
+            default:
+              return (a.distance || 0) - (b.distance || 0);
+          }
+        } catch (error) {
+          console.error('排序错误:', error);
+          return 0;
+        }
+      });
+      setSortedSpots(sorted);
+    }
+  };
+
+  // 修改 updateSortedSpots 函数，在设置数据后立即应用当前的排序方式
   const updateSortedSpots = async (lat, lng) => {
-    setIsCalculating(true); // 开始计算
+    setIsCalculating(true);
     if (!Array.isArray(parkingSpots)) {
       console.error('停车位数据无效:', parkingSpots);
       setSortedSpots([]);
-      setIsCalculating(false); // 计算结束
+      setIsCalculating(false);
       return;
     }
 
@@ -311,8 +347,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
               return null;
             }
 
-            // 使用 Haversine 公式计算距离
-            const R = 6371; // 地球半径（公里）
+            const R = 6371;
             const dLat = (spotLat - parseFloat(lat)) * Math.PI / 180;
             const dLng = (spotLng - parseFloat(lng)) * Math.PI / 180;
             const a = 
@@ -333,42 +368,16 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         })
         .filter(spot => spot !== null);
 
-      sortSpots(spotsWithDistance);
-      return true; // 返回成功标志
+      // 直接使用 handleSortChange 的排序逻辑
+      handleSortChange(sortType);
+      return true;
     } catch (error) {
       console.error('计算距离时出错:', error);
       setSortedSpots([]);
       return false;
     } finally {
-      setIsCalculating(false); // 计算结束
+      setIsCalculating(false);
     }
-  };
-
-  // 排序函数
-  const sortSpots = (spots) => {
-    const sorted = [...spots].sort((a, b) => {
-      try {
-        switch(sortType) {
-          case 'price':
-            return parseFloat(a.price || 0) - parseFloat(b.price || 0);
-          case 'name':
-            return (a.location || '').localeCompare(b.location || '');
-          case 'distance':
-          default:
-            return (a.distance || 0) - (b.distance || 0);
-        }
-      } catch (error) {
-        console.error('排序错误:', error);
-        return 0;
-      }
-    });
-    setSortedSpots(sorted);
-  };
-
-  // 处理排序方式变更
-  const handleSortChange = (value) => {
-    setSortType(value);
-    sortSpots(sortedSpots);
   };
 
   // 处理抽屉拖动开始
@@ -597,6 +606,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
                   onChange={(e) => handleSortChange(e.target.value)}
                   className="sort-select"
                 >
+                  <option value="rating">按评分排序</option>
                   <option value="distance">按距离排序</option>
                   <option value="price">按价格排序</option>
                   <option value="name">按名称排序</option>
@@ -626,6 +636,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
                       <h3>{spot.location}</h3>
                       <p>价格: ¥{spot.price}/小时</p>
                       <p>距离: {spot.distance}公里</p>
+                      <p>评分: {spot.average_rating ? `${spot.average_rating.toFixed(1)}分` : '暂无评分'}</p>
                       <p>联系方式: {spot.contact}</p>
                     </div>
                   ))
