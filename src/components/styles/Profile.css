@@ -97,10 +97,25 @@
 }
 
 .parking-record-item {
-  padding: 1rem;
-  border: 1px solid #eee;
+  background: #fff;
   border-radius: 8px;
-  background: #f9f9f9;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.parking-record-item.active {
+  border-left: 4px solid #4CAF50;
+}
+
+.parking-record-item.clickable {
+  cursor: pointer;
+}
+
+.parking-record-item.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .record-header {
@@ -161,6 +176,25 @@
 
 .review-btn:hover {
   background: #388e3c;
+}
+
+.record-review-section {
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.record-review-section .reviews-container {
+  margin-top: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.record-review-section .review-form {
+  background: white;
 }
 
 @keyframes slideUp {

@@ -4,6 +4,7 @@ import { Button } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import './styles/ParkingDetail.css';
 import Map from './Map';
+import Reviews from './Reviews';
 import config from '../config';
 
 function ParkingDetail() {
@@ -83,6 +84,12 @@ function ParkingDetail() {
                 <label>发布时间：</label>
                 <span>{new Date(parkingSpot.created_at).toLocaleString()}</span>
               </div>
+              {parkingSpot.average_rating && (
+                <div className="info-item">
+                  <label>平均评分：</label>
+                  <span>{parkingSpot.average_rating.toFixed(1)} 分</span>
+                </div>
+              )}
             </div>
 
             <div className="description-section">
@@ -107,6 +114,8 @@ function ParkingDetail() {
             </div>
           </div>
         </div>
+
+        <Reviews parkingSpotId={id} />
       </div>
     </div>
   );

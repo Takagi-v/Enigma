@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Reviews from './Reviews';
 import './styles/Profile.css';
 import defaultAvatar from '../images/default-avatar.jpg'; // 请确保有默认头像图片
 import config from '../config';
@@ -9,6 +10,7 @@ function Profile() {
   const { user, authFetch } = useAuth();
   const [parkingRecords, setParkingRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reviewingRecordId, setReviewingRecordId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -118,29 +120,60 @@ function Profile() {
           ) : (
             <div className="parking-records-list">
               {parkingRecords.map(record => (
-                <div key={record.id} className="parking-record-item">
-                  <div className="record-header">
-                    <h4>{record.location}</h4>
-                    <span className={`status ${record.status}`}>
-                      {getStatusText(record.status)}
-                    </span>
-                  </div>
-                  <div className="record-details">
-                    <p>开始时间：{formatTime(record.start_time)}</p>
-                    <p>结束时间：{formatTime(record.end_time)}</p>
-                    <p>费用：¥{record.total_amount || '计费中'}</p>
-                    <p>支付状态：{getPaymentStatusText(record.payment_status)}</p>
-                    {record.vehicle_plate && (
-                      <p>车牌号：{record.vehicle_plate}</p>
+                <div key={record.id}>
+                  <div 
+                    className={`parking-record-item clickable ${record.status}`}
+                    onClick={(e) => {
+                      // 防止评价按钮的点击事件冒泡
+                      if (e.target.className === 'review-btn') return;
+                      
+                      if (record.status === 'active' || 
+                          (record.status === 'completed' && record.payment_status === 'pending')) {
+                        // 使用中或待支付的记录，跳转到使用/支付页面
+                        navigate(`/parking/${record.parking_spot_id}/use?usage_id=${record.id}`);
+                      } else {
+                        // 其他状态的记录，跳转到详情页面
+                        navigate(`/parking-record/${record.id}`);
+                      }
+                    }}
+                  >
+                    <div className="record-header">
+                      <h4>{record.location}</h4>
+                      <span className={`status ${record.status}`}>
+                        {getStatusText(record.status)}
+                      </span>
+                    </div>
+                    <div className="record-details">
+                      <p>开始时间：{formatTime(record.start_time)}</p>
+                      <p>结束时间：{formatTime(record.end_time)}</p>
+                      <p>费用：¥{record.total_amount || '计费中'}</p>
+                      <p>支付状态：{getPaymentStatusText(record.payment_status)}</p>
+                      {record.vehicle_plate && (
+                        <p>车牌号：{record.vehicle_plate}</p>
+                      )}
+                    </div>
+                    {record.status === 'completed' && record.payment_status === 'paid' && !record.rating && (
+                      <button 
+                        className="review-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReviewingRecordId(record.id);
+                        }}
+                      >
+                        评价
+                      </button>
                     )}
                   </div>
-                  {record.status === 'completed' && record.payment_status === 'paid' && !record.rating && (
-                    <button 
-                      className="review-btn"
-                      onClick={() => navigate(`/review/${record.id}`)}
-                    >
-                      评价
-                    </button>
+                  {reviewingRecordId === record.id && (
+                    <div className="record-review-section">
+                      <Reviews 
+                        parkingSpotId={record.parking_spot_id}
+                        onReviewSubmitted={() => {
+                          setReviewingRecordId(null);
+                          fetchParkingRecords();
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
               ))}

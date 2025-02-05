@@ -53,6 +53,7 @@ async function createTables() {
       current_user_id INTEGER,
       hourly_rate REAL NOT NULL DEFAULT 10.0,
       contact TEXT,
+      average_rating REAL DEFAULT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (owner_username) REFERENCES users(username),
       FOREIGN KEY (current_user_id) REFERENCES users(id)
@@ -101,6 +102,18 @@ async function createTables() {
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    
+    // 评论表
+    `CREATE TABLE IF NOT EXISTS reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parking_spot_id INTEGER,
+      user_id INTEGER,
+      rating INTEGER,
+      comment TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (parking_spot_id) REFERENCES parking_spots(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )`
   ];
 

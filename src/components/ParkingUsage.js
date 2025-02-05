@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import parkingService from '../services/parkingService';
 import './styles/ParkingUsage.css';
 
 const ParkingUsage = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const usageId = searchParams.get('usage_id');
   const navigate = useNavigate();
   const [parkingSpot, setParkingSpot] = useState(null);
   const [usage, setUsage] = useState(null);
@@ -40,23 +42,46 @@ const ParkingUsage = () => {
   };
 
   useEffect(() => {
-    const fetchParkingSpot = async () => {
+    const fetchData = async () => {
       try {
-        const data = await parkingService.getParkingSpotDetail(id);
-        setParkingSpot(data);
+        setIsLoading(true);
+        // 获取停车位信息
+        const spotData = await parkingService.getParkingSpotDetail(id);
+        setParkingSpot(spotData);
+
+        // 如果有 usage_id，说明是从记录页面跳转来的
+        if (usageId) {
+          const records = await parkingService.getParkingRecords(authFetch);
+          const currentUsage = records.records.find(record => record.id === parseInt(usageId));
+          if (currentUsage) {
+            setUsage({
+              id: currentUsage.id,
+              start_time: new Date(currentUsage.start_time),
+              end_time: currentUsage.end_time ? new Date(currentUsage.end_time) : null,
+              total_amount: currentUsage.total_amount
+            });
+            
+            // 如果是使用中的记录，计算已经过去的时间
+            if (currentUsage.status === 'active') {
+              const startTime = new Date(currentUsage.start_time);
+              const elapsedSeconds = Math.floor((new Date() - startTime) / 1000);
+              setTimer(elapsedSeconds);
+            }
+          }
+        }
       } catch (error) {
-        console.error('获取停车场信息失败:', error);
-        setError(error.message || '获取停车场信息失败');
+        console.error('获取信息失败:', error);
+        setError(error.message || '获取信息失败');
         if (error.message.includes('401')) {
           navigate('/auth');
         }
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    if (user) {
-      fetchParkingSpot();
-    }
-  }, [id, user, navigate]);
+    fetchData();
+  }, [id, usageId, user, navigate, authFetch]);
 
   useEffect(() => {
     let interval;
