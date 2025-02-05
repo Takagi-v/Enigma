@@ -197,6 +197,71 @@
   background: white;
 }
 
+.coupons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.coupon-item {
+  display: flex;
+  align-items: center;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%);
+  padding: 1rem;
+  border-radius: 8px;
+  color: white;
+  box-shadow: 0 2px 4px rgba(255, 107, 107, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.coupon-item::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+}
+
+.coupon-item::after {
+  content: '';
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+}
+
+.coupon-amount {
+  font-size: 1.8rem;
+  font-weight: bold;
+  padding: 0 1.5rem;
+  border-right: 2px dashed rgba(255, 255, 255, 0.5);
+  margin-right: 1rem;
+}
+
+.coupon-info {
+  flex: 1;
+}
+
+.coupon-description {
+  font-size: 1rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.coupon-expiry {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  margin: 0;
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;

@@ -5,12 +5,14 @@ import Reviews from './Reviews';
 import './styles/Profile.css';
 import defaultAvatar from '../images/default-avatar.jpg'; // 请确保有默认头像图片
 import config from '../config';
+import couponService from '../services/couponService';
 
 function Profile() {
   const { user, authFetch } = useAuth();
   const [parkingRecords, setParkingRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [reviewingRecordId, setReviewingRecordId] = useState(null);
+  const [coupons, setCoupons] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,6 +22,7 @@ function Profile() {
     }
 
     fetchParkingRecords();
+    fetchCoupons();
   }, [user, navigate]);
 
   const fetchParkingRecords = async () => {
@@ -40,6 +43,18 @@ function Profile() {
       alert(error.message || '获取停车记录失败，请重试');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCoupons = async () => {
+    if (!user) return;
+
+    try {
+      const data = await couponService.getUserCoupons(user.id);
+      setCoupons(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('获取优惠券失败:', error);
+      setCoupons([]);
     }
   };
 
@@ -103,6 +118,27 @@ function Profile() {
             <h3>联系方式</h3>
             <p>电话：{user.phone}</p>
             <p>用户ID：{user.id}</p>
+          </div>
+
+          <div className="info-section">
+            <h3>我的优惠券</h3>
+            {coupons.length === 0 ? (
+              <p>暂无可用优惠券</p>
+            ) : (
+              <div className="coupons-list">
+                {coupons.map(coupon => (
+                  <div key={coupon.id} className="coupon-item">
+                    <div className="coupon-amount">¥{coupon.amount}</div>
+                    <div className="coupon-info">
+                      <p className="coupon-description">{coupon.description}</p>
+                      <p className="coupon-expiry">
+                        有效期至：{new Date(coupon.expiry_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <button 
