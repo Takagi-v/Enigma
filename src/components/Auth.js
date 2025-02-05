@@ -9,6 +9,26 @@ import { useAuth } from '../contexts/AuthContext';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
 
+// 添加验证规则
+const VALIDATION_RULES = {
+  username: {
+    pattern: /^.{4,20}$/,
+    message: '用户名必须在4-20个字符之间'
+  },
+  password: {
+    pattern: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/,
+    message: '密码必须至少8位，包含数字和字母'
+  },
+  phone: {
+    pattern: /^1[3-9]\d{9}$/,
+    message: '请输入正确的手机号码'
+  },
+  fullName: {
+    pattern: /^[\u4e00-\u9fa5a-zA-Z]{2,}$/,
+    message: '姓名至少需要2个字符'
+  }
+};
+
 function Auth() {
   const { setUser, login, authFetch } = useAuth();
   const location = useLocation();
@@ -27,6 +47,21 @@ function Auth() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const validateField = (name, value) => {
+    if (!VALIDATION_RULES[name]) return true;
+    
+    const { pattern, message } = VALIDATION_RULES[name];
+    const isValid = pattern.test(value);
+    
+    setFieldErrors(prev => ({
+      ...prev,
+      [name]: isValid ? '' : message
+    }));
+    
+    return isValid;
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -34,6 +69,36 @@ function Auth() {
       ...prev,
       [name]: value
     }));
+    validateField(name, value);
+  };
+
+  const validateForm = () => {
+    const currentStep = registrationStep;
+    let isValid = true;
+    const newErrors = {};
+
+    if (currentStep === 1) {
+      if (!validateField('username', formData.username)) {
+        newErrors.username = VALIDATION_RULES.username.message;
+        isValid = false;
+      }
+      if (!validateField('password', formData.password)) {
+        newErrors.password = VALIDATION_RULES.password.message;
+        isValid = false;
+      }
+    } else if (currentStep === 2) {
+      if (!validateField('fullName', formData.fullName)) {
+        newErrors.fullName = VALIDATION_RULES.fullName.message;
+        isValid = false;
+      }
+      if (!validateField('phone', formData.phone)) {
+        newErrors.phone = VALIDATION_RULES.phone.message;
+        isValid = false;
+      }
+    }
+
+    setFieldErrors(newErrors);
+    return isValid;
   };
 
   const handleLogin = async (e) => {
@@ -77,6 +142,11 @@ function Auth() {
   const handleRegistration = async (e) => {
     e.preventDefault();
     
+    if (!validateForm()) {
+      setError('请修正表单中的错误');
+      return;
+    }
+
     if (registrationStep < 3) {
       setRegistrationStep(prev => prev + 1);
       return;
@@ -188,19 +258,21 @@ function Auth() {
             <input
               type="text"
               name="username"
-              placeholder="用户名"
+              placeholder="用户名（4-20个字符）"
               value={formData.username}
               onChange={handleInputChange}
               required
             />
+            {fieldErrors.username && <div className="field-error">{fieldErrors.username}</div>}
             <input
               type="password"
               name="password"
-              placeholder="密码"
+              placeholder="密码（至少8位，包含数字和字母）"
               value={formData.password}
               onChange={handleInputChange}
               required
             />
+            {fieldErrors.password && <div className="field-error">{fieldErrors.password}</div>}
           </>
         );
       case 2:
@@ -210,19 +282,21 @@ function Auth() {
             <input
               type="text"
               name="fullName"
-              placeholder="姓名"
+              placeholder="姓名（至少2个字符）"
               value={formData.fullName}
               onChange={handleInputChange}
               required
             />
+            {fieldErrors.fullName && <div className="field-error">{fieldErrors.fullName}</div>}
             <input
               type="tel"
               name="phone"
-              placeholder="手机号"
+              placeholder="手机号（11位）"
               value={formData.phone}
               onChange={handleInputChange}
               required
             />
+            {fieldErrors.phone && <div className="field-error">{fieldErrors.phone}</div>}
           </>
         );
       case 3:

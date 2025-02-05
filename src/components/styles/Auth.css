@@ -79,8 +79,19 @@
   background-color: #e8e8e8;
 }
 
+.field-error {
+  color: #ff4d4f;
+  font-size: 12px;
+  margin: -8px 0 8px;
+  padding-left: 4px;
+}
+
 .error-message {
   color: #ff4d4f;
+  background-color: #fff2f0;
+  border: 1px solid #ffccc7;
+  padding: 8px 12px;
+  border-radius: 4px;
   margin-bottom: 16px;
   text-align: center;
 }

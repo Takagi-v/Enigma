@@ -251,4 +251,115 @@ router.delete("/:id", authenticateToken, (req, res) => {
   );
 });
 
+// 添加评论
+router.post('/:id/reviews', authenticateToken, async (req, res) => {
+  const parkingSpotId = req.params.id;
+  const { rating, comment } = req.body;
+  const userId = req.user.id;
+
+  try {
+    // 检查停车位是否存在
+    const parkingSpot = await new Promise((resolve, reject) => {
+      db().get('SELECT * FROM parking_spots WHERE id = ?', [parkingSpotId], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (!parkingSpot) {
+      return res.status(404).json({ message: '停车位不存在' });
+    }
+
+    // 检查用户是否已经评论过
+    const existingReview = await new Promise((resolve, reject) => {
+      db().get(
+        'SELECT * FROM reviews WHERE parking_spot_id = ? AND user_id = ?',
+        [parkingSpotId, userId],
+        (err, row) => {
+          if (err) reject(err);
+          resolve(row);
+        }
+      );
+    });
+
+    if (existingReview) {
+      return res.status(400).json({ message: '您已经评论过这个停车位' });
+    }
+
+    // 添加新评论
+    await new Promise((resolve, reject) => {
+      db().run(
+        'INSERT INTO reviews (parking_spot_id, user_id, rating, comment) VALUES (?, ?, ?, ?)',
+        [parkingSpotId, userId, rating, comment],
+        (err) => {
+          if (err) reject(err);
+          resolve();
+        }
+      );
+    });
+
+    // 更新停车位的平均评分
+    await new Promise((resolve, reject) => {
+      db().run(
+        `UPDATE parking_spots 
+         SET average_rating = (
+           SELECT AVG(rating) 
+           FROM reviews 
+           WHERE parking_spot_id = ?
+         )
+         WHERE id = ?`,
+        [parkingSpotId, parkingSpotId],
+        (err) => {
+          if (err) reject(err);
+          resolve();
+        }
+      );
+    });
+
+    res.json({ message: '评论添加成功' });
+  } catch (error) {
+    console.error('添加评论失败:', error);
+    res.status(500).json({ message: '添加评论失败' });
+  }
+});
+
+// 获取停车位评论
+router.get('/:id/reviews', async (req, res) => {
+  const parkingSpotId = req.params.id;
+
+  try {
+    // 检查停车位是否存在
+    const parkingSpot = await new Promise((resolve, reject) => {
+      db().get('SELECT * FROM parking_spots WHERE id = ?', [parkingSpotId], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (!parkingSpot) {
+      return res.status(404).json({ message: '停车位不存在' });
+    }
+
+    const reviews = await new Promise((resolve, reject) => {
+      db().all(
+        `SELECT r.*, u.username, u.avatar
+         FROM reviews r
+         JOIN users u ON r.user_id = u.id
+         WHERE r.parking_spot_id = ?
+         ORDER BY r.created_at DESC`,
+        [parkingSpotId],
+        (err, rows) => {
+          if (err) reject(err);
+          resolve(rows);
+        }
+      );
+    });
+
+    res.json({ reviews });
+  } catch (error) {
+    console.error('获取评论失败:', error);
+    res.status(500).json({ message: '获取评论失败' });
+  }
+});
+
 module.exports = router; 
