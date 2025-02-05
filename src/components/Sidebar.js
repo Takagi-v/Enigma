@@ -7,7 +7,8 @@ import {
   EnvironmentOutlined, 
   UserOutlined,
   MenuFoldOutlined,
-  MenuUnfoldOutlined
+  MenuUnfoldOutlined,
+  PhoneOutlined
 } from "@ant-design/icons";
 
 function Sidebar() {
@@ -40,7 +41,8 @@ function Sidebar() {
     { path: "/", icon: <EnvironmentOutlined />, text: "地图" },
     { path: "/parking-lots", icon: <HomeOutlined />, text: "停车场" },
     { path: "/messages", icon: <MessageOutlined />, text: "消息" },
-    { path: "/profile", icon: <UserOutlined />, text: "个人" }
+    { path: "/profile", icon: <UserOutlined />, text: "个人" },
+    { path: "/contact-us", icon: <PhoneOutlined />, text: "联系我们" }
   ];
 
   return (

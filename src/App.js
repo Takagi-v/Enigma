@@ -18,6 +18,7 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ParkingRecord from './components/ParkingRecord';
+import ContactUs from './components/ContactUs';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -79,6 +80,7 @@ function App() {
               } />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/contact-us" element={<ContactUs />} />
             </Routes>
           </main>
         </div>

@@ -78,6 +78,18 @@ function Home() {
       const uniqueSpots = Array.from(new Set(data.spots.map(spot => spot.id)))
         .map(id => data.spots.find(spot => spot.id === id));
 
+      // 如果是评分排序，在这里也进行一次排序
+      if (sortBy === 'rating') {
+        uniqueSpots.sort((a, b) => {
+          if (!a.average_rating && !b.average_rating) {
+            return calculateDistance(a.coordinates) - calculateDistance(b.coordinates);
+          }
+          if (!a.average_rating) return 1;
+          if (!b.average_rating) return -1;
+          return b.average_rating - a.average_rating;
+        });
+      }
+
       setParkingSpots(uniqueSpots);
       setPagination(data.pagination || {
         current_page: page,
@@ -98,7 +110,8 @@ function Home() {
       case 'name':
         return 'ASC';
       case 'distance':
-        return 'ASC';
+      case 'rating':
+        return 'DESC';
       default:
         return 'DESC';
     }
@@ -106,7 +119,24 @@ function Home() {
 
   const handleSortChange = (value) => {
     setSortBy(value);
-    fetchParkingSpots(1);
+    if (value === 'rating') {
+      // 如果选择按评分排序，对当前数据进行排序
+      const sorted = [...parkingSpots].sort((a, b) => {
+        // 如果没有评分，则按距离排序
+        if (!a.average_rating && !b.average_rating) {
+          return calculateDistance(a.coordinates) - calculateDistance(b.coordinates);
+        }
+        // 如果只有一个有评分，有评分的排在前面
+        if (!a.average_rating) return 1;
+        if (!b.average_rating) return -1;
+        // 都有评分则按评分排序（从高到低）
+        return b.average_rating - a.average_rating;
+      });
+      setParkingSpots(sorted);
+    } else {
+      // 其他排序方式走原有逻辑
+      fetchParkingSpots(1);
+    }
   };
 
   const handlePageChange = (page) => {
@@ -164,6 +194,7 @@ function Home() {
             onChange={handleSortChange}
             className="sort-select"
           >
+            <Option value="rating">按评分排序</Option>
             <Option value="distance">按距离排序</Option>
             <Option value="price">按价格排序</Option>
             <Option value="name">按名称排序</Option>
@@ -183,16 +214,19 @@ function Home() {
               <Link to={`/parking/${spot.id}`} key={spot.id} className="parking-link">
                 <div className="parking-card">
                   <h2>{spot.location}</h2>
-                  <p className="price">¥{spot.price}/小时</p>
+                  <div className="price">¥{spot.price}/小时</div>
                   {spot.coordinates && (
-                    <p className="distance">
-                      距离: {spot.distance || calculateDistance(spot.coordinates)} 公里
-                    </p>
+                    <div className="distance">
+                      距离: {calculateDistance(spot.coordinates)}km
+                    </div>
                   )}
+                  <div className="rating">
+                    评分: {spot.average_rating ? `${spot.average_rating.toFixed(1)}分` : '暂无评分'}
+                  </div>
                   <div className="spot-details">
-                    <p>联系人：{spot.contact}</p>
-                    <p>发布者：{spot.owner_username}</p>
                     <p>{spot.description}</p>
+                    <p>联系方式: {spot.contact}</p>
+                    <p>状态: {spot.status === 'available' ? '空闲' : '使用中'}</p>
                   </div>
                 </div>
               </Link>
