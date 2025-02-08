@@ -8,11 +8,24 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [parkingSpots, setParkingSpots] = useState([]);
   const [editingSpot, setEditingSpot] = useState(null);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!localStorage.getItem('adminToken')) {
+    const adminToken = localStorage.getItem('adminToken');
+    if (!adminToken) {
       navigate('/admin/login');
+      return;
+    }
+    try {
+      // 验证token是否有效
+      const tokenData = JSON.parse(atob(adminToken.split('.')[1]));
+      if (tokenData.exp * 1000 < Date.now()) {
+        handleLogout();
+        return;
+      }
+    } catch (error) {
+      handleLogout();
       return;
     }
     fetchData();
@@ -20,19 +33,48 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
+      setError('');
+      const headers = {
+        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+        'Content-Type': 'application/json'
+      };
+
       if (activeTab === 'users') {
-        const response = await fetch(`${config.API_URL}/admin/users`);
+        const response = await fetch(`${config.API_URL}/admin/users`, {
+          headers
+        });
+        
         const data = await response.json();
-        console.log('获取到的用户数据:', data);
+        
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            handleLogout();
+            return;
+          }
+          throw new Error(data.message || '获取用户数据失败');
+        }
+        
         setUsers(data);
       } else {
-        const response = await fetch(`${config.API_URL}/admin/parking-spots`);
+        const response = await fetch(`${config.API_URL}/admin/parking-spots`, {
+          headers
+        });
+        
         const data = await response.json();
-        console.log('获取到的停车位数据:', data);
+        
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            handleLogout();
+            return;
+          }
+          throw new Error(data.message || '获取停车位数据失败');
+        }
+        
         setParkingSpots(data);
       }
     } catch (error) {
       console.error('获取数据失败:', error);
+      setError(error.message);
     }
   };
 
@@ -43,14 +85,28 @@ const AdminDashboard = () => {
   const handleDeleteUser = async (id) => {
     if (window.confirm('确定要删除该用户吗？')) {
       try {
+        setError('');
         const response = await fetch(`${config.API_URL}/admin/users/${id}`, {
           method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+          }
         });
-        if (response.ok) {
-          setUsers(users.filter(user => user.id !== id));
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            handleLogout();
+            return;
+          }
+          throw new Error(data.message || '删除用户失败');
         }
+        
+        setUsers(users.filter(user => user.id !== id));
       } catch (error) {
         console.error('删除用户失败:', error);
+        setError(error.message);
       }
     }
   };
@@ -63,14 +119,28 @@ const AdminDashboard = () => {
   const handleDeleteSpot = async (id) => {
     if (window.confirm('确定要删除该停车位吗？')) {
       try {
+        setError('');
         const response = await fetch(`${config.API_URL}/admin/parking-spots/${id}`, {
           method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+          }
         });
-        if (response.ok) {
-          setParkingSpots(parkingSpots.filter(spot => spot.id !== id));
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            handleLogout();
+            return;
+          }
+          throw new Error(data.message || '删除停车位失败');
         }
+        
+        setParkingSpots(parkingSpots.filter(spot => spot.id !== id));
       } catch (error) {
         console.error('删除停车位失败:', error);
+        setError(error.message);
       }
     }
   };
@@ -85,9 +155,11 @@ const AdminDashboard = () => {
   const handleUpdateSpot = async (e) => {
     e.preventDefault();
     try {
+      setError('');
       const response = await fetch(`${config.API_URL}/admin/parking-spots/${editingSpot.id}`, {
         method: 'PUT',
         headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -98,16 +170,34 @@ const AdminDashboard = () => {
         }),
       });
 
-      if (response.ok) {
-        const updatedSpots = parkingSpots.map(spot => 
-          spot.id === editingSpot.id ? { ...spot, ...editingSpot } : spot
-        );
-        setParkingSpots(updatedSpots);
-        setEditingSpot(null);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          handleLogout();
+          return;
+        }
+        throw new Error(data.message || '更新停车位失败');
       }
+
+      const updatedSpots = parkingSpots.map(spot => 
+        spot.id === editingSpot.id ? { ...spot, ...editingSpot } : spot
+      );
+      setParkingSpots(updatedSpots);
+      setEditingSpot(null);
     } catch (error) {
       console.error('更新停车位失败:', error);
+      setError(error.message);
     }
+  };
+
+  const getStatusText = (status) => {
+    const statusMap = {
+      'available': '可用',
+      'occupied': '已占用',
+      'maintenance': '维护中'
+    };
+    return statusMap[status] || status;
   };
 
   return (
@@ -133,6 +223,7 @@ const AdminDashboard = () => {
       </div>
 
       <div className="admin-content">
+        {error && <div className="error-message">{error}</div>}
         {activeTab === 'users' ? (
           <div className="users-table">
             {users.length === 0 ? (
@@ -237,9 +328,9 @@ const AdminDashboard = () => {
                       <td>{spot.id}</td>
                       <td>{spot.location}</td>
                       <td>¥{spot.price}</td>
-                      <td>{spot.status || '可用'}</td>
-                      <td>{spot.owner_full_name || spot.owner_username}</td>
-                      <td>{spot.contact}</td>
+                      <td>{getStatusText(spot.status)}</td>
+                      <td>{spot.owner_full_name || spot.owner_username || '无'}</td>
+                      <td>{spot.contact || '无'}</td>
                       <td>{new Date(spot.created_at).toLocaleString()}</td>
                       <td>
                         <button onClick={() => handleEditSpot(spot)}>编辑</button>

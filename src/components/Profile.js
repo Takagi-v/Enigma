@@ -13,6 +13,7 @@ function Profile() {
   const [loading, setLoading] = useState(true);
   const [reviewingRecordId, setReviewingRecordId] = useState(null);
   const [coupons, setCoupons] = useState([]);
+  const [paymentMethod, setPaymentMethod] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +24,7 @@ function Profile() {
 
     fetchParkingRecords();
     fetchCoupons();
+    fetchPaymentMethod();
   }, [user, navigate]);
 
   const fetchParkingRecords = async () => {
@@ -55,6 +57,20 @@ function Profile() {
     } catch (error) {
       console.error('获取优惠券失败:', error);
       setCoupons([]);
+    }
+  };
+
+  // 获取支付方式信息
+  const fetchPaymentMethod = async () => {
+    try {
+      const response = await authFetch(`${config.API_URL}/payment/method`);
+      const data = await response.json();
+      
+      if (response.ok && data.paymentMethod) {
+        setPaymentMethod(data.paymentMethod);
+      }
+    } catch (error) {
+      console.error('获取支付方式失败:', error);
     }
   };
 
@@ -118,6 +134,35 @@ function Profile() {
             <h3>联系方式</h3>
             <p>电话：{user.phone}</p>
             <p>用户ID：{user.id}</p>
+          </div>
+
+          <div className="info-section">
+            <h3>支付方式</h3>
+            {paymentMethod ? (
+              <div className="payment-method-info">
+                <div className="card-info">
+                  <span className="card-brand">{paymentMethod.card.brand}</span>
+                  <span className="card-last4">**** **** **** {paymentMethod.card.last4}</span>
+                  <span className="card-expiry">有效期至 {paymentMethod.card.exp_month}/{paymentMethod.card.exp_year}</span>
+                </div>
+                <button 
+                  className="update-payment-btn"
+                  onClick={() => navigate('/payment-setup')}
+                >
+                  更新支付方式
+                </button>
+              </div>
+            ) : (
+              <div className="no-payment-method">
+                <p>暂未绑定支付方式</p>
+                <button 
+                  className="setup-payment-btn"
+                  onClick={() => navigate('/payment-setup')}
+                >
+                  绑定支付方式
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="info-section">

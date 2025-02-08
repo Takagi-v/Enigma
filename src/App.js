@@ -19,6 +19,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ParkingRecord from './components/ParkingRecord';
 import ContactUs from './components/ContactUs';
+import StripeProvider from './components/StripeProvider';
+import PaymentSetup from './components/PaymentSetup';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -54,37 +56,40 @@ function App() {
   
   return (
     <AuthProvider>
-      <Router>
-        <div className="App">
-          <Header />
-          <Sidebar />
-          <main className="content">
-            <Routes>
-              <Route path="/" element={<Map />} />
-              <Route path="/parking-lots" element={<Home />} />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              <Route path="/messages" element={<Messages token={token} />} />
-              <Route path="/auth" element={<Auth />}/>
-              <Route path="/publish" element={<ParkingSpotForm />} />
-              <Route path="/parking/:id" element={<ParkingDetail />} />
-              <Route path="/parking/:id/use" element={<ParkingUsage />} />
-              <Route path="/search" element={<ParkingSearch />} />
-              <Route path="/parking-record/:id" element={
-                <ProtectedRoute>
-                  <ParkingRecord />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/contact-us" element={<ContactUs />} />
-            </Routes>
-          </main>
-        </div>
-      </Router>
+      <StripeProvider>
+        <Router>
+          <div className="App">
+            <Header />
+            <Sidebar />
+            <main className="content">
+              <Routes>
+                <Route path="/" element={<Map />} />
+                <Route path="/parking-lots" element={<Home />} />
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } />
+                <Route path="/messages" element={<Messages token={token} />} />
+                <Route path="/auth" element={<Auth />}/>
+                <Route path="/publish" element={<ParkingSpotForm />} />
+                <Route path="/parking/:id" element={<ParkingDetail />} />
+                <Route path="/parking/:id/use" element={<ParkingUsage />} />
+                <Route path="/search" element={<ParkingSearch />} />
+                <Route path="/parking-record/:id" element={
+                  <ProtectedRoute>
+                    <ParkingRecord />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/contact-us" element={<ContactUs />} />
+                <Route path="/payment-setup" element={<PaymentSetup />} />
+              </Routes>
+            </main>
+          </div>
+        </Router>
+      </StripeProvider>
     </AuthProvider>
   );
 }

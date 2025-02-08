@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import "./styles/Sidebar.css";
 import { 
   HomeOutlined, 
-  MessageOutlined, 
   EnvironmentOutlined, 
   UserOutlined,
   MenuFoldOutlined,
@@ -39,8 +38,6 @@ function Sidebar() {
 
   const menuItems = [
     { path: "/", icon: <EnvironmentOutlined />, text: "地图" },
-    { path: "/parking-lots", icon: <HomeOutlined />, text: "停车场" },
-    { path: "/messages", icon: <MessageOutlined />, text: "消息" },
     { path: "/profile", icon: <UserOutlined />, text: "个人" },
     { path: "/contact-us", icon: <PhoneOutlined />, text: "联系我们" }
   ];

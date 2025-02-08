@@ -129,65 +129,67 @@ router.post("/register", async (req, res) => {
 
 // 登录路由
 router.post("/login", (req, res) => {
-  const { username, password } = req.body;
+  const { account, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ message: "用户名和密码不能为空" });
+  if (!account || !password) {
+    return res.status(400).json({ message: "账号和密码不能为空" });
   }
 
-  db().get(
-    "SELECT * FROM users WHERE username = ?",
-    [username],
-    async (err, user) => {
-      if (err) {
-        return res.status(500).json({ message: "登录过程中出错" });
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "用户名或密码错误" });
-      }
+  // 判断是手机号还是用户名
+  const isPhone = /^1[3-9]\d{9}$/.test(account);
+  const query = isPhone ? 
+    "SELECT * FROM users WHERE phone = ?" : 
+    "SELECT * FROM users WHERE username = ?";
 
-      try {
-        const match = await bcrypt.compare(password, user.password);
-        if (match) {
-          // 生成JWT token
-          const token = jwt.sign(
-            { 
-              id: user.id,
-              username: user.username
-            },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-          );
-
-          // 设置 HttpOnly Cookie
-          res.cookie('token', token, COOKIE_OPTIONS);
-
-          // 返回用户信息（不包含密码）
-          const { password: _, ...userWithoutPassword } = user;
-          
-          res.json({ 
-            message: "登录成功",
-            isAuthenticated: true,
-            user: {
-              id: user.id,
-              username: user.username,
-              fullName: user.full_name,
-              phone: user.phone,
-              avatar: user.avatar,
-              bio: user.bio,
-              address: user.address,
-              email: user.email
-            }
-          });
-        } else {
-          res.status(401).json({ message: "用户名或密码错误" });
-        }
-      } catch (error) {
-        res.status(500).json({ message: "登录过程中出错" });
-      }
+  db().get(query, [account], async (err, user) => {
+    if (err) {
+      return res.status(500).json({ message: "登录过程中出错" });
     }
-  );
+    
+    if (!user) {
+      return res.status(401).json({ message: "账号或密码错误" });
+    }
+
+    try {
+      const match = await bcrypt.compare(password, user.password);
+      if (match) {
+        // 生成JWT token
+        const token = jwt.sign(
+          { 
+            id: user.id,
+            username: user.username
+          },
+          JWT_SECRET,
+          { expiresIn: '24h' }
+        );
+
+        // 设置 HttpOnly Cookie
+        res.cookie('token', token, COOKIE_OPTIONS);
+
+        // 返回用户信息（不包含密码）
+        const { password: _, ...userWithoutPassword } = user;
+        
+        res.json({ 
+          message: "登录成功",
+          isAuthenticated: true,
+          user: {
+            id: user.id,
+            username: user.username,
+            fullName: user.full_name,
+            phone: user.phone,
+            avatar: user.avatar,
+            bio: user.bio,
+            address: user.address,
+            email: user.email
+          }
+        });
+      } else {
+        res.status(401).json({ message: "账号或密码错误" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "登录过程中出错" });
+    }
+  });
 });
 
 // 头像上传路由

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
@@ -47,6 +48,7 @@ const parkingUsageRouter = require('./routes/parking-usage');
 const messagesRouter = require('./routes/messages');
 const adminRouter = require('./routes/admin');
 const couponsRouter = require('./routes/coupons');
+const paymentRoutes = require('./routes/payment');
 
 // API 路由注册
 app.use('/api/auth', authRouter);
@@ -56,6 +58,10 @@ app.use('/api/parking-spots', parkingRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/coupons', couponsRouter);
+app.use('/api/payment', paymentRoutes);
+
+// 添加 Stripe webhook 路由的特殊处理
+app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
 
 // 处理前端路由 - 保持在最后
 app.get('*', (req, res) => {

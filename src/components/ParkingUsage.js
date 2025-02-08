@@ -95,6 +95,17 @@ const ParkingUsage = () => {
 
   const handleStart = async () => {
     try {
+      // 检查用户是否已绑定支付方式
+      const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/payment/status`);
+      const paymentStatus = await response.json();
+
+      if (!paymentStatus.hasPaymentMethod) {
+        // 保存当前页面URL，用于支付绑定后返回
+        localStorage.setItem('returnUrl', window.location.pathname);
+        navigate('/payment-setup');
+        return;
+      }
+
       const data = await parkingService.startParking(id, authFetch, 'TEST123');
       setUsage({
         id: data.usage_id,

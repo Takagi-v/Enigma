@@ -33,8 +33,9 @@ function Auth() {
   const { setUser, login, authFetch } = useAuth();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/profile';
-  const [isLogin, setIsLogin] = useState(true);
-  const [registrationStep, setRegistrationStep] = useState(1);
+  const [isLogin, setIsLogin] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState(0);
+  const [registrationType, setRegistrationType] = useState('');
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -42,7 +43,8 @@ function Auth() {
     phone: '',
     avatar: '',
     bio: '',
-    address: ''
+    address: '',
+    account: ''
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +110,7 @@ function Auth() {
 
     try {
       console.log('开始登录请求');
-      const response = await login(formData.username, formData.password);
+      const response = await login(formData.account, formData.password);
       console.log('登录响应:', response);
       
       // 获取并打印当前的 cookie
@@ -178,18 +180,29 @@ function Auth() {
         throw new Error(data.message || '注册失败');
       }
 
-      alert('注册成功！请登录。');
-      setIsLogin(true);
-      setRegistrationStep(1);
-      setFormData({
-        username: '',
-        password: '',
-        fullName: '',
-        phone: '',
-        avatar: '',
-        bio: '',
-        address: ''
-      });
+      // 注册成功后自动登录
+      try {
+        const loginResponse = await login(formData.username, formData.password);
+        if (loginResponse.user) {
+          alert('注册成功并已自动登录！');
+          navigate(from);
+        }
+      } catch (loginError) {
+        console.error('自动登录失败:', loginError);
+        alert('注册成功！但自动登录失败，请手动登录。');
+        setIsLogin(true);
+        setRegistrationStep(0);
+        setFormData({
+          username: '',
+          password: '',
+          fullName: '',
+          phone: '',
+          avatar: '',
+          bio: '',
+          address: '',
+          account: ''
+        });
+      }
     } catch (err) {
       setError(err.message || '注册失败，请重试');
     } finally {
@@ -247,6 +260,135 @@ function Auth() {
     } catch (err) {
       setError(err.message || '头像上传失败，请重试');
     }
+  };
+
+  const generateRandomUsername = (phone) => {
+    const prefix = 'user';
+    const randomNum = Math.floor(Math.random() * 10000);
+    return `${prefix}${phone.slice(-4)}${randomNum}`;
+  };
+
+  const handleQuickRegistration = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.phone || !VALIDATION_RULES.phone.pattern.test(formData.phone)) {
+      setError('请输入正确的手机号码');
+      return;
+    }
+
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const username = generateRandomUsername(formData.phone);
+      const password = formData.phone.slice(-8);
+
+      const response = await fetch(`${config.API_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username,
+          password: password,
+          full_name: '未设置',
+          phone: formData.phone,
+          avatar: '',
+          bio: '这个用户很神秘',
+          address: ''
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || '注册失败');
+      }
+
+      // 注册成功后自动登录
+      try {
+        const loginResponse = await login(username, password);
+        if (loginResponse.user) {
+          alert(`注册成功并已自动登录！\n请记住您的登录信息：\n用户名：${username}\n密码：您手机号的后8位\n您可以稍后在个人设置中修改这些信息。`);
+          navigate(from);
+        }
+      } catch (loginError) {
+        console.error('自动登录失败:', loginError);
+        alert(`注册成功！但自动登录失败。\n您的登录信息：\n用户名：${username}\n密码：您手机号的后8位\n请使用这些信息手动登录。`);
+        setIsLogin(true);
+        setRegistrationStep(0);
+        setRegistrationType('');
+        setFormData({
+          username: '',
+          password: '',
+          fullName: '',
+          phone: '',
+          avatar: '',
+          bio: '',
+          address: '',
+          account: ''
+        });
+      }
+    } catch (err) {
+      setError(err.message || '注册失败，请重试');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderRegistrationChoice = () => {
+    return (
+      <div className="registration-choice">
+        <h3>请选择注册方式</h3>
+        <button
+          type="button"
+          className="choice-button"
+          onClick={() => {
+            setRegistrationType('quick');
+            setRegistrationStep(1);
+          }}
+        >
+          快速注册
+          <small>仅需手机号，立即使用</small>
+        </button>
+        <button
+          type="button"
+          className="choice-button"
+          onClick={() => {
+            setRegistrationType('normal');
+            setRegistrationStep(1);
+          }}
+        >
+          普通注册
+          <small>填写完整信息</small>
+        </button>
+      </div>
+    );
+  };
+
+  const renderQuickRegistration = () => {
+    return (
+      <>
+        <h3>快速注册</h3>
+        <form onSubmit={handleQuickRegistration}>
+          <input
+            type="tel"
+            name="phone"
+            placeholder="请输入手机号（11位）"
+            value={formData.phone}
+            onChange={handleInputChange}
+            required
+          />
+          {fieldErrors.phone && <div className="field-error">{fieldErrors.phone}</div>}
+          <small className="quick-reg-note">
+            注册后，您的用户名将自动生成，密码为手机号后8位
+          </small>
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? '注册中...' : '立即注册'}
+          </button>
+        </form>
+      </>
+    );
   };
 
   const renderRegistrationStep = () => {
@@ -340,76 +482,112 @@ function Auth() {
 
   return (
     <div className="auth-container">
-      <form onSubmit={isLogin ? handleLogin : handleRegistration} className="auth-form">
-        <h2>{isLogin ? '登录' : '注册'}</h2>
+      <div className="auth-form">
+        <h2>{isLogin ? '登录' : '欢迎注册'}</h2>
         
         {error && <div className="error-message">{error}</div>}
         
         {isLogin ? (
           <>
-            <input
-              type="text"
-              name="username"
-              placeholder="用户名"
-              value={formData.username}
-              onChange={handleInputChange}
-              required
-              disabled={isLoading}
-            />
-            <input
-              type="password"
-              name="password"
-              placeholder="密码"
-              value={formData.password}
-              onChange={handleInputChange}
-              required
-              disabled={isLoading}
-            />
+            <form onSubmit={handleLogin}>
+              <input
+                type="text"
+                name="account"
+                placeholder="手机号/用户名"
+                value={formData.account}
+                onChange={handleInputChange}
+                required
+                disabled={isLoading}
+              />
+              <input
+                type="password"
+                name="password"
+                placeholder="密码"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+                disabled={isLoading}
+              />
+              <button type="submit" disabled={isLoading}>
+                {isLoading ? '登录中...' : '登录'}
+              </button>
+            </form>
+            <p className="login-tip">
+              首次使用停车场？ 
+              <button 
+                type="button" 
+                className="switch-button"
+                onClick={() => {
+                  setIsLogin(false);
+                  setRegistrationStep(0);
+                  setRegistrationType('');
+                  setFormData({
+                    username: '',
+                    password: '',
+                    fullName: '',
+                    phone: '',
+                    avatar: '',
+                    bio: '',
+                    address: '',
+                    account: ''
+                  });
+                }}
+              >
+                立即注册
+              </button>
+            </p>
           </>
         ) : (
-          renderRegistrationStep()
-        )}
-        
-        <button 
-          type="submit" 
-          disabled={isLoading || (!isLogin && !formData.username) || (!isLogin && !formData.password)}
-        >
-          {isLoading ? '处理中...' : (isLogin ? '登录' : 
-            registrationStep < 3 ? '下一步' : '完成注册')}
-        </button>
+          <>
+            {registrationStep === 0 && renderRegistrationChoice()}
+            {registrationStep > 0 && registrationType === 'quick' && renderQuickRegistration()}
+            {registrationStep > 0 && registrationType === 'normal' && (
+              <form onSubmit={handleRegistration}>
+                {renderRegistrationStep()}
+                <button 
+                  type="submit" 
+                  disabled={isLoading || !formData.username || !formData.password}
+                >
+                  {isLoading ? '处理中...' : (registrationStep < 3 ? '下一步' : '完成注册')}
+                </button>
 
-        {registrationStep > 1 && !isLogin && (
-          <Button 
-            type="link" 
-            icon={<ArrowLeftOutlined />} 
-            onClick={() => setRegistrationStep(prev => prev - 1)}
-            className="back-button"
-          />
+                {registrationStep > 1 && (
+                  <Button 
+                    type="link" 
+                    icon={<ArrowLeftOutlined />} 
+                    onClick={() => setRegistrationStep(prev => prev - 1)}
+                    className="back-button"
+                  />
+                )}
+              </form>
+            )}
+            <p className="switch-mode">
+              已有账号？ 
+              <button 
+                type="button" 
+                className="switch-button"
+                onClick={() => {
+                  setIsLogin(true);
+                  setRegistrationStep(0);
+                  setRegistrationType('');
+                  setFormData({
+                    username: '',
+                    password: '',
+                    fullName: '',
+                    phone: '',
+                    avatar: '',
+                    bio: '',
+                    address: '',
+                    account: ''
+                  });
+                }}
+              >
+                立即登录
+              </button>
+            </p>
+          </>
         )}
-
-        <p className="switch-mode">
-          {isLogin ? "还没有账号？ " : "已有账号？ "}
-          <button 
-            type="button" 
-            className="switch-button"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setRegistrationStep(1);
-              setFormData({
-                username: '',
-                password: '',
-                fullName: '',
-                phone: '',
-                avatar: '',
-                bio: '',
-                address: ''
-              });
-            }}
-          >
-            {isLogin ? '注册' : '登录'}
-          </button>
-        </p>
-      </form>
+      </div>
     </div>
   );
 }
