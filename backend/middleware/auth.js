@@ -3,8 +3,16 @@ const { db } = require('../models/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+const getTokenFromRequest = (req) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return req.cookies?.token;
+};
+
 const authenticateToken = async (req, res, next) => {
-  const token = req.cookies.token;
+  const token = getTokenFromRequest(req);
 
   if (!token) {
     return res.status(401).json({ 
@@ -86,7 +94,7 @@ const checkUserAccess = (req, res, next) => {
 
 // 管理员认证中间件
 const authenticateAdmin = async (req, res, next) => {
-  const token = req.cookies.token;
+  const token = getTokenFromRequest(req);
 
   if (!token) {
     return res.status(401).json({ 
@@ -97,6 +105,13 @@ const authenticateAdmin = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ 
+        message: '需要管理员权限',
+        code: 'ADMIN_REQUIRED'
+      });
+    }
     
     // 从数据库获取管理员信息
     db().get(

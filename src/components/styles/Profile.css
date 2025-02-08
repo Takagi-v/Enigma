@@ -262,6 +262,68 @@
   margin: 0;
 }
 
+.payment-method-info {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 0.5rem;
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.card-brand {
+  font-weight: 500;
+  color: #2d3748;
+  text-transform: capitalize;
+}
+
+.card-last4 {
+  font-family: monospace;
+  font-size: 1.1rem;
+  color: #4a5568;
+  letter-spacing: 0.1em;
+}
+
+.card-expiry {
+  color: #718096;
+  font-size: 0.9rem;
+}
+
+.update-payment-btn,
+.setup-payment-btn {
+  background-color: #4299e1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+}
+
+.update-payment-btn:hover,
+.setup-payment-btn:hover {
+  background-color: #3182ce;
+}
+
+.no-payment-method {
+  text-align: center;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.no-payment-method p {
+  color: #718096;
+  margin-bottom: 1rem;
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;

@@ -127,6 +127,18 @@ async function createTables() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       description TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+
+    // 支付方式表
+    `CREATE TABLE IF NOT EXISTS user_payment_methods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      stripe_customer_id TEXT NOT NULL,
+      payment_method_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(user_id)
     )`
   ];
 

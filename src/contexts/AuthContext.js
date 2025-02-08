@@ -55,11 +55,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (username, password) => {
+  const login = async (account, password) => {
     try {
       const response = await authFetch(`${config.API_URL}/auth/login`, {
         method: 'POST',
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ account, password })
       });
 
       const data = await response.json();
