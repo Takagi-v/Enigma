@@ -38,7 +38,8 @@ async function createTables() {
       avatar TEXT,
       bio TEXT DEFAULT '该用户很神秘',
       address TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      balance REAL DEFAULT 0
     )`,
     
     // 停车位表
@@ -120,6 +121,7 @@ async function createTables() {
     `CREATE TABLE IF NOT EXISTS coupons (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
+      type TEXT NOT NULL DEFAULT 'coupon',
       amount REAL NOT NULL,
       status TEXT DEFAULT 'valid',
       expiry_date DATETIME,

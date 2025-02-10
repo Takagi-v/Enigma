@@ -1,13 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../models/db');
+const { db: getDB } = require('../models/db');
 
-// 获取用户的所有优惠券
+const dbConnection = getDB();
+
+// 获取用户的所有优惠券和赠送余额
 router.get('/user/:userId', async (req, res) => {
   try {
     const coupons = await new Promise((resolve, reject) => {
-      db.all(
-        `SELECT * FROM coupons WHERE user_id = ? AND status = 'valid' ORDER BY created_at DESC`,
+      dbConnection.all(
+        `SELECT * FROM coupons WHERE user_id = ? ORDER BY created_at DESC`,
         [req.params.userId],
         (err, rows) => {
           if (err) reject(err);
@@ -17,8 +19,8 @@ router.get('/user/:userId', async (req, res) => {
     });
     res.json(coupons);
   } catch (error) {
-    console.error('获取优惠券失败:', error);
-    res.status(500).json({ error: '获取优惠券失败' });
+    console.error('获取优惠券和赠送余额失败:', error);
+    res.status(500).json({ error: '获取优惠券和赠送余额失败' });
   }
 });
 
@@ -32,7 +34,7 @@ router.post('/create-default', async (req, res) => {
     expiryDate.setMonth(expiryDate.getMonth() + 1);
 
     await new Promise((resolve, reject) => {
-      db.run(
+      dbConnection.run(
         `INSERT INTO coupons (user_id, amount, status, expiry_date, description) 
          VALUES (?, ?, ?, ?, ?)`,
         [userId, 5.0, 'valid', expiryDate.toISOString(), '新用户注册优惠券'],

@@ -25,41 +25,56 @@ const PaymentSetup = () => {
     setError(null);
 
     try {
-      // 1. 获取卡片信息
-      const cardElement = elements.getElement(CardElement);
-      const {error: cardError, paymentMethod} = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: {
-          name: user.fullName,
-          email: user.email,
-          phone: user.phone
+      // 1. 创建 Setup Intent
+      const setupResponse = await authFetch(`${config.API_URL}/payment/setup-intent`);
+      if (!setupResponse.ok) {
+        const errorData = await setupResponse.json();
+        throw new Error(errorData.error || '创建支付设置失败');
+      }
+      const { clientSecret, customerId } = await setupResponse.json();
+
+      // 保存 customerId 如果需要的话
+      localStorage.setItem('stripeCustomerId', customerId);
+
+      // 2. 确认 Setup Intent
+      const result = await stripe.confirmCardSetup(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement),
+          billing_details: {
+            name: user.fullName,
+            email: user.email,
+            phone: user.phone
+          }
         }
       });
 
-      if (cardError) {
-        throw new Error(cardError.message);
+      if (result.error) {
+        throw new Error(result.error.message);
       }
 
-      // 2. 保存支付方式信息到数据库
-      const saveResponse = await authFetch(`${config.API_URL}/payment/setup`, {
+      // 3. 保存支付方式到后端
+      const response = await authFetch(`${config.API_URL}/payment/save-method`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          payment_method_id: paymentMethod.id
-        })
+          paymentMethodId: result.setupIntent.payment_method
+        }),
       });
 
-      if (!saveResponse.ok) {
-        throw new Error('支付方式保存失败');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Save Method Response:', errorText);
+        throw new Error(`保存支付方式失败: ${response.status}`);
       }
+
+      const responseData = await response.json();
 
       alert('支付方式绑定成功！');
       navigate(returnUrl);
     } catch (err) {
-      console.error('绑定支付方式失败:', err);
+      console.error('详细错误信息:', err);
       setError(err.message || '绑定支付方式失败，请重试');
     } finally {
       setProcessing(false);
@@ -120,8 +135,8 @@ const PaymentSetup = () => {
             <span>您的支付信息将通过 Stripe 安全加密处理</span>
           </div>
 
-          <button
-            type="submit"
+          <button 
+            type="submit" 
             disabled={!stripe || processing}
             className={`submit-button ${processing ? 'processing' : ''}`}
           >

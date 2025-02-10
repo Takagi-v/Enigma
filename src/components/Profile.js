@@ -14,6 +14,7 @@ function Profile() {
   const [reviewingRecordId, setReviewingRecordId] = useState(null);
   const [coupons, setCoupons] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState(null);
+  const [giftBalance, setGiftBalance] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,6 +26,7 @@ function Profile() {
     fetchParkingRecords();
     fetchCoupons();
     fetchPaymentMethod();
+    fetchGiftBalance();
   }, [user, navigate]);
 
   const fetchParkingRecords = async () => {
@@ -71,6 +73,16 @@ function Profile() {
       }
     } catch (error) {
       console.error('获取支付方式失败:', error);
+    }
+  };
+
+  const fetchGiftBalance = async () => {
+    try {
+      const response = await authFetch(`${config.API_URL}/users/${user.id}/gift-balance`);
+      const data = await response.json();
+      setGiftBalance(data.gift_balance);
+    } catch (error) {
+      console.error('获取赠送余额失败:', error);
     }
   };
 
@@ -166,24 +178,37 @@ function Profile() {
           </div>
 
           <div className="info-section">
-            <h3>我的优惠券</h3>
+            <h3>我的优惠</h3>
             {coupons.length === 0 ? (
-              <p>暂无可用优惠券</p>
+              <p>暂无可用优惠</p>
             ) : (
               <div className="coupons-list">
                 {coupons.map(coupon => (
                   <div key={coupon.id} className="coupon-item">
-                    <div className="coupon-amount">¥{coupon.amount}</div>
+                    <div className="coupon-amount">
+                      {coupon.type === 'gift_balance' ? '赠送余额' : '优惠券'} ¥{coupon.amount}
+                    </div>
                     <div className="coupon-info">
                       <p className="coupon-description">{coupon.description}</p>
-                      <p className="coupon-expiry">
-                        有效期至：{new Date(coupon.expiry_date).toLocaleDateString()}
-                      </p>
+                      {coupon.expiry_date && (
+                        <p className="coupon-expiry">
+                          有效期至：{new Date(coupon.expiry_date).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="info-section">
+            <h3>账户余额</h3>
+            <div className="balance-info">
+              <p>赠送余额: <span className="gift-balance">¥{giftBalance}</span></p>
+              <p>实际余额: <span className="actual-balance">¥{user.balance || 0}</span></p>
+              <p>总余额: <span className="total-balance">¥{(giftBalance + (user.balance || 0))}</span></p>
+            </div>
           </div>
 
           <button 

@@ -324,6 +324,36 @@
   margin-bottom: 1rem;
 }
 
+.balance-info {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.balance-info p {
+  margin: 8px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gift-balance {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.actual-balance {
+  color: #007bff;
+  font-weight: bold;
+}
+
+.total-balance {
+  color: #17a2b8;
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;
