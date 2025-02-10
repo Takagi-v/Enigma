@@ -19,15 +19,18 @@ html, body {
 }
 
 /* 地图容器 */
-.map-container {
+.fullscreen-map-container {
   position: relative;
   width: 100%;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-wrapper {
   width: 100%;
   height: 100%;
+  flex: 1;
 }
 
 .map {

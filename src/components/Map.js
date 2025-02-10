@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./styles/Map.css";
 import config from '../config';
-import { GOOGLE_MAPS_API_KEY, defaultCenter, defaultZoom, mapStyles } from '../config/maps';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, LoadScript } from '@react-google-maps/api';
 import { Input, Drawer, Select, Card, Empty, Spin } from 'antd';
 import usePlacesAutocomplete, {
   getGeocode,
@@ -12,6 +11,21 @@ import usePlacesAutocomplete, {
 
 const { Search } = Input;
 const { Option } = Select;
+
+const defaultCenter = {
+  lat: 39.915,  // 默认中心点纬度
+  lng: 116.404  // 默认中心点经度
+};
+
+const defaultZoom = 15;
+
+const mapStyles = {
+  width: '100%',
+  height: '100%'
+};
+
+// 地图库配置
+const libraries = ["places"];
 
 // 错误边界组件
 class ErrorBoundary extends React.Component {
@@ -63,8 +77,11 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
 
   // 加载 Google Maps API
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: ["places"],
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+    libraries: libraries,
+    language: 'zh-CN',
+    region: 'CN'
   });
 
   // Places Autocomplete 设置
@@ -76,7 +93,10 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     clearSuggestions,
   } = usePlacesAutocomplete({
     requestOptions: {
-      /* Google Places 选项 */
+      location: { lat: () => userLocation?.lat || defaultCenter.lat, lng: () => userLocation?.lng || defaultCenter.lng },
+      radius: 20000, // 搜索半径（米）
+      types: ['establishment', 'geocode'],
+      componentRestrictions: { country: 'cn' }
     },
     debounce: 300,
   });
@@ -327,16 +347,16 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   };
 
   if (loadError) {
-    return <div className="map-error">地图加载失败，请检查网络连接后重试</div>;
+    return <div className="map-error">地图加载失败: {loadError.message}</div>;
   }
 
   if (!isLoaded || loading) {
-    return <div className="map-loading">正在加载地图...</div>;
+    return <div className="map-loading"><Spin tip="正在加载地图..." /></div>;
   }
 
   return (
     <ErrorBoundary>
-      <div className="map-container">
+      <div className="fullscreen-map-container">
         {!hideSearch && (
           <div className="map-search-container">
             <div className="search-box">
@@ -355,6 +375,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
               <button 
                 className="search-button"
                 onClick={handleSearch}
+                disabled={!ready}
               >
                 搜索
               </button>
@@ -382,6 +403,24 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
             onClick={handleMapClick}
             onLoad={map => {
               mapRef.current = map;
+              // 设置地图控件
+              map.setOptions({
+                zoomControl: true,
+                mapTypeControl: true,
+                scaleControl: true,
+                streetViewControl: true,
+                rotateControl: true,
+                fullscreenControl: true
+              });
+            }}
+            options={{
+              // 地图控件位置设置
+              zoomControlOptions: { position: window.google?.maps?.ControlPosition?.RIGHT_CENTER },
+              mapTypeControlOptions: { position: window.google?.maps?.ControlPosition?.TOP_RIGHT },
+              // 其他地图选项
+              gestureHandling: 'greedy', // 允许手势操作
+              disableDefaultUI: false,   // 启用默认UI
+              mapTypeId: 'roadmap'       // 地图类型
             }}
           >
             {/* 用户位置标记 */}

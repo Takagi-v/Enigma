@@ -30,95 +30,14 @@ router.get('/status', authenticateToken, async (req, res) => {
   }
 });
 
-// 设置支付方式
-router.post('/setup', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { payment_method_id } = req.body;
-
-    if (!payment_method_id) {
-      return res.status(400).json({ message: '支付方式ID不能为空' });
-    }
-
-    // 1. 检查用户是否已有 Stripe 客户 ID
-    db().get(
-      'SELECT stripe_customer_id FROM user_payment_methods WHERE user_id = ?',
-      [userId],
-      async (err, row) => {
-        if (err) {
-          console.error('数据库查询错误:', err);
-          return res.status(500).json({ message: '设置支付方式失败' });
-        }
-
-        let stripeCustomerId = row?.stripe_customer_id;
-
-        try {
-          // 2. 如果用户没有 Stripe 客户 ID，创建新客户
-          if (!stripeCustomerId) {
-            const customer = await stripe.customers.create({
-              email: req.user.email,
-              name: req.user.fullName,
-              phone: req.user.phone
-            });
-            stripeCustomerId = customer.id;
-          }
-
-          // 3. 获取支付方式信息
-          const paymentMethod = await stripe.paymentMethods.retrieve(payment_method_id);
-
-          // 4. 如果支付方式已经附加到其他客户，先分离
-          if (paymentMethod.customer && paymentMethod.customer !== stripeCustomerId) {
-            await stripe.paymentMethods.detach(payment_method_id);
-          }
-
-          // 5. 如果支付方式未附加到当前客户，则附加
-          if (!paymentMethod.customer || paymentMethod.customer !== stripeCustomerId) {
-            await stripe.paymentMethods.attach(payment_method_id, {
-              customer: stripeCustomerId,
-            });
-          }
-
-          // 6. 设置为默认支付方式
-          await stripe.customers.update(stripeCustomerId, {
-            invoice_settings: {
-              default_payment_method: payment_method_id,
-            },
-          });
-
-          // 7. 保存或更新支付方式信息
-          db().run(
-            `INSERT OR REPLACE INTO user_payment_methods 
-             (user_id, stripe_customer_id, payment_method_id, created_at, updated_at)
-             VALUES (?, ?, ?, datetime('now'), datetime('now'))`,
-            [userId, stripeCustomerId, payment_method_id],
-            (err) => {
-              if (err) {
-                console.error('保存支付方式失败:', err);
-                return res.status(500).json({ message: '保存支付方式失败' });
-              }
-
-              res.json({ message: '支付方式设置成功' });
-            }
-          );
-        } catch (stripeError) {
-          console.error('Stripe 操作失败:', stripeError);
-          res.status(500).json({ message: stripeError.message });
-        }
-      }
-    );
-  } catch (error) {
-    console.error('设置支付方式失败:', error);
-    res.status(500).json({ message: '设置支付方式失败' });
-  }
-});
-
 // 创建 Setup Intent
 router.post('/setup-intent', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
+  const userId = req.user.id;
+  console.log(`开始为用户 ${userId} 创建 Setup Intent`);
 
-    // 检查用户是否已有 Stripe 客户 ID
-    const userPaymentMethod = await new Promise((resolve, reject) => {
+  try {
+    // 1. 检查用户是否已有 Stripe 客户 ID
+    const existingCustomer = await new Promise((resolve, reject) => {
       db().get(
         'SELECT stripe_customer_id FROM user_payment_methods WHERE user_id = ?',
         [userId],
@@ -131,94 +50,122 @@ router.post('/setup-intent', authenticateToken, async (req, res) => {
 
     let stripeCustomerId;
 
-    if (userPaymentMethod?.stripe_customer_id) {
-      stripeCustomerId = userPaymentMethod.stripe_customer_id;
-    } else {
-      // 创建新的 Stripe 客户
+    // 2. 如果用户没有 Stripe 客户 ID，创建新客户
+    if (!existingCustomer?.stripe_customer_id) {
+      console.log(`用户 ${userId} 无 Stripe 客户记录，创建新客户`);
       const customer = await stripe.customers.create({
         email: req.user.email,
         name: req.user.fullName,
-        phone: req.user.phone
+        phone: req.user.phone,
+        metadata: {
+          userId: userId
+        }
       });
       stripeCustomerId = customer.id;
+
+      // 保存客户 ID 到数据库
+      await new Promise((resolve, reject) => {
+        db().run(
+          `INSERT INTO user_payment_methods (user_id, stripe_customer_id) 
+           VALUES (?, ?)`,
+          [userId, stripeCustomerId],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+    } else {
+      stripeCustomerId = existingCustomer.stripe_customer_id;
     }
 
-    // 创建 Setup Intent
+    // 3. 创建 Setup Intent
     const setupIntent = await stripe.setupIntents.create({
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       usage: 'off_session', // 允许将来的离线支付
       metadata: {
-        user_id: userId
+        userId: userId
       }
     });
 
-    res.json({
-      clientSecret: setupIntent.client_secret
-    });
-  } catch (error) {
-    console.error('创建 Setup Intent 失败:', error);
-    res.status(500).json({ message: '创建支付设置失败' });
-  }
-});
-
-// 处理 Stripe Webhook
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-
-  try {
-    const event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-
-    // 处理不同类型的事件
-    switch (event.type) {
-      case 'setup_intent.succeeded':
-        const setupIntent = event.data.object;
-        // 处理成功设置的支付方式
-        await handleSetupIntentSucceeded(setupIntent);
-        break;
-      case 'payment_intent.succeeded':
-        const paymentIntent = event.data.object;
-        // 处理成功的支付
-        await handleSuccessfulPayment(paymentIntent);
-        break;
-      case 'payment_method.attached':
-        const paymentMethod = event.data.object;
-        // 处理新添加的支付方式
-        await handlePaymentMethodAttached(paymentMethod);
-        break;
-    }
-
-    res.json({ received: true });
-  } catch (err) {
-    console.error('Webhook 错误:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-});
-
-// 处理成功设置的支付方式
-async function handleSetupIntentSucceeded(setupIntent) {
-  const { customer, payment_method, metadata } = setupIntent;
-  
-  try {
-    // 从元数据中获取用户ID
-    const userId = metadata.user_id;
+    console.log(`Setup Intent 创建成功 - 客户ID: ${stripeCustomerId}`);
     
-    if (!userId) {
-      console.error('设置支付方式失败: 未找到用户ID');
-      return;
+    // 4. 返回客户端所需信息
+    res.json({
+      clientSecret: setupIntent.client_secret,
+      customerId: stripeCustomerId
+    });
+
+  } catch (error) {
+    console.error('Setup Intent 创建失败:', error);
+    
+    // 5. 错误处理
+    let errorMessage = '创建支付设置失败';
+    let statusCode = 500;
+
+    if (error.type === 'StripeCardError') {
+      errorMessage = '卡片验证失败';
+      statusCode = 400;
+    } else if (error.type === 'StripeInvalidRequestError') {
+      errorMessage = '无效的请求参数';
+      statusCode = 400;
+    } else if (error.type === 'StripeAPIError') {
+      errorMessage = 'Stripe服务暂时不可用';
+      statusCode = 503;
     }
 
-    // 保存或更新支付方式信息
+    res.status(statusCode).json({
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// 保存支付方式
+router.post('/save-method', authenticateToken, async (req, res) => {
+  const { paymentMethodId } = req.body;
+  const userId = req.user.id;
+
+  try {
+    // 创建或获取 Stripe 客户
+    let customer;
+    const existingCustomer = await new Promise((resolve, reject) => {
+      db().get(
+        'SELECT stripe_customer_id FROM user_payment_methods WHERE user_id = ?',
+        [userId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (existingCustomer?.stripe_customer_id) {
+      customer = await stripe.customers.retrieve(existingCustomer.stripe_customer_id);
+    } else {
+      customer = await stripe.customers.create();
+    }
+
+    // 将支付方式附加到客户
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: customer.id,
+    });
+
+    // 设置为默认支付方式
+    await stripe.customers.update(customer.id, {
+      invoice_settings: {
+        default_payment_method: paymentMethodId,
+      },
+    });
+
+    // 保存到数据库
     await new Promise((resolve, reject) => {
       db().run(
         `INSERT OR REPLACE INTO user_payment_methods 
-         (user_id, stripe_customer_id, payment_method_id, created_at, updated_at)
-         VALUES (?, ?, ?, datetime('now'), datetime('now'))`,
-        [userId, customer, payment_method],
+         (user_id, stripe_customer_id, payment_method_id) 
+         VALUES (?, ?, ?)`,
+        [userId, customer.id, paymentMethodId],
         (err) => {
           if (err) reject(err);
           else resolve();
@@ -226,43 +173,12 @@ async function handleSetupIntentSucceeded(setupIntent) {
       );
     });
 
-    console.log(`成功保存用户 ${userId} 的支付方式`);
+    res.json({ message: '支付方式保存成功' });
   } catch (error) {
     console.error('保存支付方式失败:', error);
+    res.status(500).json({ error: '保存支付方式失败' });
   }
-}
-
-// 处理成功的支付
-async function handleSuccessfulPayment(paymentIntent) {
-  const { customer, metadata } = paymentIntent;
-  if (metadata.usage_id) {
-    db().run(
-      'UPDATE parking_usage SET payment_status = ? WHERE id = ?',
-      ['paid', metadata.usage_id],
-      (err) => {
-        if (err) {
-          console.error('更新支付状态失败:', err);
-        }
-      }
-    );
-  }
-}
-
-// 处理新添加的支付方式
-async function handlePaymentMethodAttached(paymentMethod) {
-  const { customer } = paymentMethod;
-  if (customer) {
-    db().run(
-      'UPDATE user_payment_methods SET updated_at = datetime("now") WHERE stripe_customer_id = ?',
-      [customer],
-      (err) => {
-        if (err) {
-          console.error('更新支付方式状态失败:', err);
-        }
-      }
-    );
-  }
-}
+});
 
 // 获取用户支付方式
 router.get('/method', authenticateToken, async (req, res) => {

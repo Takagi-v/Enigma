@@ -247,56 +247,165 @@ router.post("/:spotId/end", authenticateToken, (req, res) => {
 });
 
 // 支付停车费用
-router.post("/:usageId/payment", authenticateToken, (req, res) => {
+router.post("/:usageId/payment", authenticateToken, async (req, res) => {
   const { usageId } = req.params;
   const userId = req.user.id;
 
   console.log('处理停车费用支付:', { usageId, userId });
 
-  // 检查使用记录是否存在且属于当前用户
-  db().get(
-    `SELECT * FROM parking_usage 
-     WHERE id = ? AND user_id = ? AND status = 'completed' AND payment_status = 'pending'`,
-    [usageId, userId],
-    (err, usage) => {
-      if (err) {
-        console.error('查询使用记录失败:', err);
-        return res.status(500).json({ 
-          message: "查询使用记录失败",
-          code: 'DB_ERROR'
+  try {
+    // 检查使用记录是否存在且属于当前用户
+    const usage = await new Promise((resolve, reject) => {
+      db().get(
+        `SELECT * FROM parking_usage 
+         WHERE id = ? AND user_id = ? AND status = 'completed' AND payment_status = 'pending'`,
+        [usageId, userId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (!usage) {
+      console.log('未找到有效的支付记录:', { usageId, userId });
+      return res.status(404).json({ 
+        message: "未找到有效的支付记录",
+        code: 'USAGE_NOT_FOUND'
+      });
+    }
+
+    // 获取用户的赠送余额和账户余额
+    const [giftBalance, accountBalance] = await Promise.all([
+      new Promise((resolve, reject) => {
+        db().get(
+          `SELECT COALESCE(SUM(amount), 0) AS total 
+           FROM coupons
+           WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
+          [usage.user_id],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row.total);
+          }
+        );
+      }),
+      new Promise((resolve, reject) => {
+        db().get(
+          `SELECT COALESCE(balance, 0) AS balance FROM users WHERE id = ?`,
+          [usage.user_id],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row.balance);
+          }
+        );
+      })
+    ]);
+
+    let giftBalanceUsed = 0;
+    let accountBalanceUsed = 0;
+
+    if (giftBalance >= usage.total_amount) {
+      // 赠送余额足够支付全部费用
+      giftBalanceUsed = usage.total_amount;
+    } else {
+      // 赠送余额不足,先用完赠送余额,再从账户余额中扣除剩余部分
+      giftBalanceUsed = giftBalance;
+      accountBalanceUsed = usage.total_amount - giftBalance;
+    }
+
+    // 检查余额是否足够
+    if (giftBalanceUsed + accountBalance < usage.total_amount) {
+      return res.status(400).json({
+        message: "余额不足",
+        code: 'INSUFFICIENT_BALANCE'
+      });
+    }
+
+    // 开启事务
+    await new Promise((resolve, reject) => {
+      db().run("BEGIN TRANSACTION", err => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    try {
+      // 更新赠送余额
+      if (giftBalanceUsed > 0) {
+        await new Promise((resolve, reject) => {
+          db().run(
+            `UPDATE coupons
+             SET amount = amount - ?,
+                 status = CASE WHEN amount - ? <= 0 THEN 'used' ELSE status END,
+                 used_at = CASE WHEN amount - ? <= 0 THEN DATETIME('now') ELSE used_at END
+             WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
+            [giftBalanceUsed, giftBalanceUsed, giftBalanceUsed, usage.user_id],
+            err => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
         });
       }
 
-      if (!usage) {
-        console.log('未找到有效的支付记录:', { usageId, userId });
-        return res.status(404).json({ 
-          message: "未找到有效的支付记录",
-          code: 'USAGE_NOT_FOUND'
+      // 更新账户余额
+      if (accountBalanceUsed > 0) {
+        await new Promise((resolve, reject) => {
+          db().run(
+            `UPDATE users SET balance = balance - ? WHERE id = ?`,
+            [accountBalanceUsed, usage.user_id],
+            err => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
         });
       }
 
       // 更新支付状态
-      db().run(
-        "UPDATE parking_usage SET payment_status = 'paid' WHERE id = ?",
-        [usageId],
-        function(err) {
-          if (err) {
-            console.error('更新支付状态失败:', err);
-            return res.status(500).json({ 
-              message: "更新支付状态失败",
-              code: 'DB_ERROR'
-            });
+      await new Promise((resolve, reject) => {
+        db().run(
+          `UPDATE parking_usage 
+           SET payment_status = 'paid',
+               payment_method = 'balance',
+               payment_time = DATETIME('now')
+           WHERE id = ?`,
+          [usageId],
+          err => {
+            if (err) reject(err);
+            else resolve();
           }
+        );
+      });
 
-          console.log('支付成功:', { usageId });
-          res.json({ 
-            message: "支付成功",
-            code: 'SUCCESS'
-          });
-        }
-      );
+      // 提交事务
+      await new Promise((resolve, reject) => {
+        db().run("COMMIT", err => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      res.json({ 
+        message: '支付成功',
+        code: 'SUCCESS'
+      });
+
+    } catch (error) {
+      // 回滚事务
+      await new Promise((resolve) => {
+        db().run("ROLLBACK", () => resolve());
+      });
+      throw error;
     }
-  );
+
+  } catch (error) {
+    console.error('支付失败:', error);
+    return res.status(500).json({ 
+      message: "支付失败",
+      code: 'PAYMENT_ERROR'
+    });
+  }
 });
 
 module.exports = router; 

@@ -85,4 +85,26 @@ router.put("/:username", authenticateToken, checkUserAccess, (req, res) => {
   );
 });
 
+// 获取用户赠送余额
+router.get('/:userId/gift-balance', async (req, res) => {
+  try {
+    const giftBalance = await new Promise((resolve, reject) => {
+      db().get(
+        `SELECT COALESCE(SUM(amount), 0) as gift_balance 
+         FROM coupons 
+         WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
+        [req.params.userId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row ? row.gift_balance : 0);
+        }
+      );
+    });
+    res.json({ gift_balance: giftBalance });
+  } catch (error) {
+    console.error('获取赠送余额失败:', error);
+    res.status(500).json({ error: '获取赠送余额失败' });
+  }
+});
+
 module.exports = router; 

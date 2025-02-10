@@ -84,7 +84,7 @@ router.post("/register", async (req, res) => {
       }
     }
     
-    db().run(
+    await db().run(
       `INSERT INTO users (username, password, full_name, phone, avatar, bio, address) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [username, hashedPassword, full_name, phone, avatarUrl, bio || '该用户很神秘', address || ''],
@@ -96,29 +96,15 @@ router.post("/register", async (req, res) => {
           return res.status(500).json({ message: "创建用户失败" });
         }
 
-        // 为新用户创建优惠券
-        try {
-          const userId = this.lastID;
-          const expiryDate = new Date();
-          expiryDate.setMonth(expiryDate.getMonth() + 1);
+        // 赠送 20 美元余额
+        const giftBalance = 20;
+        await db().run(
+          `INSERT INTO coupons (user_id, type, amount, description) 
+           VALUES (?, 'gift_balance', ?, '新用户注册赠送余额')`,
+          [this.lastID, giftBalance]
+        );
 
-          await new Promise((resolve, reject) => {
-            db().run(
-              `INSERT INTO coupons (user_id, amount, status, expiry_date, description) 
-               VALUES (?, ?, ?, ?, ?)`,
-              [userId, 5.0, 'valid', expiryDate.toISOString(), '新用户注册优惠券'],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
-
-          res.status(201).json({ message: "注册成功，已发放新用户优惠券" });
-        } catch (error) {
-          console.error('创建优惠券失败:', error);
-          res.status(201).json({ message: "注册成功，但优惠券创建失败" });
-        }
+        res.status(201).json({ message: "注册成功" });
       }
     );
   } catch (error) {
