@@ -56,6 +56,7 @@ async function createTables() {
       contact TEXT,
       average_rating REAL DEFAULT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      opening_hours TEXT DEFAULT '00:00-23:59',
       FOREIGN KEY (owner_username) REFERENCES users(username),
       FOREIGN KEY (current_user_id) REFERENCES users(id)
     )`,
@@ -141,6 +142,24 @@ async function createTables() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
       UNIQUE(user_id)
+    )`,
+
+    // 预定表
+    `CREATE TABLE IF NOT EXISTS reservations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parking_spot_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      reservation_date DATE NOT NULL,
+      start_time TIME NOT NULL,
+      end_time TIME NOT NULL,
+      status TEXT DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      total_amount REAL,
+      payment_status TEXT DEFAULT 'pending',
+      notes TEXT,
+      FOREIGN KEY (parking_spot_id) REFERENCES parking_spots(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )`
   ];
 
@@ -239,6 +258,17 @@ async function createTestParkingSpots() {
     '公园旁停车场，环境优美'
   ];
 
+  // 定义一些常见的开放时段
+  const openingHoursList = [
+    '00:00-23:59',
+    '06:00-22:00',
+    '07:00-21:00',
+    '08:00-20:00',
+    '09:00-18:00',
+    '10:00-22:00',
+    '07:30-23:30'
+  ];
+
   const testSpots = [];
   let spotId = 1;
 
@@ -252,6 +282,7 @@ async function createTestParkingSpots() {
         const hourlyRate = Math.floor(Math.random() * 15) + 5; // 5-20元每小时
         const description = descriptions[Math.floor(Math.random() * descriptions.length)];
         const coordinates = district.coordinates[Math.floor(Math.random() * district.coordinates.length)];
+        const opening_hours = openingHoursList[Math.floor(Math.random() * openingHoursList.length)];
         
         testSpots.push({
           owner_username: 'admin',
@@ -262,7 +293,8 @@ async function createTestParkingSpots() {
           description: `${description}，位于${district.name}${street}，周边配套齐全`,
           status: 'available',
           contact: `1380013${(8000 + spotId).toString().padStart(4, '0')}`,
-          current_user_id: null
+          current_user_id: null,
+          opening_hours: opening_hours
         });
         
         spotId++;
@@ -285,8 +317,8 @@ async function createTestParkingSpots() {
         `INSERT INTO parking_spots (
           owner_username, location, coordinates, price, 
           description, status, contact, hourly_rate,
-          current_user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          current_user_id, opening_hours
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           spot.owner_username,
           spot.location,
@@ -296,7 +328,8 @@ async function createTestParkingSpots() {
           spot.status,
           spot.contact,
           spot.hourly_rate,
-          spot.current_user_id
+          spot.current_user_id,
+          spot.opening_hours
         ]
       );
     }

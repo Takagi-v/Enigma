@@ -3,12 +3,14 @@
   top: 0;
   right: 0;
   padding: 16px;
-  z-index: 1000;
+  z-index: 1001;
   display: flex;
   justify-content: flex-end;
+  pointer-events: none;
 }
 
 .user-controls {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 16px;

@@ -52,12 +52,12 @@ body {
 .App {
   display: flex;
   min-height: 100vh;
-  padding-top: 60px;
+  padding-top: 0;
 }
 
 .content {
   flex: 1;
-  padding: 20px;
+  padding: 0;
   margin-left: 60px;
   width: calc(100% - 60px);
   box-sizing: border-box;
