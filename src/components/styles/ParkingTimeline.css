@@ -1,0 +1,116 @@
+.parking-timeline {
+  margin: 20px 0;
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.timeline-legend {
+  display: flex;
+  gap: 20px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.legend-color.available {
+  background-color: #52c41a;
+}
+
+.legend-color.reserved {
+  background-color: #faad14;
+}
+
+.timeline-slot.passed {
+  background-color: #d9d9d9;
+  opacity: 0.6;
+}
+
+.legend-color.passed {
+  background-color: #d9d9d9;
+}
+
+.timeline-container {
+  display: flex;
+  align-items: center;
+  height: 60px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  position: relative;
+  overflow-x: auto;
+  padding: 0 20px;
+}
+
+.timeline-slot {
+  flex: 1;
+  height: 30px;
+  min-width: 30px;
+  border-right: 1px solid #fff;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.timeline-slot:hover {
+  transform: scaleY(1.1);
+}
+
+.timeline-slot.hour {
+  border-right: 2px solid #fff;
+}
+
+.timeline-slot.available {
+  background-color: #52c41a;
+}
+
+.timeline-slot.reserved {
+  background-color: #faad14;
+}
+
+.time-label {
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+}
+
+/* 自定义滚动条样式 */
+.timeline-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.timeline-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.timeline-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.timeline-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+} 

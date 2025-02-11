@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./styles/Map.css";
 import config from '../config';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, LoadScript } from '@react-google-maps/api';
-import { Input, Drawer, Select, Card, Empty, Spin } from 'antd';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { Input, Drawer, Select, Card, Empty, Spin, Modal } from 'antd';
 import usePlacesAutocomplete, {
   getGeocode,
   getLatLng,
@@ -24,8 +24,63 @@ const mapStyles = {
   height: '100%'
 };
 
-// 地图库配置
+const detailMapStyles = {
+  width: '100%',
+  height: '400px',
+  borderRadius: '8px',
+  overflow: 'hidden'
+};
+
+// 自定义图标配置
+const parkingIcon = {
+  url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="#1967D2" stroke="white" stroke-width="2"/>
+      <text x="20" y="27" font-size="22" font-family="Arial, sans-serif" font-weight="bold" 
+        fill="white" text-anchor="middle">P</text>
+    </svg>
+  `),
+  scaledSize: window.google?.maps?.Size ? new window.google.maps.Size(40, 40) : null,
+  anchor: window.google?.maps?.Point ? new window.google.maps.Point(20, 20) : null
+};
+
+const userLocationIcon = {
+  path: window.google?.maps?.SymbolPath?.CIRCLE,
+  fillColor: '#4285F4',
+  fillOpacity: 1,
+  strokeWeight: 2,
+  strokeColor: '#ffffff',
+  scale: 8
+};
+
+// 地图库配置 - 确保在所有模式下都加载所需的库
 const libraries = ["places"];
+
+// 添加时间验证相关函数
+const checkParkingTime = (openingHours) => {
+  const [start, end] = openingHours.split('-');
+  const [startHour, startMin] = start.split(':').map(Number);
+  const [endHour, endMin] = end.split(':').map(Number);
+  
+  // 获取纽约时间
+  const nyTime = new Date().toLocaleString("en-US", {timeZone: "America/New_York"});
+  const nyDate = new Date(nyTime);
+  const currentHour = nyDate.getHours();
+  const currentMin = nyDate.getMinutes();
+  
+  // 计算当前时间到结束时间的分钟差
+  const currentTotalMins = currentHour * 60 + currentMin;
+  const endTotalMins = endHour * 60 + endMin;
+  const minsUntilClose = endTotalMins - currentTotalMins;
+  
+  // 如果结束时间是第二天（比如 00:00），加上24小时
+  const adjustedMinsUntilClose = minsUntilClose < 0 ? minsUntilClose + 24 * 60 : minsUntilClose;
+  
+  return {
+    isNearClosing: adjustedMinsUntilClose <= 60, // 离关闭时间不到1小时
+    minsUntilClose: adjustedMinsUntilClose
+  };
+};
 
 // 错误边界组件
 class ErrorBoundary extends React.Component {
@@ -69,17 +124,19 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   const [isDrawerMounted, setIsDrawerMounted] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [initialTouchY, setInitialTouchY] = useState(null);
-  const [initialHeight, setInitialHeight] = useState(null);
+  const [startY, setStartY] = useState(0);
+  const [startHeight, setStartHeight] = useState(0);
   const minHeight = 200;
   const maxHeight = window.innerHeight * 0.8;
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isUserInitiated, setIsUserInitiated] = useState(false);
 
-  // 加载 Google Maps API
+  // 加载 Google Maps API - 使用相同的 libraries 配置
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-    libraries: libraries,
+    libraries,
     language: 'zh-CN',
     region: 'CN'
   });
@@ -93,19 +150,21 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     clearSuggestions,
   } = usePlacesAutocomplete({
     requestOptions: {
+      language: 'zh-CN',
+      region: 'CN',
       location: { lat: () => userLocation?.lat || defaultCenter.lat, lng: () => userLocation?.lng || defaultCenter.lng },
-      radius: 20000, // 搜索半径（米）
-      types: ['establishment', 'geocode'],
-      componentRestrictions: { country: 'cn' }
+      radius: 20000,
     },
     debounce: 300,
+    cache: 24 * 60 * 60,
+    enabled: mode !== 'detail', // 在详情模式下禁用
   });
 
   // 获取用户位置
   useEffect(() => {
     if (mode === 'detail' && initialSpot) {
-      const [lat, lng] = initialSpot.coordinates.split(',');
-      setUserLocation({ lat: parseFloat(lat), lng: parseFloat(lng) });
+      setUserLocation({ lat: initialSpot.lat, lng: initialSpot.lng });
+      setLoading(false);
       return;
     }
 
@@ -180,19 +239,18 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         .filter(spot => spot?.coordinates)
         .map(spot => {
           const [spotLat, spotLng] = spot.coordinates.split(',').map(Number);
+          const distanceFromPoint = calculateDistance(lat, lng, spotLat, spotLng);
+          const distanceFromUser = userLocation ? 
+            calculateDistance(userLocation.lat, userLocation.lng, spotLat, spotLng) : 
+            distanceFromPoint;
           return {
             ...spot,
-            distance: calculateDistance(lat, lng, spotLat, spotLng)
+            distance: isUserInitiated ? distanceFromUser : distanceFromPoint
           };
         });
 
       const sorted = [...spotsWithDistance].sort((a, b) => {
         switch(sortType) {
-          case 'rating':
-            if (!a.average_rating && !b.average_rating) return a.distance - b.distance;
-            if (!a.average_rating) return 1;
-            if (!b.average_rating) return -1;
-            return b.average_rating - a.average_rating;
           case 'price':
             return parseFloat(a.price || 0) - parseFloat(b.price || 0);
           case 'name':
@@ -264,52 +322,69 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     }
   };
 
-  // Drawer 相关函数
-  const handleTouchStart = (e) => {
+  // 处理拖动开始
+  const handleDragStart = (e) => {
+    const clientY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
     setIsDragging(true);
-    setInitialTouchY(e.touches[0].clientY);
-    setInitialHeight(drawerHeight);
+    setStartY(clientY);
+    setStartHeight(drawerHeight);
   };
 
-  const handleTouchMove = (e) => {
-    if (!isDragging || initialTouchY === null) return;
-    e.preventDefault();
+  // 处理拖动过程
+  const handleDragMove = (e) => {
+    if (!isDragging) return;
     
-    const currentTouchY = e.touches[0].clientY;
-    const deltaY = initialTouchY - currentTouchY;
-    const newHeight = Math.min(Math.max(initialHeight + deltaY, minHeight), maxHeight);
+    const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
+    const delta = startY - clientY;
+    const newHeight = Math.min(Math.max(startHeight + delta, minHeight), maxHeight);
     
     setDrawerHeight(newHeight);
+    e.preventDefault();
+    e.stopPropagation();
   };
 
-  const handleTouchEnd = () => {
+  // 处理拖动结束
+  const handleDragEnd = () => {
     setIsDragging(false);
-    setInitialTouchY(null);
+    document.removeEventListener('mousemove', handleDragMove);
+    document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchmove', handleDragMove);
+    document.removeEventListener('touchend', handleDragEnd);
   };
 
+  // 处理鼠标按下
   const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setInitialTouchY(e.clientY);
-    setInitialHeight(drawerHeight);
+    handleDragStart(e);
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
   };
 
-  const handleMouseMove = (e) => {
-    if (!isDragging || initialTouchY === null) return;
-    e.preventDefault();
-    
-    const deltaY = initialTouchY - e.clientY;
-    const newHeight = Math.min(Math.max(initialHeight + deltaY, minHeight), maxHeight);
-    
-    setDrawerHeight(newHeight);
+  // 处理触摸开始
+  const handleTouchStart = (e) => {
+    handleDragStart(e);
+    document.addEventListener('touchmove', handleDragMove, { passive: false });
+    document.addEventListener('touchend', handleDragEnd);
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setInitialTouchY(null);
-  };
+  // 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.removeEventListener('touchmove', handleDragMove);
+      document.removeEventListener('touchend', handleDragEnd);
+    };
+  }, []);
 
-  const showDrawer = () => {
+  const showDrawer = async (isUserAction = false) => {
+    setIsUserInitiated(isUserAction);
     setIsDrawerMounted(true);
+
+    if (isUserAction && userLocation) {
+      setCurrentPoint(userLocation);
+      await updateSortedSpots(userLocation.lat, userLocation.lng);
+    }
+
     requestAnimationFrame(() => {
       setDrawerVisible(true);
     });
@@ -328,11 +403,6 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     if (sortedSpots.length > 0) {
       const sorted = [...sortedSpots].sort((a, b) => {
         switch(value) {
-          case 'rating':
-            if (!a.average_rating && !b.average_rating) return a.distance - b.distance;
-            if (!a.average_rating) return 1;
-            if (!b.average_rating) return -1;
-            return b.average_rating - a.average_rating;
           case 'price':
             return parseFloat(a.price || 0) - parseFloat(b.price || 0);
           case 'name':
@@ -346,6 +416,31 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     }
   };
 
+  // 处理滚动
+  const handleScroll = (e) => {
+    const element = e.target;
+    const isAtTop = element.scrollTop === 0;
+    const wheelEvent = e.nativeEvent;
+    
+    if (wheelEvent.deltaY > 0 && isAtTop && !isExpanded) {
+      // 在顶部继续向下滚动，展开drawer
+      setIsExpanded(true);
+      setDrawerHeight(maxHeight);
+    } else if (wheelEvent.deltaY < 0 && isAtTop && isExpanded) {
+      // 在顶部继续向上滚动，收缩drawer
+      setIsExpanded(false);
+      setDrawerHeight(400);
+    }
+  };
+
+  // 添加回到用户位置的函数
+  const handleReturnToUserLocation = useCallback(() => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.panTo(userLocation);
+      mapRef.current.setZoom(16);
+    }
+  }, [userLocation]);
+
   if (loadError) {
     return <div className="map-error">地图加载失败: {loadError.message}</div>;
   }
@@ -356,8 +451,8 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
 
   return (
     <ErrorBoundary>
-      <div className="fullscreen-map-container">
-        {!hideSearch && (
+      <div className={mode === 'detail' ? 'detail-map-container' : 'fullscreen-map-container'}>
+        {!hideSearch && mode !== 'detail' && (
           <div className="map-search-container">
             <div className="search-box">
               <input
@@ -380,12 +475,13 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
                 搜索
               </button>
             </div>
-            {status === "OK" && (
+            {status === "OK" && value && (
               <ul className="suggestions-list">
                 {data.map(({ place_id, description }) => (
                   <li
                     key={place_id}
                     onClick={() => handlePlaceSelect(description)}
+                    className="suggestion-item"
                   >
                     {description}
                   </li>
@@ -395,56 +491,72 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
           </div>
         )}
 
-        <div className="map-wrapper">
+        <div className={mode === 'detail' ? 'detail-map-wrapper' : 'map-wrapper'}>
           <GoogleMap
-            mapContainerStyle={mapStyles}
+            mapContainerStyle={mode === 'detail' ? detailMapStyles : mapStyles}
             center={userLocation || defaultCenter}
-            zoom={defaultZoom}
+            zoom={mode === 'detail' ? 17 : defaultZoom}
             onClick={handleMapClick}
             onLoad={map => {
               mapRef.current = map;
-              // 设置地图控件
               map.setOptions({
                 zoomControl: true,
-                mapTypeControl: true,
+                mapTypeControl: mode !== 'detail',
                 scaleControl: true,
-                streetViewControl: true,
-                rotateControl: true,
-                fullscreenControl: true
+                streetViewControl: mode !== 'detail',
+                rotateControl: mode !== 'detail',
+                fullscreenControl: mode !== 'detail',
+                mapTypeControlOptions: {
+                  position: window.google?.maps?.ControlPosition?.TOP_LEFT,
+                  style: window.google?.maps?.MapTypeControlStyle?.DROPDOWN_MENU
+                },
+                zoomControlOptions: {
+                  position: window.google?.maps?.ControlPosition?.RIGHT_CENTER
+                },
+                streetViewControlOptions: {
+                  position: window.google?.maps?.ControlPosition?.RIGHT_CENTER
+                },
+                fullscreenControlOptions: {
+                  position: window.google?.maps?.ControlPosition?.RIGHT_TOP
+                }
               });
             }}
             options={{
-              // 地图控件位置设置
-              zoomControlOptions: { position: window.google?.maps?.ControlPosition?.RIGHT_CENTER },
-              mapTypeControlOptions: { position: window.google?.maps?.ControlPosition?.TOP_RIGHT },
-              // 其他地图选项
-              gestureHandling: 'greedy', // 允许手势操作
-              disableDefaultUI: false,   // 启用默认UI
-              mapTypeId: 'roadmap'       // 地图类型
+              gestureHandling: mode === 'detail' ? 'cooperative' : 'greedy',
+              disableDefaultUI: false,
+              mapTypeId: 'roadmap',
+              scrollwheel: mode !== 'detail'
             }}
           >
             {/* 用户位置标记 */}
             {userLocation && (
               <Marker
                 position={userLocation}
-                icon={{
-                  url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-                }}
+                icon={userLocationIcon}
               />
             )}
 
-            {/* 停车位标记 */}
-            {parkingSpots.map((spot) => {
+            {/* 停车位标记 - 仅在非详情模式下显示 */}
+            {mode !== 'detail' && parkingSpots.map((spot) => {
               if (!spot.coordinates) return null;
               const [lat, lng] = spot.coordinates.split(',').map(Number);
               return (
                 <Marker
                   key={spot.id}
                   position={{ lat, lng }}
+                  icon={parkingIcon}
                   onClick={() => setSelectedMarker(spot)}
                 />
               );
             })}
+
+            {/* 详情模式下的停车位标记 */}
+            {mode === 'detail' && userLocation && (
+              <Marker
+                position={userLocation}
+                icon={parkingIcon}
+              />
+            )}
 
             {/* 信息窗口 */}
             {selectedMarker && (
@@ -454,14 +566,78 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
                   lng: parseFloat(selectedMarker.coordinates.split(',')[1])
                 }}
                 onCloseClick={() => setSelectedMarker(null)}
+                options={{
+                  pixelOffset: new window.google.maps.Size(0, -30)
+                }}
               >
-                <div>
-                  <h3>{selectedMarker.location}</h3>
-                  <p>价格: ¥{selectedMarker.price}/小时</p>
-                  <p>评分: {selectedMarker.average_rating ? 
-                    `${selectedMarker.average_rating.toFixed(1)}分` : 
-                    '暂无评分'}</p>
-                  <p>联系方式: {selectedMarker.contact}</p>
+                <div 
+                  className="info-window-content"
+                  onClick={() => {
+                    const timeCheck = checkParkingTime(selectedMarker.opening_hours);
+                    if (timeCheck.isNearClosing) {
+                      Modal.confirm({
+                        title: '停车场即将关闭',
+                        content: `该停车场将在${Math.floor(timeCheck.minsUntilClose)}分钟后关闭，请确保您能在关闭前离开。是否继续？`,
+                        okText: '继续',
+                        cancelText: '取消',
+                        onOk: () => navigate(`/parking/${selectedMarker.id}`)
+                      });
+                    } else {
+                      navigate(`/parking/${selectedMarker.id}`);
+                    }
+                  }}
+                  style={{
+                    cursor: 'pointer',
+                    padding: '8px',
+                    minWidth: '200px'
+                  }}
+                >
+                  <h3 style={{ 
+                    margin: '0 0 8px 0',
+                    fontSize: '16px',
+                    color: '#1a1a1a'
+                  }}>{selectedMarker.location}</h3>
+                  <p style={{
+                    margin: '4px 0',
+                    color: '#f5222d',
+                    fontSize: '15px',
+                    fontWeight: 'bold'
+                  }}>¥{selectedMarker.price}/小时</p>
+                  <p style={{
+                    margin: '4px 0',
+                    color: '#52c41a',
+                    fontSize: '13px'
+                  }}>
+                    {selectedMarker.status === 'available' ? '空闲' : '使用中'}
+                  </p>
+                  <p style={{
+                    margin: '4px 0',
+                    color: '#666',
+                    fontSize: '13px'
+                  }}>开放时段: {selectedMarker.opening_hours}</p>
+                  {checkParkingTime(selectedMarker.opening_hours).isNearClosing && (
+                    <p style={{
+                      margin: '4px 0',
+                      color: '#ff4d4f',
+                      fontSize: '13px',
+                      fontWeight: 'bold'
+                    }}>
+                      距离关闭还有{Math.floor(checkParkingTime(selectedMarker.opening_hours).minsUntilClose)}分钟
+                    </p>
+                  )}
+                  <p style={{
+                    margin: '4px 0',
+                    color: '#666',
+                    fontSize: '13px'
+                  }}>联系方式: {selectedMarker.contact}</p>
+                  <div style={{
+                    marginTop: '8px',
+                    textAlign: 'right',
+                    color: '#1890ff',
+                    fontSize: '13px'
+                  }}>
+                    点击查看详情 →
+                  </div>
                 </div>
               </InfoWindow>
             )}
@@ -470,15 +646,36 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
             {selectedLocation && mode === "select" && (
               <Marker
                 position={selectedLocation}
-                icon={{
-                  url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                }}
+                icon={parkingIcon}
               />
             )}
           </GoogleMap>
         </div>
 
-        {isDrawerMounted && (
+        {mode !== 'detail' && (
+          <div className="map-controls">
+            <button 
+              className="map-control-button"
+              onClick={() => showDrawer(true)}
+              aria-label="显示停车位列表"
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+              </svg>
+            </button>
+            <button 
+              className="map-control-button"
+              onClick={handleReturnToUserLocation}
+              aria-label="回到我的位置"
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {mode !== 'detail' && isDrawerMounted && (
           <>
             <div 
               className={`drawer-overlay ${drawerVisible ? 'visible' : ''}`}
@@ -486,63 +683,103 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
             />
             <div 
               ref={drawerRef}
-              className={`parking-spots-panel ${drawerVisible ? 'visible' : ''}`}
-              style={{ 
-                height: drawerHeight + 'px',
-                cursor: isDragging ? 'grabbing' : 'default'
-              }}
+              className={`parking-spots-panel ${drawerVisible ? 'visible' : ''} ${isExpanded ? 'expanded' : ''}`}
+              style={{ height: drawerHeight + 'px' }}
             >
-              <div 
-                className="panel-header"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-                onMouseDown={handleMouseDown}
-                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-              >
-                <div className="drawer-handle"></div>
-                <h3>所有停车位</h3>
+              <div className="drawer-handle" />
+              <div className="panel-header">
+                <h3>附近停车位</h3>
                 <select
                   value={sortType}
                   onChange={(e) => handleSortChange(e.target.value)}
                   className="sort-select"
                 >
-                  <option value="rating">按评分排序</option>
-                  <option value="distance">按距离排序</option>
-                  <option value="price">按价格排序</option>
-                  <option value="name">按名称排序</option>
+                  <option value="distance">距离最近</option>
+                  <option value="price">价格最低</option>
+                  <option value="name">名称排序</option>
                 </select>
               </div>
-              <div className="parking-spots-list">
+              <div 
+                className="parking-spots-list" 
+                onWheel={handleScroll}
+                onTouchMove={(e) => {
+                  const touch = e.touches[0];
+                  const element = e.target;
+                  const isAtTop = element.scrollTop === 0;
+                  
+                  if (isAtTop && !isExpanded && touch.clientY < e.target.getBoundingClientRect().top) {
+                    setIsExpanded(true);
+                    setDrawerHeight(maxHeight);
+                  } else if (isAtTop && isExpanded && touch.clientY > e.target.getBoundingClientRect().top) {
+                    setIsExpanded(false);
+                    setDrawerHeight(400);
+                  }
+                }}
+              >
                 {!currentPoint ? (
                   <div className="empty-state">
-                    <p>请先搜索位置</p>
+                    <p>请先搜索位置或点击地图选择地点</p>
                   </div>
                 ) : isLoadingSpots || isCalculating ? (
                   <div className="spots-loading">
-                    <div className="loading-spinner"></div>
-                    <p>正在加载附近停车位...</p>
+                    <div className="loading-spinner" />
+                    <p>正在搜索附近停车位...</p>
                   </div>
                 ) : sortedSpots.length === 0 ? (
                   <div className="empty-state">
                     <p>附近暂无停车位信息</p>
                   </div>
                 ) : (
-                  sortedSpots.map((spot) => (
-                    <div 
-                      key={spot.id}
-                      className="parking-spot-card"
-                      onClick={() => navigate(`/parking/${spot.id}`)}
-                    >
-                      <h3>{spot.location}</h3>
-                      <p>价格: ¥{spot.price}/小时</p>
-                      <p>距离: {spot.distance.toFixed(2)}公里</p>
-                      <p>评分: {spot.average_rating ? 
-                        `${spot.average_rating.toFixed(1)}分` : 
-                        '暂无评分'}</p>
-                      <p>联系方式: {spot.contact}</p>
-                    </div>
-                  ))
+                  sortedSpots.map((spot) => {
+                    const timeCheck = checkParkingTime(spot.opening_hours);
+                    return (
+                      <div 
+                        key={spot.id}
+                        className="parking-spot-card"
+                        onClick={() => {
+                          if (timeCheck.isNearClosing) {
+                            Modal.confirm({
+                              title: '停车场即将关闭',
+                              content: `该停车场将在${Math.floor(timeCheck.minsUntilClose)}分钟后关闭，请确保您能在关闭前离开。是否继续？`,
+                              okText: '继续',
+                              cancelText: '取消',
+                              onOk: () => navigate(`/parking/${spot.id}`)
+                            });
+                          } else {
+                            navigate(`/parking/${spot.id}`);
+                          }
+                        }}
+                      >
+                        <h3 className="spot-title">{spot.location}</h3>
+                        <div className="spot-info">
+                          <div className="spot-detail">
+                            <span className="spot-price">¥{spot.price}/小时</span>
+                          </div>
+                          <div className="spot-detail">
+                            <span className="spot-distance">{spot.distance.toFixed(1)}km</span>
+                          </div>
+                          <div className="spot-detail">
+                            <span className={`status ${spot.status}`}>
+                              {spot.status === 'available' ? '空闲' : '使用中'}
+                            </span>
+                          </div>
+                          <div className="spot-detail">
+                            <span className="spot-hours">开放时段: {spot.opening_hours}</span>
+                            {timeCheck.isNearClosing && (
+                              <span className="closing-warning">
+                                距离关闭还有{Math.floor(timeCheck.minsUntilClose)}分钟
+                              </span>
+                            )}
+                          </div>
+                          {spot.contact && (
+                            <div className="spot-detail">
+                              <span>联系方式: {spot.contact}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
