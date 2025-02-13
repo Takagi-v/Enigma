@@ -354,6 +354,29 @@
   font-size: 1.2em;
 }
 
+.top-up-button {
+  width: 100%;
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #4299e1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.top-up-button:hover {
+  background-color: #3182ce;
+  transform: translateY(-1px);
+}
+
+.top-up-button:active {
+  transform: translateY(0);
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;

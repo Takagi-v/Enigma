@@ -8,7 +8,7 @@ const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY);
 const StripeProvider = ({ children }) => {
   const options = {
     mode: 'setup',
-    currency: 'cny',
+    currency: 'usd',
     payment_method_types: ['card'],
     appearance: {
       theme: 'stripe',

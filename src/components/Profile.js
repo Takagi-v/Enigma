@@ -186,13 +186,13 @@ function Profile() {
                 {coupons.map(coupon => (
                   <div key={coupon.id} className="coupon-item">
                     <div className="coupon-amount">
-                      {coupon.type === 'gift_balance' ? '赠送余额' : '优惠券'} ¥{coupon.amount}
+                      {coupon.type === 'gift_balance' ? 'Gift Balance' : 'Coupon'} ${coupon.amount}
                     </div>
                     <div className="coupon-info">
                       <p className="coupon-description">{coupon.description}</p>
                       {coupon.expiry_date && (
                         <p className="coupon-expiry">
-                          有效期至：{new Date(coupon.expiry_date).toLocaleDateString()}
+                          Valid until: {new Date(coupon.expiry_date).toLocaleDateString()}
                         </p>
                       )}
                     </div>
@@ -203,11 +203,17 @@ function Profile() {
           </div>
 
           <div className="info-section">
-            <h3>账户余额</h3>
+            <h3>My Balance</h3>
             <div className="balance-info">
-              <p>赠送余额: <span className="gift-balance">¥{giftBalance}</span></p>
-              <p>实际余额: <span className="actual-balance">¥{user.balance || 0}</span></p>
-              <p>总余额: <span className="total-balance">¥{(giftBalance + (user.balance || 0))}</span></p>
+              <p>Gift Balance: <span className="gift-balance">${giftBalance}</span></p>
+              <p>Account Balance: <span className="actual-balance">${user.balance || 0}</span></p>
+              <p>Total Balance: <span className="total-balance">${(giftBalance + (user.balance || 0))}</span></p>
+              <button 
+                className="top-up-button"
+                onClick={() => navigate('/top-up')}
+              >
+                Top Up
+              </button>
             </div>
           </div>
 

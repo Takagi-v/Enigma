@@ -138,6 +138,7 @@ async function createTables() {
       user_id INTEGER NOT NULL,
       stripe_customer_id TEXT NOT NULL,
       payment_method_id TEXT NOT NULL,
+      payment_type TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
