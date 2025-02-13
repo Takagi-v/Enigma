@@ -21,6 +21,7 @@ import ParkingRecord from './components/ParkingRecord';
 import ContactUs from './components/ContactUs';
 import StripeProvider from './components/StripeProvider';
 import PaymentSetup from './components/PaymentSetup';
+import TopUp from './components/TopUp';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -85,6 +86,11 @@ function App() {
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/contact-us" element={<ContactUs />} />
                 <Route path="/payment-setup" element={<PaymentSetup />} />
+                <Route path="/top-up" element={
+                  <ProtectedRoute>
+                    <TopUp />
+                  </ProtectedRoute>
+                } />
               </Routes>
             </main>
           </div>

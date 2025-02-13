@@ -11,13 +11,17 @@
   align-items: center;
   gap: 16px;
   margin-bottom: 24px;
-  padding: 0 20px;
+  background: #fff;
+  padding: 16px 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .header-section h1 {
   margin: 0;
   font-size: 24px;
   color: #333;
+  font-weight: 600;
 }
 
 .back-button {
@@ -31,6 +35,7 @@
   background: #fff;
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f0f0f0;
 }
 
 .back-button:hover {
@@ -47,7 +52,6 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 30px;
-  margin-top: 20px;
 }
 
 .info-section {
@@ -57,17 +61,23 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.map-section {
+.parking-detail .map-section {
   background: #fff;
   padding: 24px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  height: fit-content;
 }
 
-.map-wrapper {
+.parking-detail .map-section h3 {
+  margin-bottom: 16px;
+}
+
+.parking-detail .map-wrapper {
+  width: 100%;
+  height: 500px !important;
   border-radius: 8px;
   overflow: hidden;
-  margin-top: 10px;
 }
 
 .price-section {
@@ -152,14 +162,27 @@
 @media (max-width: 768px) {
   .detail-content {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
   
   .header-section {
-    padding: 0 10px;
+    padding: 12px 16px;
   }
   
-  .parking-detail {
-    padding-top: 20px;
+  .header-section h1 {
+    font-size: 20px;
+  }
+  
+  .parking-detail .map-section {
+    height: auto;
+  }
+  
+  .parking-detail .map-wrapper {
+    height: 300px !important;
+  }
+  
+  .info-section {
+    padding: 16px;
   }
 }
 
@@ -238,4 +261,46 @@
 .reservation-item .status.completed {
   background-color: #f6ffed;
   color: #52c41a;
+}
+
+/* Timeline 新样式 */
+.timeline-container {
+  margin: 20px 0;
+}
+
+.timeline-bar {
+  width: 100%;
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.timeline-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: #52c41a;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.timeline-progress.reserved {
+  background: #faad14;
+}
+
+.timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: #666;
+  font-size: 12px;
+}
+
+/* 移除之前的 Timeline 相关样式 */
+.timeline-container::before,
+.timeline-container .ant-timeline {
+  display: none;
 } 

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { CardElement, useStripe, useElements, PaymentRequestButtonElement } from '@stripe/react-stripe-js';
 import config from '../config';
 import './styles/PaymentSetup.css';
 
@@ -13,6 +13,63 @@ const PaymentSetup = () => {
   const [error, setError] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [returnUrl] = useState(localStorage.getItem('returnUrl') || '/profile');
+  const [paymentRequest, setPaymentRequest] = useState(null);
+  const [selectedMethod, setSelectedMethod] = useState('card');
+
+  useEffect(() => {
+    if (stripe) {
+      const pr = stripe.paymentRequest({
+        country: 'US',
+        currency: 'usd',
+        total: {
+          label: 'Parking Service',
+          amount: 0,
+        },
+        requestPayerName: true,
+        requestPayerEmail: true,
+        requestPayerPhone: true,
+      });
+
+      // 检查设备是否支持 Apple Pay 或 Google Pay
+      pr.canMakePayment().then(result => {
+        if (result) {
+          setPaymentRequest(pr);
+          
+          // 设置 PaymentRequest 事件处理
+          pr.on('paymentmethod', async (event) => {
+            try {
+              // 保存支付方式到后端
+              const response = await authFetch(`${config.API_URL}/payment/save-method`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  paymentMethodId: event.paymentMethod.id,
+                  paymentType: 'wallet'
+                }),
+              });
+
+              const responseData = await response.json();
+
+              if (!response.ok) {
+                event.complete('fail');
+                throw new Error(responseData.error || '保存支付方式失败');
+              }
+
+              event.complete('success');
+              alert('支付方式绑定成功！');
+              navigate(returnUrl);
+            } catch (err) {
+              console.error('保存数字钱包支付方式失败:', err);
+              event.complete('fail');
+              setError(err.message || '绑定支付方式失败，请重试');
+            }
+          });
+        }
+      });
+    }
+  }, [stripe, authFetch, navigate, returnUrl]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -25,54 +82,52 @@ const PaymentSetup = () => {
     setError(null);
 
     try {
-      // 1. 创建 Setup Intent
-      const setupResponse = await authFetch(`${config.API_URL}/payment/setup-intent`);
-      if (!setupResponse.ok) {
-        const errorData = await setupResponse.json();
-        throw new Error(errorData.error || '创建支付设置失败');
-      }
-      const { clientSecret, customerId } = await setupResponse.json();
+      let paymentMethod;
+      let createError;
 
-      // 保存 customerId 如果需要的话
-      localStorage.setItem('stripeCustomerId', customerId);
-
-      // 2. 确认 Setup Intent
-      const result = await stripe.confirmCardSetup(clientSecret, {
-        payment_method: {
+      if (selectedMethod === 'card') {
+        // 处理信用卡支付方式
+        const result = await stripe.createPaymentMethod({
+          type: 'card',
           card: elements.getElement(CardElement),
           billing_details: {
             name: user.fullName,
             email: user.email,
             phone: user.phone
           }
-        }
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message);
+        });
+        createError = result.error;
+        paymentMethod = result.paymentMethod;
       }
 
-      // 3. 保存支付方式到后端
+      if (createError) {
+        throw new Error(createError.message);
+      }
+
+      // 保存支付方式到后端
       const response = await authFetch(`${config.API_URL}/payment/save-method`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          paymentMethodId: result.setupIntent.payment_method
+          paymentMethodId: paymentMethod.id,
+          paymentType: selectedMethod
         }),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Save Method Response:', errorText);
-        throw new Error(`保存支付方式失败: ${response.status}`);
-      }
-
       const responseData = await response.json();
 
-      alert('支付方式绑定成功！');
-      navigate(returnUrl);
+      if (!response.ok) {
+        throw new Error(responseData.error || '保存支付方式失败');
+      }
+
+      if (responseData.success) {
+        alert('支付方式绑定成功！');
+        navigate(returnUrl);
+      } else {
+        throw new Error(responseData.error || '绑定支付方式失败');
+      }
     } catch (err) {
       console.error('详细错误信息:', err);
       setError(err.message || '绑定支付方式失败，请重试');
@@ -115,33 +170,75 @@ const PaymentSetup = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="payment-methods">
-            <div className="payment-method-item active">
+            <div 
+              className={`payment-method-item ${selectedMethod === 'card' ? 'active' : ''}`}
+              onClick={() => setSelectedMethod('card')}
+            >
               <div className="payment-method-header">
-                <img src="/images/credit-card-icon.svg" alt="信用卡" className="payment-icon" />
-                <span>信用卡/借记卡</span>
+                <img src="/images/credit-card-icon.svg" alt="Credit Card" className="payment-icon" />
+                <span>Credit/Debit Card</span>
               </div>
               <div className="card-brands">
-                <img src="/images/visa-logo.svg" alt="Visa" />
-                <img src="/images/mastercard-logo.svg" alt="Mastercard" />
+                <img src="https://js.stripe.com/v3/fingerprinted/img/visa-729c05c240c4bdb47b03ac81d9945bfe.svg" alt="Visa" />
+                <img src="https://js.stripe.com/v3/fingerprinted/img/mastercard-4d8844094130711885b5e41b28c9848f.svg" alt="Mastercard" />
+                <img src="https://js.stripe.com/v3/fingerprinted/img/amex-a49b82f46c5cd6a96a6e418a6ca1717c.svg" alt="American Express" />
               </div>
             </div>
+
+            {paymentRequest && (
+              <div 
+                className={`payment-method-item ${selectedMethod === 'wallet' ? 'active' : ''}`}
+                onClick={() => setSelectedMethod('wallet')}
+              >
+                <div className="payment-method-header">
+                  <img 
+                    src={`https://js.stripe.com/v3/fingerprinted/img/${
+                      /iPhone|iPad|Macintosh/i.test(navigator.userAgent) ? 'apple-pay' : 'google-pay'
+                    }.svg`} 
+                    alt="Digital Wallet" 
+                    className="payment-icon"
+                  />
+                  <span>{/iPhone|iPad|Macintosh/i.test(navigator.userAgent) ? 'Apple Pay' : 'Google Pay'}</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="card-element-container">
-            <CardElement options={cardElementOptions} />
-          </div>
+          {selectedMethod === 'card' ? (
+            <div className="card-element-container">
+              <CardElement options={cardElementOptions} />
+            </div>
+          ) : (
+            paymentRequest && (
+              <div className="wallet-payment-container">
+                <PaymentRequestButtonElement
+                  options={{
+                    paymentRequest,
+                    style: {
+                      paymentRequestButton: {
+                        theme: 'dark',
+                        height: '44px',
+                      },
+                    },
+                  }}
+                />
+              </div>
+            )
+          )}
 
           <div className="secure-badge">
             <span>您的支付信息将通过 Stripe 安全加密处理</span>
           </div>
 
-          <button 
-            type="submit" 
-            disabled={!stripe || processing}
-            className={`submit-button ${processing ? 'processing' : ''}`}
-          >
-            {processing ? '处理中...' : '绑定支付方式'}
-          </button>
+          {selectedMethod === 'card' && (
+            <button 
+              type="submit" 
+              disabled={!stripe || processing}
+              className={`submit-button ${processing ? 'processing' : ''}`}
+            >
+              {processing ? '处理中...' : '绑定支付方式'}
+            </button>
+          )}
         </form>
       </div>
     </div>

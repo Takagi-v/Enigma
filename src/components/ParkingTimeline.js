@@ -3,130 +3,87 @@ import { Tooltip } from 'antd';
 import moment from 'moment';
 import './styles/ParkingTimeline.css';
 
-const ParkingTimeline = ({ openingHours, reservations, onTimeSelect }) => {
+const ParkingTimeline = ({ openingHours, reservations }) => {
   // 解析开放时间
   const [startTime, endTime] = openingHours.split('-');
   const startHour = parseInt(startTime.split(':')[0]);
   const endHour = parseInt(endTime.split(':')[0]);
   const now = moment();
+  const currentHour = now.hours();
 
-  // 生成时间段（每半小时一个时间段）
-  const generateTimeSlots = () => {
-    const slots = [];
-    let currentHour = startHour;
-    
-    while (currentHour !== endHour || slots.length === 0) {
-      // 添加整点
-      slots.push({
-        time: `${currentHour.toString().padStart(2, '0')}:00`,
-        type: 'hour'
-      });
-      
-      // 添加半点
-      slots.push({
-        time: `${currentHour.toString().padStart(2, '0')}:30`,
-        type: 'half'
-      });
-      
-      currentHour = (currentHour + 1) % 24;
+  // 生成时间刻度
+  const generateTimeMarks = () => {
+    const marks = [];
+    for (let hour = startHour; hour <= endHour; hour++) {
+      marks.push(hour);
     }
-    
-    return slots;
+    return marks;
   };
 
   // 检查时间段是否被预定
-  const isTimeSlotReserved = (timeSlot) => {
-    const [hours, minutes] = timeSlot.split(':').map(Number);
-    const slotTime = moment().set({ hours, minutes, seconds: 0 });
-    
+  const isTimeReserved = (hour) => {
     return reservations.some(reservation => {
-      const startTime = moment(reservation.start_time, 'HH:mm:ss');
-      const endTime = moment(reservation.end_time, 'HH:mm:ss');
-      
-      const reservationStart = moment().set({
-        hours: startTime.hours(),
-        minutes: startTime.minutes(),
-        seconds: 0
-      });
-      const reservationEnd = moment().set({
-        hours: endTime.hours(),
-        minutes: endTime.minutes(),
-        seconds: 0
-      });
-      
-      return slotTime.isBetween(reservationStart, reservationEnd, null, '[)');
+      const start = moment(reservation.start_time, 'HH:mm:ss').hours();
+      const end = moment(reservation.end_time, 'HH:mm:ss').hours();
+      return hour >= start && hour < end;
     });
   };
 
-  // 检查时间段是否已过期
-  const isTimeSlotPassed = (timeSlot) => {
-    const [hours, minutes] = timeSlot.split(':').map(Number);
-    const slotTime = moment().set({ hours, minutes, seconds: 0 });
-    return slotTime.isBefore(now);
+  // 检查时间是否已过
+  const isTimePassed = (hour) => {
+    return hour < currentHour;
   };
 
-  // 获取时间段的状态信息
-  const getTimeSlotInfo = (timeSlot) => {
-    if (isTimeSlotPassed(timeSlot)) {
-      return {
-        status: 'passed',
-        tooltip: '已过期'
-      };
-    }
-
-    const isReserved = isTimeSlotReserved(timeSlot);
-    const reservation = reservations.find(r => {
-      const startTime = moment(r.start_time, 'HH:mm:ss').format('HH:mm');
-      const endTime = moment(r.end_time, 'HH:mm:ss').format('HH:mm');
-      return startTime <= timeSlot && timeSlot < endTime;
-    });
-
-    return {
-      status: isReserved ? 'reserved' : 'available',
-      tooltip: isReserved 
-        ? `已被预定 (${reservation.start_time} - ${reservation.end_time})`
-        : '可预定'
-    };
+  // 检查时间是否在非开放时段
+  const isTimeUnavailable = (hour) => {
+    return hour < startHour || hour > endHour;
   };
 
-  const timeSlots = generateTimeSlots();
+  // 获取时间块的状态
+  const getTimeBlockStatus = (hour) => {
+    if (isTimePassed(hour)) return 'passed';
+    if (isTimeReserved(hour)) return 'reserved';
+    if (isTimeUnavailable(hour)) return 'unavailable';
+    return 'available';
+  };
+
+  const timeMarks = generateTimeMarks();
 
   return (
-    <div className="parking-timeline">
-      <div className="timeline-header">
-        <span>今日开放时间</span>
-        <div className="timeline-legend">
-          <span className="legend-item">
-            <span className="legend-color passed"></span>
-            已过期
-          </span>
-          <span className="legend-item">
-            <span className="legend-color available"></span>
-            可预定
-          </span>
-          <span className="legend-item">
-            <span className="legend-color reserved"></span>
-            已预定
-          </span>
+    <div className="timeline-container">
+      <div className="timeline-legend">
+        <span className="legend-item">
+          <span className="legend-color reserved"></span>
+          已预约
+        </span>
+        <span className="legend-item">
+          <span className="legend-color available"></span>
+          预约时间段
+        </span>
+        <span className="legend-item">
+          <span className="legend-color passed"></span>
+          已过时间
+        </span>
+        <span className="legend-item">
+          <span className="legend-color unavailable"></span>
+          非开放预约时段
+        </span>
+      </div>
+      
+      <div className="timeline-content">
+        <div className="timeline-hours">
+          {timeMarks.map(hour => (
+            <div key={hour} className="hour-mark">
+              <div className={`hour-block ${getTimeBlockStatus(hour)}`} />
+              <span className="hour-label">{hour.toString().padStart(2, '0')}</span>
+            </div>
+          ))}
         </div>
       </div>
-      <div className="timeline-container">
-        {timeSlots.map((slot, index) => {
-          const { status, tooltip } = getTimeSlotInfo(slot.time);
-          return (
-            <Tooltip key={index} title={`${slot.time} - ${tooltip}`}>
-              <div
-                className={`timeline-slot ${slot.type} ${status}`}
-                onClick={() => !isTimeSlotPassed(slot.time) && onTimeSelect && onTimeSelect(slot.time)}
-                style={{ cursor: status === 'passed' ? 'not-allowed' : 'pointer' }}
-              >
-                {slot.type === 'hour' && (
-                  <span className="time-label">{slot.time}</span>
-                )}
-              </div>
-            </Tooltip>
-          );
-        })}
+
+      <div className="timeline-info">
+        <div>当日开放 {startTime}--{endTime}</div>
+        <div>每次预约 1时-16时</div>
       </div>
     </div>
   );

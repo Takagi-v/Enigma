@@ -258,11 +258,13 @@ function ParkingDetail() {
               </div>
             </div>
 
-            <ParkingTimeline 
-              openingHours={parkingSpot.opening_hours}
-              reservations={reservations}
-              onTimeSelect={handleTimeSelect}
-            />
+            <div className="timeline-container">
+              <ParkingTimeline 
+                openingHours={parkingSpot.opening_hours}
+                reservations={reservations}
+                onTimeSelect={handleTimeSelect}
+              />
+            </div>
 
             <div className="reservations-section">
               <h3>今日预定情况</h3>
@@ -293,7 +295,7 @@ function ParkingDetail() {
 
           <div className="map-section">
             <h3>位置信息</h3>
-            <div className="map-wrapper" style={{ height: '400px', width: '100%' }}>
+            <div className="map-wrapper">
               <Map 
                 mode="detail"
                 initialSpot={{

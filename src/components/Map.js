@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "./styles/Map.css";
 import config from '../config';
@@ -441,6 +441,190 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     }
   }, [userLocation]);
 
+  // 缓存地图配置
+  const mapOptions = useMemo(() => ({
+    gestureHandling: mode === 'detail' ? 'cooperative' : 'greedy',
+    disableDefaultUI: false,
+    mapTypeId: 'roadmap',
+    scrollwheel: mode !== 'detail',
+    zoomControl: true,
+    mapTypeControl: mode !== 'detail',
+    scaleControl: true,
+    streetViewControl: mode !== 'detail',
+    rotateControl: mode !== 'detail',
+    fullscreenControl: mode !== 'detail',
+    mapTypeControlOptions: {
+      position: window.google?.maps?.ControlPosition?.TOP_LEFT,
+      style: window.google?.maps?.MapTypeControlStyle?.DROPDOWN_MENU
+    },
+    zoomControlOptions: {
+      position: window.google?.maps?.ControlPosition?.RIGHT_CENTER
+    },
+    streetViewControlOptions: {
+      position: window.google?.maps?.ControlPosition?.RIGHT_CENTER
+    },
+    fullscreenControlOptions: {
+      position: window.google?.maps?.ControlPosition?.RIGHT_TOP
+    }
+  }), [mode]);
+
+  // 缓存地图样式
+  const currentMapStyles = useMemo(() => 
+    mode === 'detail' ? detailMapStyles : mapStyles
+  , [mode]);
+
+  // 缓存地图中心点
+  const mapCenter = useMemo(() => 
+    userLocation || defaultCenter
+  , [userLocation]);
+
+  // 缓存地图组件
+  const renderMap = useMemo(() => (
+    <GoogleMap
+      mapContainerStyle={currentMapStyles}
+      center={mapCenter}
+      zoom={mode === 'detail' ? 17 : defaultZoom}
+      onClick={handleMapClick}
+      onLoad={map => {
+        mapRef.current = map;
+        map.setOptions(mapOptions);
+      }}
+      options={mapOptions}
+    >
+      {/* 用户位置标记 */}
+      {userLocation && (
+        <Marker
+          position={userLocation}
+          icon={userLocationIcon}
+        />
+      )}
+
+      {/* 停车位标记 - 仅在非详情模式下显示 */}
+      {mode !== 'detail' && parkingSpots.map((spot) => {
+        if (!spot.coordinates) return null;
+        const [lat, lng] = spot.coordinates.split(',').map(Number);
+        return (
+          <Marker
+            key={spot.id}
+            position={{ lat, lng }}
+            icon={parkingIcon}
+            onClick={() => setSelectedMarker(spot)}
+          />
+        );
+      })}
+
+      {/* 详情模式下的停车位标记 */}
+      {mode === 'detail' && userLocation && (
+        <Marker
+          position={userLocation}
+          icon={parkingIcon}
+        />
+      )}
+
+      {/* 信息窗口 */}
+      {selectedMarker && (
+        <InfoWindow
+          position={{
+            lat: parseFloat(selectedMarker.coordinates.split(',')[0]),
+            lng: parseFloat(selectedMarker.coordinates.split(',')[1])
+          }}
+          onCloseClick={() => setSelectedMarker(null)}
+          options={{
+            pixelOffset: new window.google.maps.Size(0, -30)
+          }}
+        >
+          <div 
+            className="info-window-content"
+            onClick={() => {
+              const timeCheck = checkParkingTime(selectedMarker.opening_hours);
+              if (timeCheck.isNearClosing) {
+                Modal.confirm({
+                  title: '停车场即将关闭',
+                  content: `该停车场将在${Math.floor(timeCheck.minsUntilClose)}分钟后关闭，请确保您能在关闭前离开。是否继续？`,
+                  okText: '继续',
+                  cancelText: '取消',
+                  onOk: () => navigate(`/parking/${selectedMarker.id}`)
+                });
+              } else {
+                navigate(`/parking/${selectedMarker.id}`);
+              }
+            }}
+            style={{
+              cursor: 'pointer',
+              padding: '8px',
+              minWidth: '200px'
+            }}
+          >
+            <h3 style={{ 
+              margin: '0 0 8px 0',
+              fontSize: '16px',
+              color: '#1a1a1a'
+            }}>{selectedMarker.location}</h3>
+            <p style={{
+              margin: '4px 0',
+              color: '#f5222d',
+              fontSize: '15px',
+              fontWeight: 'bold'
+            }}>¥{selectedMarker.price}/小时</p>
+            <p style={{
+              margin: '4px 0',
+              color: '#52c41a',
+              fontSize: '13px'
+            }}>
+              {selectedMarker.status === 'available' ? '空闲' : '使用中'}
+            </p>
+            <p style={{
+              margin: '4px 0',
+              color: '#666',
+              fontSize: '13px'
+            }}>开放时段: {selectedMarker.opening_hours}</p>
+            {checkParkingTime(selectedMarker.opening_hours).isNearClosing && (
+              <p style={{
+                margin: '4px 0',
+                color: '#ff4d4f',
+                fontSize: '13px',
+                fontWeight: 'bold'
+              }}>
+                距离关闭还有{Math.floor(checkParkingTime(selectedMarker.opening_hours).minsUntilClose)}分钟
+              </p>
+            )}
+            <p style={{
+              margin: '4px 0',
+              color: '#666',
+              fontSize: '13px'
+            }}>联系方式: {selectedMarker.contact}</p>
+            <div style={{
+              marginTop: '8px',
+              textAlign: 'right',
+              color: '#1890ff',
+              fontSize: '13px'
+            }}>
+              点击查看详情 →
+            </div>
+          </div>
+        </InfoWindow>
+      )}
+
+      {/* 选中位置标记 */}
+      {selectedLocation && mode === "select" && (
+        <Marker
+          position={selectedLocation}
+          icon={parkingIcon}
+        />
+      )}
+    </GoogleMap>
+  ), [
+    currentMapStyles,
+    mapCenter,
+    mode,
+    handleMapClick,
+    mapOptions,
+    userLocation,
+    parkingSpots,
+    selectedMarker,
+    selectedLocation
+  ]);
+
   if (loadError) {
     return <div className="map-error">地图加载失败: {loadError.message}</div>;
   }
@@ -492,164 +676,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         )}
 
         <div className={mode === 'detail' ? 'detail-map-wrapper' : 'map-wrapper'}>
-          <GoogleMap
-            mapContainerStyle={mode === 'detail' ? detailMapStyles : mapStyles}
-            center={userLocation || defaultCenter}
-            zoom={mode === 'detail' ? 17 : defaultZoom}
-            onClick={handleMapClick}
-            onLoad={map => {
-              mapRef.current = map;
-              map.setOptions({
-                zoomControl: true,
-                mapTypeControl: mode !== 'detail',
-                scaleControl: true,
-                streetViewControl: mode !== 'detail',
-                rotateControl: mode !== 'detail',
-                fullscreenControl: mode !== 'detail',
-                mapTypeControlOptions: {
-                  position: window.google?.maps?.ControlPosition?.TOP_LEFT,
-                  style: window.google?.maps?.MapTypeControlStyle?.DROPDOWN_MENU
-                },
-                zoomControlOptions: {
-                  position: window.google?.maps?.ControlPosition?.RIGHT_CENTER
-                },
-                streetViewControlOptions: {
-                  position: window.google?.maps?.ControlPosition?.RIGHT_CENTER
-                },
-                fullscreenControlOptions: {
-                  position: window.google?.maps?.ControlPosition?.RIGHT_TOP
-                }
-              });
-            }}
-            options={{
-              gestureHandling: mode === 'detail' ? 'cooperative' : 'greedy',
-              disableDefaultUI: false,
-              mapTypeId: 'roadmap',
-              scrollwheel: mode !== 'detail'
-            }}
-          >
-            {/* 用户位置标记 */}
-            {userLocation && (
-              <Marker
-                position={userLocation}
-                icon={userLocationIcon}
-              />
-            )}
-
-            {/* 停车位标记 - 仅在非详情模式下显示 */}
-            {mode !== 'detail' && parkingSpots.map((spot) => {
-              if (!spot.coordinates) return null;
-              const [lat, lng] = spot.coordinates.split(',').map(Number);
-              return (
-                <Marker
-                  key={spot.id}
-                  position={{ lat, lng }}
-                  icon={parkingIcon}
-                  onClick={() => setSelectedMarker(spot)}
-                />
-              );
-            })}
-
-            {/* 详情模式下的停车位标记 */}
-            {mode === 'detail' && userLocation && (
-              <Marker
-                position={userLocation}
-                icon={parkingIcon}
-              />
-            )}
-
-            {/* 信息窗口 */}
-            {selectedMarker && (
-              <InfoWindow
-                position={{
-                  lat: parseFloat(selectedMarker.coordinates.split(',')[0]),
-                  lng: parseFloat(selectedMarker.coordinates.split(',')[1])
-                }}
-                onCloseClick={() => setSelectedMarker(null)}
-                options={{
-                  pixelOffset: new window.google.maps.Size(0, -30)
-                }}
-              >
-                <div 
-                  className="info-window-content"
-                  onClick={() => {
-                    const timeCheck = checkParkingTime(selectedMarker.opening_hours);
-                    if (timeCheck.isNearClosing) {
-                      Modal.confirm({
-                        title: '停车场即将关闭',
-                        content: `该停车场将在${Math.floor(timeCheck.minsUntilClose)}分钟后关闭，请确保您能在关闭前离开。是否继续？`,
-                        okText: '继续',
-                        cancelText: '取消',
-                        onOk: () => navigate(`/parking/${selectedMarker.id}`)
-                      });
-                    } else {
-                      navigate(`/parking/${selectedMarker.id}`);
-                    }
-                  }}
-                  style={{
-                    cursor: 'pointer',
-                    padding: '8px',
-                    minWidth: '200px'
-                  }}
-                >
-                  <h3 style={{ 
-                    margin: '0 0 8px 0',
-                    fontSize: '16px',
-                    color: '#1a1a1a'
-                  }}>{selectedMarker.location}</h3>
-                  <p style={{
-                    margin: '4px 0',
-                    color: '#f5222d',
-                    fontSize: '15px',
-                    fontWeight: 'bold'
-                  }}>¥{selectedMarker.price}/小时</p>
-                  <p style={{
-                    margin: '4px 0',
-                    color: '#52c41a',
-                    fontSize: '13px'
-                  }}>
-                    {selectedMarker.status === 'available' ? '空闲' : '使用中'}
-                  </p>
-                  <p style={{
-                    margin: '4px 0',
-                    color: '#666',
-                    fontSize: '13px'
-                  }}>开放时段: {selectedMarker.opening_hours}</p>
-                  {checkParkingTime(selectedMarker.opening_hours).isNearClosing && (
-                    <p style={{
-                      margin: '4px 0',
-                      color: '#ff4d4f',
-                      fontSize: '13px',
-                      fontWeight: 'bold'
-                    }}>
-                      距离关闭还有{Math.floor(checkParkingTime(selectedMarker.opening_hours).minsUntilClose)}分钟
-                    </p>
-                  )}
-                  <p style={{
-                    margin: '4px 0',
-                    color: '#666',
-                    fontSize: '13px'
-                  }}>联系方式: {selectedMarker.contact}</p>
-                  <div style={{
-                    marginTop: '8px',
-                    textAlign: 'right',
-                    color: '#1890ff',
-                    fontSize: '13px'
-                  }}>
-                    点击查看详情 →
-                  </div>
-                </div>
-              </InfoWindow>
-            )}
-
-            {/* 选中位置标记 */}
-            {selectedLocation && mode === "select" && (
-              <Marker
-                position={selectedLocation}
-                icon={parkingIcon}
-              />
-            )}
-          </GoogleMap>
+          {renderMap}
         </div>
 
         {mode !== 'detail' && (
