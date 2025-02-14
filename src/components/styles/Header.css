@@ -6,11 +6,9 @@
   z-index: 1001;
   display: flex;
   justify-content: flex-end;
-  pointer-events: none;
 }
 
 .user-controls {
-  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -19,7 +17,7 @@
 .user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   background: white;
   padding: 8px 16px;
   border-radius: 20px;
@@ -29,6 +27,9 @@
 .user-info span {
   color: #1a1a1a;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-info button {
@@ -36,9 +37,16 @@
   border: none;
   color: #f5222d;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 0;
+  margin: 0;
   border-radius: 4px;
   transition: background-color 0.2s;
+  white-space: nowrap;
+  min-width: 40px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .user-info button:hover {
@@ -63,10 +71,51 @@
 /* 响应式设计 */
 @media (max-width: 768px) {
   .header {
-    padding: 12px;
+    padding: 8px;
   }
 
   .user-info {
+    padding: 4px 12px;
+    max-width: 240px;
+    gap: 6px;
+  }
+
+  .user-info span {
+    max-width: 180px;
+  }
+
+  .user-info button {
+    min-width: 32px;
+    height: 24px;
+    font-size: 13px;
+  }
+
+  .auth-link {
     padding: 6px 12px;
+    font-size: 14px;
+  }
+}
+
+/* 小屏手机适配 */
+@media (max-width: 375px) {
+  .header {
+    padding: 6px;
+  }
+
+  .user-info {
+    padding: 4px 10px;
+    max-width: 220px;
+    gap: 4px;
+  }
+
+  .user-info span {
+    max-width: 160px;
+    font-size: 13px;
+  }
+
+  .user-info button {
+    min-width: 28px;
+    height: 22px;
+    font-size: 12px;
   }
 } 

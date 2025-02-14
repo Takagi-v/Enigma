@@ -51,6 +51,16 @@ function Auth() {
   const navigate = useNavigate();
   const [fieldErrors, setFieldErrors] = useState({});
 
+  const handleBack = () => {
+    if (registrationStep > 0) {
+      setRegistrationStep(prev => prev - 1);
+    } else if (!isLogin) {
+      setIsLogin(true);
+    } else {
+      navigate(-1);
+    }
+  };
+
   const validateField = (name, value) => {
     if (!VALIDATION_RULES[name]) return true;
     
@@ -338,38 +348,73 @@ function Auth() {
 
   const renderRegistrationChoice = () => {
     return (
-      <div className="registration-choice">
-        <h3>请选择注册方式</h3>
-        <button
-          type="button"
-          className="choice-button"
-          onClick={() => {
-            setRegistrationType('quick');
-            setRegistrationStep(1);
-          }}
-        >
-          快速注册
-          <small>仅需手机号，立即使用</small>
-        </button>
-        <button
-          type="button"
-          className="choice-button"
-          onClick={() => {
-            setRegistrationType('normal');
-            setRegistrationStep(1);
-          }}
-        >
-          普通注册
-          <small>填写完整信息</small>
-        </button>
+      <div className="auth-form">
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={handleBack}
+          className="back-button"
+        />
+        <h2>选择注册方式</h2>
+        <div className="registration-choice">
+          <button
+            className="choice-button"
+            onClick={() => {
+              setRegistrationType('quick');
+              setRegistrationStep(1);
+            }}
+          >
+            快速注册
+            <small>使用手机号快速注册账号</small>
+          </button>
+          <button
+            className="choice-button"
+            onClick={() => {
+              setRegistrationType('full');
+              setRegistrationStep(1);
+            }}
+          >
+            完整注册
+            <small>填写完整信息进行注册</small>
+          </button>
+        </div>
+        <p className="switch-mode">
+          已有账号？ 
+          <button 
+            type="button" 
+            className="switch-button"
+            onClick={() => {
+              setIsLogin(true);
+              setRegistrationStep(0);
+              setRegistrationType('');
+              setFormData({
+                username: '',
+                password: '',
+                fullName: '',
+                phone: '',
+                avatar: '',
+                bio: '',
+                address: '',
+                account: ''
+              });
+            }}
+          >
+            立即登录
+          </button>
+        </p>
       </div>
     );
   };
 
   const renderQuickRegistration = () => {
     return (
-      <>
-        <h3>快速注册</h3>
+      <div className="auth-form">
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={handleBack}
+          className="back-button"
+        />
+        <h2>快速注册</h2>
+        {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleQuickRegistration}>
           <input
             type="tel"
@@ -387,207 +432,154 @@ function Auth() {
             {isLoading ? '注册中...' : '立即注册'}
           </button>
         </form>
-      </>
+      </div>
     );
   };
 
   const renderRegistrationStep = () => {
-    switch (registrationStep) {
-      case 1:
-        return (
-          <>
-            <h3>第 1 步：基本信息</h3>
-            <input
-              type="text"
-              name="username"
-              placeholder="用户名（4-20个字符）"
-              value={formData.username}
-              onChange={handleInputChange}
-              required
-            />
-            {fieldErrors.username && <div className="field-error">{fieldErrors.username}</div>}
-            <input
-              type="password"
-              name="password"
-              placeholder="密码（至少8位，包含数字和字母）"
-              value={formData.password}
-              onChange={handleInputChange}
-              required
-            />
-            {fieldErrors.password && <div className="field-error">{fieldErrors.password}</div>}
-          </>
-        );
-      case 2:
-        return (
-          <>
-            <h3>第 2 步：个人信息</h3>
-            <input
-              type="text"
-              name="fullName"
-              placeholder="姓名（至少2个字符）"
-              value={formData.fullName}
-              onChange={handleInputChange}
-              required
-            />
-            {fieldErrors.fullName && <div className="field-error">{fieldErrors.fullName}</div>}
-            <input
-              type="tel"
-              name="phone"
-              placeholder="手机号（11位）"
-              value={formData.phone}
-              onChange={handleInputChange}
-              required
-            />
-            {fieldErrors.phone && <div className="field-error">{fieldErrors.phone}</div>}
-          </>
-        );
-      case 3:
-        return (
-          <>
-            <h3>第 3 步：补充信息</h3>
-            <div className="avatar-upload">
-              {formData.avatar && (
-                <img 
-                  src={formData.avatar} 
-                  alt="头像预览" 
-                  className="avatar-preview"
-                />
-              )}
+    return (
+      <div className="auth-form">
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={handleBack}
+          className="back-button"
+        />
+        <h2>{registrationStep === 1 ? '基本信息' : registrationStep === 2 ? '个人资料' : '完成注册'}</h2>
+        {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleRegistration}>
+          {registrationStep === 1 && (
+            <>
               <input
-                type="file"
-                accept="image/jpeg,image/png,image/gif"
-                onChange={handleFileUpload}
+                type="text"
+                name="username"
+                placeholder="用户名（4-20个字符）"
+                value={formData.username}
+                onChange={handleInputChange}
+                required
               />
-              <small>支持 JPG、PNG 和 GIF 格式，最大5MB</small>
-            </div>
-            <textarea
-              name="bio"
-              placeholder="个人简介（选填）"
-              value={formData.bio}
-              onChange={handleInputChange}
-            />
-            <input
-              type="text"
-              name="address"
-              placeholder="家庭住址（选填）"
-              value={formData.address}
-              onChange={handleInputChange}
-            />
-          </>
-        );
-      default:
-        return null;
-    }
+              {fieldErrors.username && <div className="field-error">{fieldErrors.username}</div>}
+              <input
+                type="password"
+                name="password"
+                placeholder="密码（至少8位，包含数字和字母）"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+              />
+              {fieldErrors.password && <div className="field-error">{fieldErrors.password}</div>}
+            </>
+          )}
+          {registrationStep === 2 && (
+            <>
+              <input
+                type="text"
+                name="fullName"
+                placeholder="姓名（至少2个字符）"
+                value={formData.fullName}
+                onChange={handleInputChange}
+                required
+              />
+              {fieldErrors.fullName && <div className="field-error">{fieldErrors.fullName}</div>}
+              <input
+                type="tel"
+                name="phone"
+                placeholder="手机号（11位）"
+                value={formData.phone}
+                onChange={handleInputChange}
+                required
+              />
+              {fieldErrors.phone && <div className="field-error">{fieldErrors.phone}</div>}
+            </>
+          )}
+          {registrationStep === 3 && (
+            <>
+              <div className="avatar-upload">
+                {formData.avatar && (
+                  <img 
+                    src={formData.avatar} 
+                    alt="头像预览" 
+                    className="avatar-preview"
+                  />
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif"
+                  onChange={handleFileUpload}
+                />
+                <small>支持 JPG、PNG 和 GIF 格式，最大5MB</small>
+              </div>
+              <textarea
+                name="bio"
+                placeholder="个人简介（选填）"
+                value={formData.bio}
+                onChange={handleInputChange}
+              />
+              <input
+                type="text"
+                name="address"
+                placeholder="家庭住址（选填）"
+                value={formData.address}
+                onChange={handleInputChange}
+              />
+            </>
+          )}
+          <button 
+            type="submit" 
+            disabled={isLoading}
+          >
+            {isLoading ? '处理中...' : (registrationStep < 3 ? '下一步' : '完成注册')}
+          </button>
+        </form>
+      </div>
+    );
+  };
+
+  const renderLoginForm = () => {
+    return (
+      <div className="auth-form">
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={handleBack}
+          className="back-button"
+        />
+        <h2>登录</h2>
+        {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleLogin}>
+          <input
+            type="text"
+            name="account"
+            placeholder="手机号/用户名"
+            value={formData.account}
+            onChange={handleInputChange}
+            required
+            disabled={isLoading}
+          />
+          <input
+            type="password"
+            name="password"
+            placeholder="密码"
+            value={formData.password}
+            onChange={handleInputChange}
+            required
+            disabled={isLoading}
+          />
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? '登录中...' : '登录'}
+          </button>
+        </form>
+      </div>
+    );
   };
 
   return (
     <div className="auth-container">
-      <div className="auth-form">
-        <h2>{isLogin ? '登录' : '欢迎注册'}</h2>
-        
-        {error && <div className="error-message">{error}</div>}
-        
-        {isLogin ? (
-          <>
-            <form onSubmit={handleLogin}>
-              <input
-                type="text"
-                name="account"
-                placeholder="手机号/用户名"
-                value={formData.account}
-                onChange={handleInputChange}
-                required
-                disabled={isLoading}
-              />
-              <input
-                type="password"
-                name="password"
-                placeholder="密码"
-                value={formData.password}
-                onChange={handleInputChange}
-                required
-                disabled={isLoading}
-              />
-              <button type="submit" disabled={isLoading}>
-                {isLoading ? '登录中...' : '登录'}
-              </button>
-            </form>
-            <p className="login-tip">
-              首次使用停车场？ 
-              <button 
-                type="button" 
-                className="switch-button"
-                onClick={() => {
-                  setIsLogin(false);
-                  setRegistrationStep(0);
-                  setRegistrationType('');
-                  setFormData({
-                    username: '',
-                    password: '',
-                    fullName: '',
-                    phone: '',
-                    avatar: '',
-                    bio: '',
-                    address: '',
-                    account: ''
-                  });
-                }}
-              >
-                立即注册
-              </button>
-            </p>
-          </>
-        ) : (
-          <>
-            {registrationStep === 0 && renderRegistrationChoice()}
-            {registrationStep > 0 && registrationType === 'quick' && renderQuickRegistration()}
-            {registrationStep > 0 && registrationType === 'normal' && (
-              <form onSubmit={handleRegistration}>
-                {renderRegistrationStep()}
-                <button 
-                  type="submit" 
-                  disabled={isLoading || !formData.username || !formData.password}
-                >
-                  {isLoading ? '处理中...' : (registrationStep < 3 ? '下一步' : '完成注册')}
-                </button>
-
-                {registrationStep > 1 && (
-                  <Button 
-                    type="link" 
-                    icon={<ArrowLeftOutlined />} 
-                    onClick={() => setRegistrationStep(prev => prev - 1)}
-                    className="back-button"
-                  />
-                )}
-              </form>
-            )}
-            <p className="switch-mode">
-              已有账号？ 
-              <button 
-                type="button" 
-                className="switch-button"
-                onClick={() => {
-                  setIsLogin(true);
-                  setRegistrationStep(0);
-                  setRegistrationType('');
-                  setFormData({
-                    username: '',
-                    password: '',
-                    fullName: '',
-                    phone: '',
-                    avatar: '',
-                    bio: '',
-                    address: '',
-                    account: ''
-                  });
-                }}
-              >
-                立即登录
-              </button>
-            </p>
-          </>
-        )}
-      </div>
+      {isLogin ? renderLoginForm() : (
+        <>
+          {registrationStep === 0 && renderRegistrationChoice()}
+          {registrationStep > 0 && registrationType === 'quick' && renderQuickRegistration()}
+          {registrationStep > 0 && registrationType === 'full' && renderRegistrationStep()}
+        </>
+      )}
     </div>
   );
 }

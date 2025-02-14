@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import "./components/styles/App.css";
 import Home from "./components/Home";
@@ -53,6 +53,18 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
+  useEffect(() => {
+    // 添加viewport meta标签以支持响应式设计
+    const viewport = document.createElement('meta');
+    viewport.name = "viewport";
+    viewport.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
+    document.head.appendChild(viewport);
+
+    return () => {
+      document.head.removeChild(viewport);
+    };
+  }, []);
+
   const [token, setToken] = useState(null);
   
   return (

@@ -1,17 +1,20 @@
-.sidebar {
-  width: 60px;
-  background-color: #1e1e1e;
-  position: fixed;
-  left: 0;
-  top: 0;
-  height: 100%;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1000;
-  padding-top: 60px;
-}
+/* 桌面端样式 */
+@media screen and (min-width: 769px) {
+  .sidebar {
+    width: 60px;
+    background-color: #1e1e1e;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    padding-top: 60px;
+  }
 
-.sidebar.active {
-  width: 200px;
+  .sidebar.active {
+    width: 200px;
+  }
 }
 
 /* 导航菜单样式 */
@@ -90,8 +93,9 @@
   left: 10px;
   width: 40px;
   height: 40px;
-  background-color: transparent;
+  background-color: #1e1e1e;
   border: none;
+  border-radius: 50%;
   cursor: pointer;
   z-index: 1001;
   display: flex;
@@ -100,27 +104,112 @@
   color: #fff;
   font-size: 20px;
   transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .toggle-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
+  background-color: #2d2d2d;
 }
 
-/* 响应式调整 */
-@media (max-width: 768px) {
+/* 遮罩层 */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
   .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: fixed;
+    top: 0;
+    left: -200px;
+    width: 200px;
+    height: 100%;
+    background-color: #1e1e1e;
+    z-index: 1000;
+    padding-top: 60px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .sidebar.active {
-    transform: translateX(0);
+    left: 0;
+    width: 200px;
   }
-  
+
+  .sidebar-link {
+    padding: 20px 20px;
+  }
+
+  .sidebar-link .icon {
+    font-size: 24px;
+    min-width: 28px;
+  }
+
+  .sidebar-link .text {
+    opacity: 1;
+    transform: translateX(0);
+    font-size: 17px;
+    margin-left: 16px;
+    font-weight: 500;
+  }
+
+  .toggle-button {
+    background-color: rgba(30, 30, 30, 0.9);
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+
+  /* 移除对主内容区域的影响 */
   .content {
     margin-left: 0 !important;
     width: 100% !important;
+  }
+}
+
+/* 小屏手机适配 */
+@media screen and (max-width: 375px) {
+  .sidebar {
+    width: 180px;
+    left: -180px;
+  }
+
+  .sidebar.active {
+    width: 180px;
+  }
+
+  .sidebar-link {
+    padding: 18px 18px;
+  }
+
+  .sidebar-link .icon {
+    font-size: 22px;
+    min-width: 26px;
+  }
+
+  .sidebar-link .text {
+    font-size: 16px;
+    margin-left: 15px;
+    font-weight: 500;
+  }
+
+  .toggle-button {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
   }
 }
 

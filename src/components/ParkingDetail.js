@@ -192,110 +192,110 @@ function ParkingDetail() {
 
   return (
     <div className="parking-detail-container">
-      <div className="header-section">
-        <Button 
-          type="text" 
-          icon={<ArrowLeftOutlined />} 
-          onClick={() => navigate('/')}
-          className="back-button"
-        />
-        <h1>{parkingSpot.location}</h1>
-      </div>
-      
-      <div className="parking-detail">
-        <div className="detail-content">
-          <div className="info-section">
-            <div className="price-section">
+      <div className="detail-content">
+        <div className="info-section">
+          <div className="header-section">
+            <Button 
+              type="text" 
+              icon={<ArrowLeftOutlined />} 
+              onClick={() => navigate('/')}
+              className="back-button"
+            />
+          </div>
+          
+          <div className="price-section">
+            <div className="price-info">
+              <h1 className="location-title">{parkingSpot.location}</h1>
               <h2 className="price">¥{parkingSpot.price}/小时</h2>
-              <div className="status-section">
-                <span className={`status ${parkingSpot.status}`}>
-                  {parkingSpot.status === 'available' ? '空闲' : '使用中'}
-                </span>
-                {parkingSpot.status === 'available' && (
-                  <div className="action-buttons">
-                    <Button
-                      type="primary"
-                      size="large"
-                      className="use-button"
-                      onClick={handleUseParking}
-                    >
-                      立即使用
-                    </Button>
-                    <Button
-                      type="default"
-                      size="large"
-                      className="reserve-button"
-                      onClick={handleReserve}
-                    >
-                      预定
-                    </Button>
-                  </div>
-                )}
-              </div>
             </div>
-            
-            <div className="info-items">
-              <div className="info-item">
-                <label>联系人：</label>
-                <span>{parkingSpot.contact}</span>
-              </div>
-              <div className="info-item">
-                <label>发布者：</label>
-                <span>{parkingSpot.owner_username}</span>
-              </div>
-              <div className="info-item">
-                <label>开放时段：</label>
-                <span>{parkingSpot.opening_hours}</span>
-                {checkParkingTime(parkingSpot.opening_hours).isNearClosing && (
-                  <span className="closing-warning">
-                    距离关闭还有{Math.floor(checkParkingTime(parkingSpot.opening_hours).minsUntilClose)}分钟
-                  </span>
-                )}
-              </div>
-              <div className="info-item">
-                <label>发布时间：</label>
-                <span>{new Date(parkingSpot.created_at).toLocaleString()}</span>
-              </div>
-            </div>
-
-            <div className="timeline-container">
-              <ParkingTimeline 
-                openingHours={parkingSpot.opening_hours}
-                reservations={reservations}
-                onTimeSelect={handleTimeSelect}
-              />
-            </div>
-
-            <div className="reservations-section">
-              <h3>今日预定情况</h3>
-              {reservations.length > 0 ? (
-                <ul className="reservations-list">
-                  {reservations.map(reservation => (
-                    <li key={reservation.id} className="reservation-item">
-                      <span className="time">{reservation.start_time} - {reservation.end_time}</span>
-                      <span className={`status ${reservation.status}`}>
-                        {reservation.status === 'pending' ? '待确认' : 
-                         reservation.status === 'confirmed' ? '已确认' : 
-                         reservation.status === 'cancelled' ? '已取消' : 
-                         '已完成'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>今日暂无预定</p>
+            <div className="status-section">
+              <span className={`status ${parkingSpot.status}`}>
+                {parkingSpot.status === 'available' ? '空闲' : '使用中'}
+              </span>
+              {parkingSpot.status === 'available' && (
+                <div className="action-buttons">
+                  <Button
+                    type="primary"
+                    size="large"
+                    className="use-button"
+                    onClick={handleUseParking}
+                  >
+                    立即使用
+                  </Button>
+                  <Button
+                    type="default"
+                    size="large"
+                    className="reserve-button"
+                    onClick={handleReserve}
+                  >
+                    预定
+                  </Button>
+                </div>
               )}
             </div>
-
-            <div className="description-section">
-              <h3>详细描述</h3>
-              <p>{parkingSpot.description || '暂无描述'}</p>
+          </div>
+          
+          <div className="info-items">
+            <div className="info-item">
+              <label>联系人：</label>
+              <span>{parkingSpot.contact}</span>
             </div>
+            <div className="info-item">
+              <label>发布者：</label>
+              <span>{parkingSpot.owner_username}</span>
+            </div>
+            <div className="info-item">
+              <label>开放时段：</label>
+              <span>{parkingSpot.opening_hours}</span>
+              {checkParkingTime(parkingSpot.opening_hours).isNearClosing && (
+                <span className="closing-warning">
+                  距离关闭还有{Math.floor(checkParkingTime(parkingSpot.opening_hours).minsUntilClose)}分钟
+                </span>
+              )}
+            </div>
+            <div className="info-item">
+              <label>发布时间：</label>
+              <span>{new Date(parkingSpot.created_at).toLocaleString()}</span>
+            </div>
+          </div>
+
+          <div className="timeline-container">
+            <ParkingTimeline 
+              openingHours={parkingSpot.opening_hours}
+              reservations={reservations}
+              onTimeSelect={handleTimeSelect}
+            />
+          </div>
+
+          <div className="reservations-section">
+            <h3>今日预定情况</h3>
+            {reservations.length > 0 ? (
+              <ul className="reservations-list">
+                {reservations.map(reservation => (
+                  <li key={reservation.id} className="reservation-item">
+                    <span className="time">{reservation.start_time} - {reservation.end_time}</span>
+                    <span className={`status ${reservation.status}`}>
+                      {reservation.status === 'pending' ? '待确认' : 
+                       reservation.status === 'confirmed' ? '已确认' : 
+                       reservation.status === 'cancelled' ? '已取消' : 
+                       '已完成'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>今日暂无预定</p>
+            )}
+          </div>
+
+          <div className="description-section">
+            <h3>详细描述</h3>
+            <p>{parkingSpot.description || '暂无描述'}</p>
           </div>
 
           <div className="map-section">
             <h3>位置信息</h3>
-            <div className="map-wrapper">
+            <div className="parking-detail-map-wrapper">
               <Map 
                 mode="detail"
                 initialSpot={{

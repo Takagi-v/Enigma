@@ -1,96 +1,81 @@
 .parking-detail-container {
-  position: relative;
-  width: 100%;
-  min-height: 100vh;
   padding: 20px;
-  background-color: #f5f5f5;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-top: 40px;
+}
+
+.detail-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  position: relative;
+}
+
+.info-section {
+  margin-top: 40px;
+  padding: 24px 24px 24px 24px;
 }
 
 .header-section {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-  background: #fff;
-  padding: 16px 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.header-section h1 {
-  margin: 0;
-  font-size: 24px;
-  color: #333;
-  font-weight: 600;
+  position: fixed;
+  top: 46px;
+  left: 210px;
+  z-index: 1;
 }
 
 .back-button {
+  color: #333;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  background: white !important;
   width: 40px;
   height: 40px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  color: #333;
-  background: #fff;
-  border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #f0f0f0;
 }
 
 .back-button:hover {
   color: #1890ff;
-  background: #fff;
-}
-
-.parking-detail {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.detail-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 30px;
-}
-
-.info-section {
-  background: #fff;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.parking-detail .map-section {
-  background: #fff;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  height: fit-content;
-}
-
-.parking-detail .map-section h3 {
-  margin-bottom: 16px;
-}
-
-.parking-detail .map-wrapper {
-  width: 100%;
-  height: 500px !important;
-  border-radius: 8px;
-  overflow: hidden;
+  border-color: #1890ff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .price-section {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.price-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.location-title {
+  margin: 0;
+  font-size: 28px;
+  color: #1a1a1a;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .price {
+  font-size: 32px;
   color: #f5222d;
-  font-size: 28px;
   margin: 0;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .status-section {
@@ -103,6 +88,7 @@
   padding: 4px 12px;
   border-radius: 4px;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .status.available {
@@ -111,38 +97,53 @@
   border: 1px solid #b7eb8f;
 }
 
-.status.occupied {
+.status.in_use {
   background-color: #fff1f0;
   color: #f5222d;
   border: 1px solid #ffa39e;
 }
 
-.info-items {
-  margin: 24px 0;
-}
-
-.info-item {
-  margin: 12px 0;
+.action-buttons {
   display: flex;
   gap: 12px;
 }
 
-.info-item label {
-  color: #666;
-  min-width: 80px;
-}
-
-.description-section {
-  margin-top: 24px;
-}
-
-.description-section h3 {
-  margin-bottom: 12px;
-  color: #333;
-}
-
 .use-button {
-  min-width: 120px;
+  background: #1890ff;
+  border-color: #1890ff;
+}
+
+.use-button:hover {
+  background: #40a9ff;
+  border-color: #40a9ff;
+}
+
+.reserve-button {
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.reserve-button:hover {
+  background: #e6f7ff;
+}
+
+.info-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+}
+
+.info-item label {
+  color: #999;
+  min-width: 70px;
 }
 
 .closing-warning {
@@ -159,60 +160,21 @@
   100% { opacity: 1; }
 }
 
-@media (max-width: 768px) {
-  .detail-content {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-  
-  .header-section {
-    padding: 12px 16px;
-  }
-  
-  .header-section h1 {
-    font-size: 20px;
-  }
-  
-  .parking-detail .map-section {
-    height: auto;
-  }
-  
-  .parking-detail .map-wrapper {
-    height: 300px !important;
-  }
-  
-  .info-section {
-    padding: 16px;
-  }
-}
-
-.action-buttons {
-  display: flex;
-  gap: 10px;
-}
-
-.reserve-button {
-  background-color: #fff;
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
-.reserve-button:hover {
-  background-color: #e6f7ff;
-  border-color: #40a9ff;
-  color: #40a9ff;
+.timeline-container {
+  margin: 24px 0;
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 8px;
 }
 
 .reservations-section {
-  margin-top: 20px;
-  padding: 20px;
-  background-color: #f5f5f5;
-  border-radius: 8px;
+  margin: 24px 0;
 }
 
 .reservations-section h3 {
   margin-bottom: 16px;
-  color: #333;
+  color: #1a1a1a;
+  font-size: 18px;
 }
 
 .reservations-list {
@@ -225,82 +187,141 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
+  padding: 12px 16px;
+  background: #fafafa;
+  border-radius: 6px;
   margin-bottom: 8px;
-  background-color: #fff;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .reservation-item:last-child {
   margin-bottom: 0;
 }
 
-.reservation-item .date {
-  font-weight: bold;
-  color: #333;
-}
-
 .reservation-item .time {
-  color: #666;
+  color: #1a1a1a;
+  font-weight: 500;
 }
 
 .reservation-item .status {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  background-color: #e6f7ff;
-  color: #1890ff;
+  font-size: 13px;
 }
 
-.reservation-item .status.cancelled {
-  background-color: #fff1f0;
-  color: #f5222d;
+.description-section {
+  margin: 24px 0;
 }
 
-.reservation-item .status.completed {
-  background-color: #f6ffed;
-  color: #52c41a;
+.description-section h3 {
+  margin-bottom: 16px;
+  color: #1a1a1a;
+  font-size: 18px;
 }
 
-/* Timeline 新样式 */
-.timeline-container {
-  margin: 20px 0;
-}
-
-.timeline-bar {
-  width: 100%;
-  height: 6px;
-  background: #f0f0f0;
-  border-radius: 3px;
-  position: relative;
-  overflow: hidden;
-}
-
-.timeline-progress {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  background: #52c41a;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.timeline-progress.reserved {
-  background: #faad14;
-}
-
-.timeline-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
+.description-section p {
   color: #666;
-  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
 }
 
-/* 移除之前的 Timeline 相关样式 */
-.timeline-container::before,
-.timeline-container .ant-timeline {
-  display: none;
+.map-section {
+  margin: 24px 0;
+}
+
+.map-section h3 {
+  margin-bottom: 16px;
+  color: #1a1a1a;
+  font-size: 18px;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  .parking-detail-container {
+    padding: 0;
+  }
+
+  .detail-content {
+    border-radius: 0;
+  }
+
+  .info-section {
+    padding: 16px 16px 16px 16px;
+  }
+
+  .header-section {
+    top: 40px;
+    left: -2px;
+  }
+
+  .back-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .price-section {
+    align-items: center;
+  }
+
+  .location-title {
+    font-size: 24px;
+  }
+
+  .price {
+    font-size: 28px;
+  }
+
+  .info-items {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .action-buttons button {
+    width: 100%;
+  }
+
+  .timeline-container {
+    margin: 16px 0;
+    padding: 16px;
+  }
+}
+
+/* 小屏手机适配 */
+@media screen and (max-width: 375px) {
+  .info-section {
+    padding: 12px 12px 12px 48px;
+  }
+
+  .header-section {
+    top: 40px;
+    left: -2px;
+  }
+
+  .back-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .location-title {
+    font-size: 20px;
+  }
+
+  .price {
+    font-size: 24px;
+  }
+
+  .status {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
+
+  .info-item {
+    font-size: 13px;
+  }
+
+  .timeline-container {
+    padding: 12px;
+  }
 } 

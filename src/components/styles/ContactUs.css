@@ -40,4 +40,74 @@
   .contact-us-container {
     padding: 16px;
   }
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  .contact-us-container {
+    padding: 16px;
+  }
+
+  .page-title {
+    font-size: 24px;
+    margin-bottom: 24px !important;
+  }
+
+  .ant-card {
+    margin-bottom: 16px;
+  }
+
+  .ant-card-head {
+    padding: 12px;
+  }
+
+  .ant-card-head-title {
+    font-size: 16px;
+  }
+
+  .ant-card-body {
+    padding: 16px;
+  }
+
+  .ant-list-item {
+    padding: 12px !important;
+    font-size: 14px;
+  }
+
+  .ant-list-item .anticon {
+    font-size: 18px;
+  }
+}
+
+/* 小屏手机适配 */
+@media screen and (max-width: 375px) {
+  .contact-us-container {
+    padding: 12px;
+  }
+
+  .page-title {
+    font-size: 20px;
+    margin-bottom: 20px !important;
+  }
+
+  .ant-card-head {
+    padding: 10px;
+  }
+
+  .ant-card-head-title {
+    font-size: 14px;
+  }
+
+  .ant-card-body {
+    padding: 12px;
+  }
+
+  .ant-list-item {
+    padding: 8px !important;
+    font-size: 12px;
+  }
+
+  .ant-list-item .anticon {
+    font-size: 16px;
+  }
 } 
