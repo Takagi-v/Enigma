@@ -675,7 +675,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
           </div>
         )}
 
-        <div className={mode === 'detail' ? 'detail-map-wrapper' : 'map-wrapper'}>
+        <div className={mode === 'detail' ? 'parking-detail-map-wrapper' : 'fullscreen-map-wrapper'}>
           {renderMap}
         </div>
 

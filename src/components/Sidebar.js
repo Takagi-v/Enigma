@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import "./styles/Sidebar.css";
 import { 
@@ -15,24 +15,31 @@ function Sidebar() {
 
   const toggleSidebar = () => {
     setIsActive(!isActive);
-    document.body.classList.toggle("overlay", !isActive);
   };
 
   const closeSidebar = (e) => {
     if (
       isActive &&
-      !document.querySelector(".sidebar").contains(e.target) &&
-      !document.querySelector(".toggle-button").contains(e.target)
+      !document.querySelector(".sidebar")?.contains(e.target) &&
+      !document.querySelector(".toggle-button")?.contains(e.target)
     ) {
       setIsActive(false);
-      document.body.classList.remove("overlay");
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     document.addEventListener("click", closeSidebar);
+    
+    // 处理移动端滚动
+    if (isActive) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
     return () => {
       document.removeEventListener("click", closeSidebar);
+      document.body.style.overflow = '';
     };
   }, [isActive]);
 
@@ -44,19 +51,26 @@ function Sidebar() {
 
   return (
     <>
+      <button
+        className="toggle-button"
+        onClick={toggleSidebar}
+        aria-label={isActive ? "收起菜单" : "展开菜单"}
+      >
+        {isActive ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+      </button>
+
+      <div className={`sidebar-overlay ${isActive ? "active" : ""}`} onClick={() => setIsActive(false)} />
+      
       <div className={`sidebar ${isActive ? "active" : ""}`}>
-        <button
-          className="toggle-button"
-          onClick={toggleSidebar}
-          aria-label={isActive ? "收起菜单" : "展开菜单"}
-        >
-          {isActive ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
-        </button>
         <nav>
           <ul>
             {menuItems.map((item, index) => (
               <li key={index}>
-                <Link to={item.path} className="sidebar-link">
+                <Link 
+                  to={item.path} 
+                  className="sidebar-link"
+                  onClick={() => setIsActive(false)}
+                >
                   <span className="icon">{item.icon}</span>
                   <span className="text">{item.text}</span>
                 </Link>

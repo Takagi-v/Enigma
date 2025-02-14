@@ -33,13 +33,14 @@ html, body {
   overflow: hidden;
 }
 
-.map-wrapper {
+.fullscreen-map-wrapper {
   width: 100%;
   height: 100%;
+  min-height: 100vh;
   position: relative;
 }
 
-.detail-map-wrapper {
+.parking-detail-map-wrapper {
   width: 100%;
   height: 400px;
   position: relative;
@@ -55,15 +56,14 @@ html, body {
 
 /* 搜索框容器 */
 .map-search-container {
-  width: 100%;
-  max-width: 600px;
   position: absolute;
-  top: 10px;
+  top: 80px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 1000;
+  width: 100%;
+  max-width: 600px;
+  z-index: 99;
   padding: 0 20px;
-  box-sizing: border-box;
 }
 
 /* 搜索框 */
@@ -124,7 +124,7 @@ html, body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   max-height: 300px;
   overflow-y: auto;
-  z-index: 1000;
+  z-index: 99;
 }
 
 .suggestions-list li {
@@ -332,8 +332,8 @@ html, body {
   }
   
   .fullscreen-map-container {
-    height: calc(100vh - 100px);
-    border-radius: 12px;
+    height: 100vh;
+    border-radius: 0;
   }
 
   .parking-spots-panel {
@@ -375,19 +375,32 @@ html, body {
   visibility: visible;
 }
 
-.map-controls {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
+/* 调整地图控件容器 */
+.map-controls-container {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  left: 20px;
+  z-index: 1000;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.map-controls {
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   z-index: 1000;
+  transform: translateY(-50%);
 }
 
 .map-control-button {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: white;
   border: none;
@@ -400,7 +413,7 @@ html, body {
 }
 
 .map-control-button:hover {
-  transform: translateY(-2px);
+  transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
@@ -441,4 +454,312 @@ html, body {
   background-color: #fff1f0;
   color: #f5222d;
   border: 1px solid #ffa39e;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  .map-search-container {
+    top: 60px;
+    width: 90%;
+    padding: 0 10px;
+  }
+  
+  .user-location-btn,
+  .drawer-trigger-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    position: fixed;
+    right: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+  }
+
+  .user-location-btn {
+    top: 50%;
+    transform: translateY(-60px);
+  }
+
+  .drawer-trigger-btn {
+    top: 50%;
+    transform: translateY(10px);
+  }
+
+  .user-location-btn:hover,
+  .drawer-trigger-btn:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(-60px) scale(1.05);
+  }
+
+  .drawer-trigger-btn:hover {
+    transform: translateY(10px) scale(1.05);
+  }
+
+  .user-location-btn svg,
+  .drawer-trigger-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .fullscreen-map-container {
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .parking-spots-panel {
+    height: 70vh;
+  }
+
+  .parking-spots-list {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .parking-spot-card {
+    padding: 12px;
+  }
+
+  .spot-title {
+    font-size: 14px;
+  }
+
+  .spot-info {
+    gap: 2px;
+  }
+
+  .spot-detail {
+    font-size: 12px;
+  }
+
+  .map-controls {
+    right: 16px;
+    gap: 16px;
+  }
+
+  .map-control-button {
+    width: 48px;
+    height: 48px;
+  }
+
+  .map-control-button svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* 小屏手机适配 */
+@media screen and (max-width: 375px) {
+  .map-search-container {
+    top: 50px;
+    width: 95%;
+    padding: 0 5px;
+  }
+
+  .user-location-btn,
+  .drawer-trigger-btn {
+    width: 44px;
+    height: 44px;
+    right: 12px;
+  }
+
+  .user-location-btn {
+    transform: translateY(-55px);
+  }
+
+  .drawer-trigger-btn {
+    transform: translateY(5px);
+  }
+
+  .user-location-btn:hover {
+    transform: translateY(-55px) scale(1.05);
+  }
+
+  .drawer-trigger-btn:hover {
+    transform: translateY(5px) scale(1.05);
+  }
+
+  .search-box {
+    height: 32px;
+  }
+
+  .search-input {
+    font-size: 12px;
+  }
+
+  .search-button {
+    width: 50px;
+    font-size: 12px;
+  }
+
+  .parking-spots-panel {
+    height: 80vh;
+  }
+
+  .panel-header h3 {
+    font-size: 14px;
+  }
+
+  .sort-select {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .map-controls {
+    right: 12px;
+    gap: 12px;
+  }
+
+  .map-control-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .map-control-button svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* 登录按钮定位 */
+.header-login-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1001;
+}
+
+/* 用户定位按钮 */
+.user-location-btn {
+  position: absolute;
+  bottom: 140px;
+  right: 20px;
+  z-index: 1000;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.user-location-btn:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  transform: translateY(-2px);
+}
+
+/* 抽屉触发按钮 */
+.drawer-trigger-btn {
+  position: absolute;
+  bottom: 140px;
+  left: 20px;
+  z-index: 1000;
+  background: white;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.drawer-trigger-btn:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  transform: translateY(-2px);
+}
+
+/* Google Maps 控件样式覆盖 */
+@media screen and (max-width: 768px) {
+  /* 隐藏全屏按钮、地图类型切换按钮和街景小人 */
+  .gm-fullscreen-control,
+  .gm-style-mtc,
+  .gm-svpc {
+    display: none !important;
+  }
+
+  /* 调整缩放控件位置 */
+  .gmnoprint.gm-bundled-control {
+    top: auto !important;
+    bottom: 80px !important;
+  }
+
+  /* 调整用户定位按钮和抽屉按钮的样式 */
+  .user-location-btn,
+  .drawer-trigger-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    position: fixed;
+    right: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+  }
+
+  .user-location-btn {
+    top: 50%;
+    transform: translateY(-60px);
+  }
+
+  .drawer-trigger-btn {
+    top: 50%;
+    transform: translateY(10px);
+  }
+
+  .user-location-btn:hover,
+  .drawer-trigger-btn:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .user-location-btn:hover {
+    transform: translateY(-60px) scale(1.05);
+  }
+
+  .drawer-trigger-btn:hover {
+    transform: translateY(10px) scale(1.05);
+  }
+
+  /* 调整按钮内部图标大小 */
+  .user-location-btn svg,
+  .drawer-trigger-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* 小屏手机适配 */
+@media screen and (max-width: 375px) {
+  /* 调整缩放控件位置 */
+  .gmnoprint.gm-bundled-control {
+    bottom: 70px !important;
+  }
+
+  .user-location-btn,
+  .drawer-trigger-btn {
+    width: 44px;
+    height: 44px;
+    right: 12px;
+  }
+
+  .user-location-btn {
+    transform: translateY(-55px);
+  }
+
+  .drawer-trigger-btn {
+    transform: translateY(5px);
+  }
+
+  .user-location-btn:hover {
+    transform: translateY(-55px) scale(1.05);
+  }
+
+  .drawer-trigger-btn:hover {
+    transform: translateY(5px) scale(1.05);
+  }
 }

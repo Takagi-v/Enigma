@@ -9,13 +9,16 @@
 }
 
 .auth-form {
-  background: white;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 420px;
   position: relative;
+  background: rgba(255, 255, 255, 0.98);
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  max-width: 100%;
+  width: 400px;
+  margin: 0;
 }
 
 .auth-form h2 {
@@ -194,14 +197,155 @@
 
 .back-button {
   position: absolute;
+  top: 20px;
   left: 20px;
-  top: 50%;
-  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
   color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   transition: all 0.3s ease;
 }
 
 .back-button:hover {
-  color: #1890ff;
-  transform: translateY(-50%) translateX(-3px);
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  .auth-container {
+    padding: 16px;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-form {
+    padding: 30px;
+    margin: 0;
+    max-width: 100%;
+    background: rgba(255, 255, 255, 0.98);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  .auth-form h2 {
+    font-size: 26px;
+    margin-bottom: 24px;
+  }
+
+  .auth-form h3 {
+    font-size: 20px;
+    margin-bottom: 20px;
+  }
+
+  .auth-form input,
+  .auth-form textarea {
+    padding: 12px 16px;
+    font-size: 16px;
+    margin-bottom: 20px;
+  }
+
+  .auth-form button {
+    padding: 14px;
+    font-size: 16px;
+  }
+
+  .choice-button {
+    padding: 20px;
+    font-size: 18px;
+  }
+
+  .choice-button small {
+    font-size: 14px;
+    margin-top: 10px;
+  }
+
+  .avatar-preview {
+    width: 90px;
+    height: 90px;
+  }
+
+  .error-message {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .field-error {
+    font-size: 13px;
+    margin-top: -16px;
+    margin-bottom: 16px;
+  }
+
+  .switch-mode,
+  .login-tip {
+    font-size: 15px;
+    margin-top: 20px;
+  }
+}
+
+/* 小屏手机适配 */
+@media screen and (max-width: 375px) {
+  .auth-container {
+    padding: 12px;
+  }
+
+  .auth-form {
+    padding: 24px;
+  }
+
+  .auth-form h2 {
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+
+  .auth-form h3 {
+    font-size: 18px;
+  }
+
+  .auth-form input,
+  .auth-form textarea {
+    padding: 10px 14px;
+    font-size: 15px;
+  }
+
+  .auth-form button {
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  .choice-button {
+    padding: 16px;
+    font-size: 16px;
+  }
+
+  .choice-button small {
+    font-size: 13px;
+  }
+
+  .avatar-preview {
+    width: 80px;
+    height: 80px;
+  }
+
+  .error-message {
+    font-size: 13px;
+  }
+
+  .field-error {
+    font-size: 12px;
+  }
+
+  .switch-mode,
+  .login-tip {
+    font-size: 14px;
+  }
 }
