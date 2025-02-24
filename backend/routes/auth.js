@@ -14,10 +14,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 // Cookie 配置
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
-  maxAge: 24 * 60 * 60 * 1000, // 24小时
-  path: '/'
+  secure: process.env.NODE_ENV === 'production',  // 开发环境下设为 false
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: 86400 * 1000,
+  path: '/',
+  ...(process.env.NODE_ENV === 'production' 
+    ? { domain: 'www.goparkme.com' }
+    : {})  // 本地开发环境不设置 domain
 };
 
 // 配置文件上传
@@ -149,7 +152,14 @@ router.post("/login", (req, res) => {
           { expiresIn: '24h' }
         );
 
-        // 设置 HttpOnly Cookie
+        // 设置 Cookie，确保只设置一次，并打印 Cookie 设置
+        console.log('设置 Cookie:', {
+          token: token,
+          options: COOKIE_OPTIONS,
+          environment: process.env.NODE_ENV || 'development',
+          host: req.get('host'),
+          origin: req.get('origin')
+        });
         res.cookie('token', token, COOKIE_OPTIONS);
 
         // 返回用户信息（不包含密码）
@@ -186,8 +196,7 @@ router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
     }
 
     const baseUrl = process.env.NODE_ENV === 'production'
-      ? `https://139.196.36.100:${serverConfig.port}`
-      : `http://localhost:${serverConfig.port}`;
+      ? `https://www.goparkme.com`      : `http://localhost:${serverConfig.port}`;
 
     const avatarUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
@@ -200,7 +209,6 @@ router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
     res.status(500).json({ message: '头像上传失败' });
   }
 });
-
 // 验证登录状态的路由
 router.get('/status', async (req, res) => {
   try {
@@ -253,20 +261,26 @@ router.post('/logout', (req, res) => {
 // Token 检查路由
 router.get('/check-token', (req, res) => {
   try {
+    // 打印完整的请求信息
+    console.log('收到 check-token 请求');
+    console.log('请求头:', req.headers);
+    console.log('Cookies:', req.cookies);
+    
     const token = req.cookies.token;
-    console.log('收到的 token:', token);
     
     if (!token) {
       console.log('没有收到 token');
       return res.status(401).json({ 
         status: 'error',
         message: 'No token found',
-        cookiesReceived: req.cookies 
+        cookies: req.cookies,
+        headers: req.headers
       });
     }
 
+    // 验证 token
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('解码后的 token 信息:', decoded);
+    console.log('Token 解码成功:', decoded);
 
     res.json({ 
       status: 'success',
@@ -274,17 +288,18 @@ router.get('/check-token', (req, res) => {
         userId: decoded.id,
         username: decoded.username,
         expiresAt: new Date(decoded.exp * 1000).toISOString()
-      },
-      cookiesReceived: req.cookies
+      }
     });
   } catch (error) {
     console.error('Token 验证错误:', error);
     res.status(401).json({ 
       status: 'error',
       message: error.message,
-      cookiesReceived: req.cookies 
+      cookies: req.cookies,
+      headers: req.headers
     });
   }
 });
 
 module.exports = router; 
+

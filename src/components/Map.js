@@ -141,6 +141,47 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     region: 'CN'
   });
 
+  // 获取用户位置 - 移到API加载之前
+  useEffect(() => {
+    const getLocation = () => {
+      if (navigator.geolocation) {
+        const options = {
+          enableHighAccuracy: true,  // 使用高精度定位
+          timeout: 5000,            // 超时时间5秒
+          maximumAge: 0            // 不使用缓存的位置信息
+        };
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+            setLoading(false);
+          },
+          (error) => {
+            console.error('获取位置失败:', error);
+            setUserLocation(defaultCenter);
+            setLoading(false);
+            setError('无法获取您的位置，已使用默认位置');
+          },
+          options
+        );
+      } else {
+        setUserLocation(defaultCenter);
+        setLoading(false);
+        setError('您的浏览器不支持地理定位');
+      }
+    };
+
+    if (mode === 'detail' && initialSpot) {
+      setUserLocation({ lat: initialSpot.lat, lng: initialSpot.lng });
+      setLoading(false);
+    } else {
+      getLocation();
+    }
+  }, [mode, initialSpot]);
+
   // Places Autocomplete 设置
   const {
     ready,
@@ -159,41 +200,6 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     cache: 24 * 60 * 60,
     enabled: mode !== 'detail', // 在详情模式下禁用
   });
-
-  // 获取用户位置
-  useEffect(() => {
-    if (mode === 'detail' && initialSpot) {
-      setUserLocation({ lat: initialSpot.lat, lng: initialSpot.lng });
-      setLoading(false);
-      return;
-    }
-
-    const getLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setUserLocation({
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            });
-            setLoading(false);
-          },
-          (error) => {
-            console.error('获取位置失败:', error);
-            setUserLocation(defaultCenter);
-            setLoading(false);
-            setError('无法获取您的位置，已使用默认位置');
-          }
-        );
-      } else {
-        setUserLocation(defaultCenter);
-        setLoading(false);
-        setError('您的浏览器不支持地理定位');
-      }
-    };
-
-    getLocation();
-  }, [mode, initialSpot]);
 
   // 获取停车位数据
   useEffect(() => {

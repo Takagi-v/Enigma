@@ -4,11 +4,18 @@ const { db } = require('../models/db');
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 const getTokenFromRequest = (req) => {
+  // 首先检查Authorization header
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
-  return req.cookies?.token;
+  
+  // 然后检查cookies
+  if (req.cookies && req.cookies.token) {
+    return req.cookies.token;
+  }
+  
+  return null;
 };
 
 const authenticateToken = async (req, res, next) => {

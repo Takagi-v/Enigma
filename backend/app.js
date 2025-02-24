@@ -7,25 +7,37 @@ const serverConfig = require('./config/server');
 
 const app = express();
 
+// CORS配置
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = process.env.NODE_ENV === 'production' 
+      ? ['https://www.goparkme.com']
+      : ['http://localhost:5050', 'http://localhost:3000'];
+      
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // 1. 基础中间件配置
 app.use(cookieParser());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5050',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Access-Control-Allow-Headers',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
-  exposedHeaders: ['Set-Cookie'],
-  optionsSuccessStatus: 200
-}));
+app.use(cors(corsOptions));
+
+// 设置安全相关的响应头
+app.use((req, res, next) => {
+  res.set({
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '1; mode=block'
+  });
+  next();
+});
 
 // 2. API 路由导入
 const authRouter = require('./routes/auth');
