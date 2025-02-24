@@ -1,11 +1,28 @@
 {
-  "short_name": "Enigma",
-  "name": "Enigma Social Platform",
+  "short_name": "GoParkMe",
+  "name": "GoParkMe - 智能停车位共享平台",
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#000000",
   "background_color": "#ffffff",
-  "description": "Connect and chat on Enigma's unique social platform",
+  "description": "GoParkMe 是一个智能停车位共享平台，帮助您轻松找到和预订停车位。",
   "orientation": "portrait-primary",
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
 }

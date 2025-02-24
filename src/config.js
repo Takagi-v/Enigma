@@ -1,14 +1,19 @@
 // 创建配置文件
 const config = {
   API_URL: process.env.NODE_ENV === 'production' 
-    ? 'https://139.196.36.100/api'
-    : 'http://localhost:3002/api',  // 确保端口与后端一致
+    ? 'https://www.goparkme.com/api'
+    : 'http://localhost:3002/api',
   WS_URL: process.env.NODE_ENV === 'production'
-    ? 'wss://139.196.36.100/ws'
+    ? 'wss://www.goparkme.com/ws'
     : 'ws://localhost:3002/ws',
   UPLOAD_URL: process.env.NODE_ENV === 'production'
-    ? 'https://139.196.36.100/uploads'
-    : 'http://localhost:3002/uploads'
+    ? 'https://www.goparkme.com/uploads'
+    : 'http://localhost:3002/uploads',
+  COOKIE_DOMAIN: process.env.NODE_ENV === 'production'
+    ? 'www.goparkme.com'
+    : 'localhost',
+  COOKIE_SECURE: true,  // 启用 secure，只允许 HTTPS 使用 cookie
+  COOKIE_SAMESITE: 'none'  // 保持关闭 samesite 限制
 };
 
 export default config; 

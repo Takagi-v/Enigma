@@ -1,12 +1,13 @@
-const http = require("http");
-const WebSocket = require("ws");
-const path = require("path");
+const https = require("https");
 const fs = require('fs');
+const path = require("path");
+const WebSocket = require("ws");
 const serverConfig = require('./config/server');
 const { connectDB, closeDB } = require('./models/db');
+const http = require('http');
 const app = require('./app');
 
-// 创建应用
+// 创建 HTTP 服务器
 const server = http.createServer(app);
 
 // WebSocket 服务器配置
@@ -58,8 +59,8 @@ process.on('SIGINT', gracefulShutdown);
 // 启动服务器
 server.listen(serverConfig.port, '0.0.0.0', () => {
   console.log(`Server running on:
-- HTTP: http://localhost:${serverConfig.port}
-- WebSocket: ws://localhost:${serverConfig.port}
+- HTTP: http://${serverConfig.domain}:${serverConfig.port}
+- WebSocket: ws://${serverConfig.domain}:${serverConfig.port}
 - Environment: ${process.env.NODE_ENV || 'development'}
 - Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5050'}`);
 }).on('error', (err) => {

@@ -11,6 +11,7 @@ function Profile() {
   const { user, authFetch } = useAuth();
   const [parkingRecords, setParkingRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [reviewingRecordId, setReviewingRecordId] = useState(null);
   const [coupons, setCoupons] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState(null);
@@ -18,15 +19,37 @@ function Profile() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+    const checkAuth = async () => {
+      if (!user) {
+        console.log('用户未登录，重定向到登录页面');
+        navigate('/auth');
+        return;
+      }
 
-    fetchParkingRecords();
-    fetchCoupons();
-    fetchPaymentMethod();
-    fetchGiftBalance();
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // 并行获取所有数据
+        await Promise.all([
+          fetchParkingRecords(),
+          fetchCoupons(),
+          fetchPaymentMethod(),
+          fetchGiftBalance()
+        ]);
+      } catch (err) {
+        console.error('获取数据失败:', err);
+        setError(err.message || '获取数据失败');
+        // 如果是认证错误，重定向到登录页面
+        if (err.message.includes('认证') || err.message.includes('登录')) {
+          navigate('/auth');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
   }, [user, navigate]);
 
   const fetchParkingRecords = async () => {
@@ -34,19 +57,16 @@ function Profile() {
 
     try {
       const response = await authFetch(`${config.API_URL}/parking-spots/usage/my`);
+      const data = await response.json();
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || '获取停车记录失败');
+        throw new Error(data.message || '获取停车记录失败');
       }
       
-      const data = await response.json();
       setParkingRecords(data.records || []);
     } catch (error) {
       console.error('获取停车记录失败:', error);
-      alert(error.message || '获取停车记录失败，请重试');
-    } finally {
-      setLoading(false);
+      throw new Error('获取停车记录失败');
     }
   };
 
@@ -54,35 +74,55 @@ function Profile() {
     if (!user) return;
 
     try {
-      const data = await couponService.getUserCoupons(user.id);
+      const response = await authFetch(`${config.API_URL}/coupons/user/${user.id}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || '获取优惠券失败');
+      }
+      
       setCoupons(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('获取优惠券失败:', error);
-      setCoupons([]);
+      throw new Error('获取优惠券失败');
     }
   };
 
-  // 获取支付方式信息
   const fetchPaymentMethod = async () => {
+    if (!user) return;
+
     try {
       const response = await authFetch(`${config.API_URL}/payment/method`);
       const data = await response.json();
       
-      if (response.ok && data.paymentMethod) {
+      if (!response.ok) {
+        throw new Error(data.message || '获取支付方式失败');
+      }
+      
+      if (data.paymentMethod) {
         setPaymentMethod(data.paymentMethod);
       }
     } catch (error) {
       console.error('获取支付方式失败:', error);
+      throw new Error('获取支付方式失败');
     }
   };
 
   const fetchGiftBalance = async () => {
+    if (!user) return;
+
     try {
       const response = await authFetch(`${config.API_URL}/users/${user.id}/gift-balance`);
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || '获取赠送余额失败');
+      }
+      
       setGiftBalance(data.gift_balance);
     } catch (error) {
       console.error('获取赠送余额失败:', error);
+      throw new Error('获取赠送余额失败');
     }
   };
 
@@ -114,6 +154,10 @@ function Profile() {
 
   if (loading) {
     return <div className="loading">加载中...</div>;
+  }
+
+  if (error) {
+    return <div className="error-message">{error}</div>;
   }
 
   if (!user) {

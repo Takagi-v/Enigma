@@ -22,28 +22,6 @@ function Home() {
   });
   const navigate = useNavigate();
 
-  // 获取用户位置
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.error('获取位置失败:', error);
-          // 默认位置（北京）
-          setUserLocation({
-            lat: 39.915,
-            lng: 116.404
-          });
-        }
-      );
-    }
-  }, []);
-
   useEffect(() => {
     if (userLocation) {
       fetchParkingSpots(1);

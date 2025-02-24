@@ -119,32 +119,18 @@ function Auth() {
     setIsLoading(true);
 
     try {
-      console.log('开始登录请求');
+      console.log('开始登录请求，账号:', formData.account);
       const response = await login(formData.account, formData.password);
       console.log('登录响应:', response);
-      
-      // 获取并打印当前的 cookie
-      console.log('当前 document.cookie:', document.cookie);
-      
-      if (response.user) {
-        // 添加延迟检查
-        setTimeout(async () => {
-          const checkResponse = await fetch(`${config.API_URL}/auth/check-token`, {
-            credentials: 'include',
-            headers: {
-              'Accept': 'application/json'
-            }
-          });
-          const checkData = await checkResponse.json();
-          console.log('Token 检查结果:', checkData);
-        }, 1000);
 
-        alert('登录成功！');
+      if (response.user) {
+        setUser(response.user);
         navigate(from);
       } else {
         throw new Error('登录失败：未收到用户信息');
       }
     } catch (err) {
+      console.error('登录错误:', err);
       setError(err.message || '登录失败，请重试');
     } finally {
       setIsLoading(false);

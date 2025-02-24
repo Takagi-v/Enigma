@@ -16,33 +16,51 @@ export const AuthProvider = ({ children }) => {
         'Content-Type': 'application/json'
       };
 
+      console.log('发送认证请求:', url);
       const response = await fetch(url, {
         ...options,
         headers,
         credentials: 'include'
       });
 
-      // 如果是 401，清除用户状态
+      // 如果是 401，清除用户状态并重定向到登录页面
       if (response.status === 401) {
+        console.log('认证失败，清除用户状态');
         setUser(null);
+        throw new Error('请重新登录');
       }
 
       return response;
     } catch (error) {
       console.error('请求失败:', error);
+      // 如果是认证相关的错误，清除用户状态
+      if (error.message.includes('登录') || error.message.includes('认证')) {
+        setUser(null);
+      }
       throw error;
     }
   };
 
   const checkAuthStatus = async () => {
     try {
-      const response = await authFetch(`${config.API_URL}/auth/status`);
+      console.log('检查认证状态...');
+      const response = await fetch(`${config.API_URL}/auth/status`, {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('认证状态响应:', response.status);
       const data = await response.json();
+      console.log('认证状态数据:', data);
 
       if (response.ok && data.isAuthenticated) {
+        console.log('用户已认证:', data.user);
         setUser(data.user);
         return true;
       } else {
+        console.log('用户未认证');
         setUser(null);
         return false;
       }
@@ -57,26 +75,62 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (account, password) => {
     try {
-      const response = await authFetch(`${config.API_URL}/auth/login`, {
+      console.log('发送登录请求...');
+      const response = await fetch(`${config.API_URL}/auth/login`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
         body: JSON.stringify({ account, password })
       });
 
+      console.log('登录响应状态:', response.status);
+      console.log('登录响应头:', [...response.headers.entries()]);
       const data = await response.json();
+      console.log('登录响应数据:', data);
 
       if (!response.ok) {
         throw new Error(data.message || '登录失败');
       }
 
+      // 检查 cookie 是否设置成功
+      console.log('登录成功，所有 cookies:', document.cookie);
+      console.log('当前域名:', window.location.hostname);
+      console.log('API URL:', config.API_URL);
+
       if (data.user) {
         setUser(data.user);
+        // 等待一小段时间确保 cookie 已经设置
+        await new Promise(resolve => setTimeout(resolve, 500));  // 增加等待时间
+        
+        console.log('准备验证 token, 当前 cookies:', document.cookie);
+        // 验证 token
+        const checkResponse = await fetch(`${config.API_URL}/auth/check-token`, {
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'  // 添加无缓存头
+          }
+        });
+        
+        console.log('Token 检查响应状态:', checkResponse.status);
+        console.log('Token 检查响应头:', [...checkResponse.headers.entries()]);
+        const checkData = await checkResponse.json();
+        console.log('Token 检查结果:', checkData);
+
+        if (checkData.status !== 'success') {
+          throw new Error('Token 验证失败');
+        }
       } else {
-        throw new Error('登录失败：未收到完整的用户信息');
+        throw new Error('登录失败：未收到用户信息');
       }
 
       return data;
     } catch (error) {
       console.error('登录失败:', error);
+      setUser(null);
       throw error;
     }
   };
