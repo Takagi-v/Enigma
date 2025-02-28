@@ -349,3 +349,62 @@
     font-size: 14px;
   }
 }
+
+/* Google登录相关样式 */
+.social-login {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.social-login .divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #666;
+  margin: 15px 0;
+}
+
+.social-login .divider:before,
+.social-login .divider:after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.social-login .divider span {
+  padding: 0 10px;
+}
+
+.google-login-container {
+  display: flex;
+  justify-content: center;
+  margin: 15px 0;
+}
+
+.google-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto 15px;
+  display: block;
+  border: 2px solid #e0e0e0;
+}
+
+/* 对话框样式优化 */
+.field-error {
+  color: #ff4d4f;
+  font-size: 12px;
+  margin-top: -5px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.error-message {
+  background-color: #fff2f0;
+  border: 1px solid #ffccc7;
+  color: #ff4d4f;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}

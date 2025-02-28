@@ -7,6 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const serverConfig = require('../config/server');
+const { OAuth2Client } = require('google-auth-library');
 
 // JWT密钥
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -56,15 +57,52 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
+// 创建Google OAuth client
+const googleClient = new OAuth2Client();
+
 // 注册路由
 router.post("/register", async (req, res) => {
-  const { username, password, full_name, phone, avatar, bio, address } = req.body;
+  const { username, password, full_name, phone, avatar, bio, address, vehicle_plate } = req.body;
 
-  if (!username || !password || !full_name || !phone) {
-    return res.status(400).json({ message: "必填信息不能为空" });
+  if (!username || !password || !full_name || !phone || !vehicle_plate) {
+    return res.status(400).json({ message: "所有必填字段都不能为空" });
   }
 
   try {
+    // 验证手机号格式
+    const phoneRegex = /^(\+?1)?[- ()]*([2-9][0-9]{2})[- )]*([2-9][0-9]{2})[- ]*([0-9]{4})$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ message: "无效的电话号码格式" });
+    }
+
+    // 标准化手机号格式
+    const digits = phone.replace(/\D/g, '');
+    const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    
+    // 检查手机号是否已存在
+    const existingPhone = await new Promise((resolve, reject) => {
+      db().get("SELECT id FROM users WHERE phone = ?", [standardizedPhone], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (existingPhone) {
+      return res.status(400).json({ message: "该手机号已被注册" });
+    }
+
+    // 检查车牌号是否已存在
+    const existingPlate = await new Promise((resolve, reject) => {
+      db().get("SELECT id FROM users WHERE vehicle_plate = ?", [vehicle_plate], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (existingPlate) {
+      return res.status(400).json({ message: "该车牌号已被绑定" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     
     // 如果avatar是base64格式，需要先保存为文件
@@ -88,25 +126,26 @@ router.post("/register", async (req, res) => {
     }
     
     await db().run(
-      `INSERT INTO users (username, password, full_name, phone, avatar, bio, address) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [username, hashedPassword, full_name, phone, avatarUrl, bio || '该用户很神秘', address || ''],
+      `INSERT INTO users (username, password, full_name, phone, avatar, bio, address, vehicle_plate) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [username, hashedPassword, full_name, standardizedPhone, avatarUrl, bio || '用户未填写简介', address || '', vehicle_plate],
       async function(err) {
         if (err) {
           if (err.message.includes("UNIQUE constraint failed")) {
-            return res.status(400).json({ message: "用户名已存在" });
+            if (err.message.includes("users.username")) {
+              return res.status(400).json({ message: "用户名已存在" });
+            } else if (err.message.includes("users.phone")) {
+              return res.status(400).json({ message: "该手机号已被注册" });
+            } else if (err.message.includes("users.vehicle_plate")) {
+              return res.status(400).json({ message: "该车牌号已被绑定" });
+            }
+            return res.status(400).json({ message: "注册信息有误，请检查" });
           }
           return res.status(500).json({ message: "创建用户失败" });
         }
 
-        // 赠送 20 美元余额
-        const giftBalance = 20;
-        await db().run(
-          `INSERT INTO coupons (user_id, type, amount, description) 
-           VALUES (?, 'gift_balance', ?, '新用户注册赠送余额')`,
-          [this.lastID, giftBalance]
-        );
-
+        // 不再赠送初始余额，改为首次充值时赠送
+        
         res.status(201).json({ message: "注册成功" });
       }
     );
@@ -125,12 +164,22 @@ router.post("/login", (req, res) => {
   }
 
   // 判断是手机号还是用户名
-  const isPhone = /^1[3-9]\d{9}$/.test(account);
+  const isPhone = /^(\+?1)?[- ()]*([2-9][0-9]{2})[- )]*([2-9][0-9]{2})[- ]*([0-9]{4})$/.test(account);
   const query = isPhone ? 
     "SELECT * FROM users WHERE phone = ?" : 
     "SELECT * FROM users WHERE username = ?";
 
-  db().get(query, [account], async (err, user) => {
+  // 如果是手机号，需要标准化格式
+  let searchAccount = account;
+  if (isPhone) {
+    // 提取纯数字
+    const digits = account.replace(/\D/g, '');
+    // 如果以1开头（美国国家代码），则去掉
+    searchAccount = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    console.log('登录时检测到手机号格式，标准化为:', searchAccount);
+  }
+
+  db().get(query, [searchAccount], async (err, user) => {
     if (err) {
       return res.status(500).json({ message: "登录过程中出错" });
     }
@@ -176,7 +225,8 @@ router.post("/login", (req, res) => {
             avatar: user.avatar,
             bio: user.bio,
             address: user.address,
-            email: user.email
+            email: user.email,
+            vehiclePlate: user.vehicle_plate
           }
         });
       } else {
@@ -222,7 +272,7 @@ router.get('/status', async (req, res) => {
     
     // 从数据库获取最新的用户信息
     db().get(
-      "SELECT id, username, full_name, phone, avatar, bio, address, email FROM users WHERE id = ?",
+      "SELECT id, username, full_name, phone, avatar, bio, address, email, vehicle_plate FROM users WHERE id = ?",
       [decoded.id],
       (err, user) => {
         if (err || !user) {
@@ -239,7 +289,8 @@ router.get('/status', async (req, res) => {
             avatar: user.avatar,
             bio: user.bio,
             address: user.address,
-            email: user.email
+            email: user.email,
+            vehiclePlate: user.vehicle_plate
           }
         });
       }
@@ -298,6 +349,192 @@ router.get('/check-token', (req, res) => {
       cookies: req.cookies,
       headers: req.headers
     });
+  }
+});
+
+// Google登录路由
+router.post('/google-login', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ message: '未提供Google令牌' });
+    }
+    
+    // 验证Google令牌
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: serverConfig.googleClientId // 使用配置中的Google Client ID
+    });
+    
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub: googleId } = payload;
+    
+    if (!email) {
+      return res.status(401).json({ message: 'Google账号未提供邮箱信息' });
+    }
+    
+    // 检查用户是否已存在
+    db().get(
+      "SELECT * FROM users WHERE email = ? OR google_id = ?",
+      [email, googleId],
+      async (err, user) => {
+        if (err) {
+          console.error('数据库查询错误:', err);
+          return res.status(500).json({ message: '服务器错误' });
+        }
+        
+        // 如果用户存在，生成token并登录
+        if (user) {
+          // 如果是老用户但没有google_id，则更新用户记录添加google_id
+          if (!user.google_id) {
+            await db().run(
+              "UPDATE users SET google_id = ? WHERE id = ?",
+              [googleId, user.id]
+            );
+          }
+          
+          // 生成JWT token
+          const token = jwt.sign(
+            { 
+              id: user.id,
+              username: user.username
+            },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+          );
+          
+          // 设置cookie
+          res.cookie('token', token, COOKIE_OPTIONS);
+          
+          // 返回用户信息
+          return res.json({
+            message: "登录成功",
+            isAuthenticated: true,
+            user: {
+              id: user.id,
+              username: user.username,
+              fullName: user.full_name,
+              phone: user.phone,
+              avatar: user.avatar || picture, // 如果用户没有头像则使用Google头像
+              bio: user.bio,
+              address: user.address,
+              email: user.email,
+              vehiclePlate: user.vehicle_plate
+            }
+          });
+        }
+        
+        // 如果用户不存在，但需要绑定车牌，返回202状态码
+        return res.status(202).json({ 
+          message: '需要绑定车牌',
+          needsVehiclePlate: true,
+          email: email
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Google登录错误:', error);
+    res.status(500).json({ message: 'Google登录失败' });
+  }
+});
+
+// Google用户绑定车牌并完成注册
+router.post('/google-bind-vehicle', async (req, res) => {
+  try {
+    const { token, vehicle_plate } = req.body;
+    
+    if (!token || !vehicle_plate) {
+      return res.status(400).json({ message: '缺少必要信息' });
+    }
+    
+    // 验证Google令牌
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: serverConfig.googleClientId // 使用配置中的Google Client ID
+    });
+    
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub: googleId } = payload;
+    
+    if (!email) {
+      return res.status(401).json({ message: 'Google账号未提供邮箱信息' });
+    }
+    
+    // 检查该车牌是否已被使用
+    const existingPlate = await new Promise((resolve, reject) => {
+      db().get("SELECT id FROM users WHERE vehicle_plate = ?", [vehicle_plate], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+    
+    if (existingPlate) {
+      return res.status(400).json({ message: '该车牌号已被绑定' });
+    }
+    
+    // 生成随机用户名
+    let username = `g_${Math.random().toString(36).substring(2, 10)}`;
+    // 确保用户名唯一
+    while (true) {
+      const existingUser = await new Promise((resolve, reject) => {
+        db().get("SELECT id FROM users WHERE username = ?", [username], (err, row) => {
+          if (err) reject(err);
+          resolve(row);
+        });
+      });
+      
+      if (!existingUser) break;
+      username = `g_${Math.random().toString(36).substring(2, 10)}`;
+    }
+    
+    // 创建用户
+    await db().run(
+      `INSERT INTO users (username, google_id, email, full_name, avatar, bio, vehicle_plate) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [username, googleId, email, name || '未设置', picture || '', '使用Google登录的用户', vehicle_plate],
+      async function(err) {
+        if (err) {
+          console.error('创建用户错误:', err);
+          return res.status(500).json({ message: '创建用户失败' });
+        }
+        
+        const userId = this.lastID;
+        
+        // 不再赠送初始余额，改为首次充值时赠送
+        
+        // 生成JWT token
+        const token = jwt.sign(
+          { 
+            id: userId,
+            username: username
+          },
+          JWT_SECRET,
+          { expiresIn: '24h' }
+        );
+        
+        // 设置cookie
+        res.cookie('token', token, COOKIE_OPTIONS);
+        
+        // 返回用户信息
+        return res.json({
+          message: "注册成功",
+          isAuthenticated: true,
+          user: {
+            id: userId,
+            username: username,
+            fullName: name || '未设置',
+            avatar: picture || '',
+            bio: '使用Google登录的用户',
+            email: email,
+            vehiclePlate: vehicle_plate
+          }
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Google绑定车牌错误:', error);
+    res.status(500).json({ message: 'Google绑定车牌失败' });
   }
 });
 

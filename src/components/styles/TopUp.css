@@ -1,50 +1,56 @@
 .top-up-container {
-  max-width: 600px;
-  margin: 40px auto;
-  padding: 0 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 60px);
+  padding: 20px;
+  background-color: #f5f5f5;
 }
 
 .top-up-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  padding: 32px;
+  width: 100%;
+  max-width: 500px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 30px;
 }
 
 .top-up-card h2 {
-  margin: 0 0 24px;
-  color: #1a1a1a;
-  font-size: 24px;
   text-align: center;
+  margin-bottom: 25px;
+  color: #333;
 }
 
 .payment-method-info {
-  background: #f8f9fa;
+  margin-bottom: 25px;
+  padding: 15px;
+  border: 1px solid #eee;
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 24px;
+  background-color: #f9f9f9;
 }
 
 .card-info {
   display: flex;
   align-items: center;
-  gap: 12px;
 }
 
 .card-brand-icon {
-  height: 24px;
-  width: auto;
+  width: 40px;
+  height: 30px;
+  margin-right: 10px;
+  object-fit: contain;
 }
 
 .amount-input-container {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .amount-input-container label {
   display: block;
   margin-bottom: 8px;
-  color: #4a5568;
-  font-size: 14px;
+  font-weight: 500;
+  color: #555;
 }
 
 .amount-input-wrapper {
@@ -55,102 +61,201 @@
 
 .currency-symbol {
   position: absolute;
-  left: 16px;
-  color: #4a5568;
+  left: 15px;
   font-size: 18px;
+  color: #555;
 }
 
 .amount-input {
   width: 100%;
-  padding: 12px 16px 12px 32px;
+  padding: 12px 15px 12px 30px;
   font-size: 18px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  outline: none;
-  transition: border-color 0.2s;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  transition: border-color 0.3s;
 }
 
 .amount-input:focus {
-  border-color: #4299e1;
+  outline: none;
+  border-color: #4a90e2;
 }
 
 .preset-amounts {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 25px;
 }
 
 .preset-amount-button {
-  padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: white;
-  color: #4a5568;
-  font-size: 16px;
+  padding: 10px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  font-weight: 500;
 }
 
-.preset-amount-button:hover {
-  background: #f7fafc;
+.preset-amount-button:hover:not(:disabled) {
+  background-color: #e0e0e0;
 }
 
 .preset-amount-button.active {
-  background: #ebf8ff;
-  border-color: #4299e1;
-  color: #2b6cb0;
+  background-color: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+.preset-amount-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  text-decoration: line-through;
 }
 
 .error-message {
-  color: #e53e3e;
-  margin-bottom: 16px;
-  padding: 12px;
-  background: #fff5f5;
-  border-radius: 6px;
+  color: #e53935;
+  margin-bottom: 15px;
   font-size: 14px;
 }
 
 .submit-button {
   width: 100%;
-  padding: 14px;
-  background: #4299e1;
+  padding: 12px;
+  background-color: #4a90e2;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.3s;
 }
 
-.submit-button:hover {
-  background: #3182ce;
+.submit-button:hover:not(:disabled) {
+  background-color: #3a7bc8;
 }
 
 .submit-button:disabled {
-  background: #a0aec0;
+  background-color: #a0a0a0;
   cursor: not-allowed;
 }
 
 .submit-button.loading {
-  background: #a0aec0;
+  background-color: #a0a0a0;
   cursor: wait;
 }
 
 .bind-payment-button {
   width: 100%;
-  padding: 14px;
-  background: #4299e1;
+  padding: 12px;
+  background-color: #4caf50;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.3s;
 }
 
 .bind-payment-button:hover {
-  background: #3182ce;
+  background-color: #43a047;
+}
+
+/* 新增样式 */
+.gift-promotion {
+  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #fff8e1;
+  border: 1px solid #ffecb3;
+}
+
+.gift-banner {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.gift-icon {
+  font-size: 24px;
+  margin-right: 10px;
+}
+
+.gift-text {
+  font-weight: bold;
+  color: #ff6f00;
+  font-size: 16px;
+}
+
+.gift-note {
+  font-size: 14px;
+  color: #bf360c;
+  margin: 0;
+}
+
+.minimum-amount-notice {
+  margin-bottom: 20px;
+  padding: 10px 15px;
+  background-color: #e8f5e9;
+  border-radius: 6px;
+  border-left: 4px solid #4caf50;
+}
+
+.minimum-amount-notice p {
+  margin: 0;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+/* 商家信息样式 */
+.merchant-info {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+.merchant-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.merchant-logo {
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+}
+
+.merchant-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #2d3748;
+}
+
+.merchant-description {
+  font-size: 14px;
+  color: #4a5568;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.merchant-trust-badges {
+  display: flex;
+  gap: 15px;
+}
+
+.secure-badge, .support-badge {
+  font-size: 12px;
+  color: #4a5568;
+  display: flex;
+  align-items: center;
+}
+
+.secure-badge i, .support-badge i {
+  margin-right: 5px;
+  color: #4299e1;
 } 

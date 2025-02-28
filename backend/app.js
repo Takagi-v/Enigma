@@ -1,9 +1,29 @@
 require('dotenv').config();
+
+// 添加环境变量调试日志
+console.log('环境变量加载情况：', {
+  NODE_ENV: process.env.NODE_ENV,
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY?.substring(0, 10) + '...',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10) + '...',
+  ENV_FILE_PATH: require('path').resolve('.env')
+});
+
 const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const serverConfig = require('./config/server');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// API 路由导入
+const authRouter = require('./routes/auth');
+const usersRouter = require('./routes/users');
+const parkingRouter = require('./routes/parking');
+const parkingUsageRouter = require('./routes/parking-usage');
+const messagesRouter = require('./routes/messages');
+const adminRouter = require('./routes/admin');
+const couponsRouter = require('./routes/coupons');
+const paymentRoutes = require('./routes/payment');
 
 const app = express();
 
@@ -12,7 +32,7 @@ const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = process.env.NODE_ENV === 'production' 
       ? ['https://www.goparkme.com']
-      : ['http://localhost:5050', 'http://localhost:3000'];
+      : ['http://localhost:5050', 'http://localhost:3002', 'https://www.goparkme.com'];
       
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -28,6 +48,44 @@ const corsOptions = {
 app.use(cookieParser());
 app.use(cors(corsOptions));
 
+// 确保在任何body parser之前处理webhook
+app.use('/api/payment/webhook', express.raw({type: 'application/json'}));
+
+// 添加调试日志中间件
+app.use('/api/payment/webhook', (req, res, next) => {
+  console.log('收到 Webhook 请求:', {
+    method: req.method,
+    path: req.path,
+    contentType: req.headers['content-type'],
+    bodyType: typeof req.body,
+    bodyLength: req.body?.length
+  });
+  next();
+});
+
+// 其他路由使用JSON parser
+app.use(express.json());
+
+// 处理预检请求的中间件
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    const allowedOrigins = process.env.NODE_ENV === 'production' 
+      ? ['https://www.goparkme.com']
+      : ['http://localhost:5050', 'http://localhost:3002', 'https://www.goparkme.com'];
+      
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.status(200).send();
+      return;
+    }
+  }
+  next();
+});
+
 // 设置安全相关的响应头
 app.use((req, res, next) => {
   res.set({
@@ -39,17 +97,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// 2. API 路由导入
-const authRouter = require('./routes/auth');
-const usersRouter = require('./routes/users');
-const parkingRouter = require('./routes/parking');
-const parkingUsageRouter = require('./routes/parking-usage');
-const messagesRouter = require('./routes/messages');
-const adminRouter = require('./routes/admin');
-const couponsRouter = require('./routes/coupons');
-const paymentRoutes = require('./routes/payment');
-const webhookRoutes = require('./routes/webhook');
-
 // 3. API 请求日志
 app.use('/api', (req, res, next) => {
   console.log(`API Request: ${req.method} ${req.url}`);
@@ -57,16 +104,10 @@ app.use('/api', (req, res, next) => {
 });
 
 // 4. API 路由处理
-// Webhook 路由（使用 raw parser）
-app.use('/api/webhook', express.raw({ type: 'application/json' }));
-app.use('/api/webhook', webhookRoutes);
-
-// 其他 API 路由（使用 JSON parser）
-app.use('/api', express.json());
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
-app.use('/api/parking-spots/usage', parkingUsageRouter);
 app.use('/api/parking-spots', parkingRouter);
+app.use('/api/parking-spots/usage', parkingUsageRouter);
 app.use('/api/messages', messagesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/coupons', couponsRouter);

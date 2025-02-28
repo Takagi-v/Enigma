@@ -123,14 +123,12 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   const drawerRef = useRef(null);
   const [isDrawerMounted, setIsDrawerMounted] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startY, setStartY] = useState(0);
-  const [startHeight, setStartHeight] = useState(0);
-  const minHeight = 200;
-  const maxHeight = window.innerHeight * 0.8;
-  const [isLoadingSpots, setIsLoadingSpots] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isUserInitiated, setIsUserInitiated] = useState(false);
+  const [touchStartY, setTouchStartY] = useState(0);
+  const [isLoadingSpots, setIsLoadingSpots] = useState(false);
+  const minHeight = 200;
+  const maxHeight = window.innerHeight * 0.8;
 
   // 加载 Google Maps API - 使用相同的 libraries 配置
   const { isLoaded, loadError } = useJsApiLoader({
@@ -328,59 +326,45 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     }
   };
 
-  // 处理拖动开始
-  const handleDragStart = (e) => {
-    const clientY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
-    setIsDragging(true);
-    setStartY(clientY);
-    setStartHeight(drawerHeight);
-  };
-
-  // 处理拖动过程
-  const handleDragMove = (e) => {
-    if (!isDragging) return;
+  // 处理滚动
+  const handleScroll = (e) => {
+    const element = e.target;
+    const isAtTop = element.scrollTop === 0;
+    const wheelEvent = e.nativeEvent;
     
-    const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
-    const delta = startY - clientY;
-    const newHeight = Math.min(Math.max(startHeight + delta, minHeight), maxHeight);
-    
-    setDrawerHeight(newHeight);
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  // 处理拖动结束
-  const handleDragEnd = () => {
-    setIsDragging(false);
-    document.removeEventListener('mousemove', handleDragMove);
-    document.removeEventListener('mouseup', handleDragEnd);
-    document.removeEventListener('touchmove', handleDragMove);
-    document.removeEventListener('touchend', handleDragEnd);
-  };
-
-  // 处理鼠标按下
-  const handleMouseDown = (e) => {
-    handleDragStart(e);
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
+    if (wheelEvent.deltaY > 0 && isAtTop && !isExpanded) {
+      // 在顶部继续向下滚动，展开drawer
+      setIsExpanded(true);
+      setDrawerHeight(maxHeight);
+    } else if (wheelEvent.deltaY < 0 && isAtTop && isExpanded) {
+      // 在顶部继续向上滚动，收缩drawer
+      setIsExpanded(false);
+      setDrawerHeight(400);
+    }
   };
 
   // 处理触摸开始
   const handleTouchStart = (e) => {
-    handleDragStart(e);
-    document.addEventListener('touchmove', handleDragMove, { passive: false });
-    document.addEventListener('touchend', handleDragEnd);
+    const touch = e.touches[0];
+    setTouchStartY(touch.clientY);
   };
 
-  // 组件卸载时清理
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleDragMove);
-      document.removeEventListener('mouseup', handleDragEnd);
-      document.removeEventListener('touchmove', handleDragMove);
-      document.removeEventListener('touchend', handleDragEnd);
-    };
-  }, []);
+  // 处理触摸移动
+  const handleTouchMove = (e) => {
+    const touch = e.touches[0];
+    const deltaY = touchStartY - touch.clientY;
+    const element = e.target.closest('.parking-spots-list');
+    
+    if (element && element.scrollTop === 0) {
+      if (deltaY > 30 && !isExpanded) {
+        setIsExpanded(true);
+        setDrawerHeight(maxHeight);
+      } else if (deltaY < -30 && isExpanded) {
+        setIsExpanded(false);
+        setDrawerHeight(400);
+      }
+    }
+  };
 
   const showDrawer = async (isUserAction = false) => {
     setIsUserInitiated(isUserAction);
@@ -419,23 +403,6 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
         }
       });
       setSortedSpots(sorted);
-    }
-  };
-
-  // 处理滚动
-  const handleScroll = (e) => {
-    const element = e.target;
-    const isAtTop = element.scrollTop === 0;
-    const wheelEvent = e.nativeEvent;
-    
-    if (wheelEvent.deltaY > 0 && isAtTop && !isExpanded) {
-      // 在顶部继续向下滚动，展开drawer
-      setIsExpanded(true);
-      setDrawerHeight(maxHeight);
-    } else if (wheelEvent.deltaY < 0 && isAtTop && isExpanded) {
-      // 在顶部继续向上滚动，收缩drawer
-      setIsExpanded(false);
-      setDrawerHeight(400);
     }
   };
 
@@ -735,19 +702,8 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
               <div 
                 className="parking-spots-list" 
                 onWheel={handleScroll}
-                onTouchMove={(e) => {
-                  const touch = e.touches[0];
-                  const element = e.target;
-                  const isAtTop = element.scrollTop === 0;
-                  
-                  if (isAtTop && !isExpanded && touch.clientY < e.target.getBoundingClientRect().top) {
-                    setIsExpanded(true);
-                    setDrawerHeight(maxHeight);
-                  } else if (isAtTop && isExpanded && touch.clientY > e.target.getBoundingClientRect().top) {
-                    setIsExpanded(false);
-                    setDrawerHeight(400);
-                  }
-                }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
               >
                 {!currentPoint ? (
                   <div className="empty-state">

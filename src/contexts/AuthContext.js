@@ -147,6 +147,93 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // 处理Google登录
+  const googleLogin = async (googleToken) => {
+    try {
+      console.log('发送Google登录请求...');
+      const response = await fetch(`${config.API_URL}/auth/google-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token: googleToken })
+      });
+
+      console.log('Google登录响应状态:', response.status);
+      const data = await response.json();
+      console.log('Google登录响应数据:', data);
+
+      if (!response.ok) {
+        // 如果需要绑定车牌
+        if (response.status === 202 && data.needsVehiclePlate) {
+          return {
+            status: 'needs_vehicle_plate',
+            email: data.email,
+            message: data.message
+          };
+        }
+        throw new Error(data.message || 'Google登录失败');
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        return {
+          status: 'success',
+          user: data.user
+        };
+      } else {
+        throw new Error('登录失败：未收到用户信息');
+      }
+    } catch (error) {
+      console.error('Google登录失败:', error);
+      setUser(null);
+      throw error;
+    }
+  };
+
+  // 处理绑定车牌
+  const bindGoogleVehicle = async (googleToken, vehiclePlate) => {
+    try {
+      console.log('发送绑定车牌请求...');
+      const response = await fetch(`${config.API_URL}/auth/google-bind-vehicle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          token: googleToken,
+          vehicle_plate: vehiclePlate
+        })
+      });
+
+      console.log('绑定车牌响应状态:', response.status);
+      const data = await response.json();
+      console.log('绑定车牌响应数据:', data);
+
+      if (!response.ok) {
+        throw new Error(data.message || '绑定车牌失败');
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        return {
+          status: 'success',
+          user: data.user
+        };
+      } else {
+        throw new Error('绑定失败：未收到用户信息');
+      }
+    } catch (error) {
+      console.error('绑定车牌失败:', error);
+      setUser(null);
+      throw error;
+    }
+  };
+
   // 初始化时检查认证状态
   useEffect(() => {
     const initAuth = async () => {
@@ -175,7 +262,9 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus,
     logout,
     login,
-    authFetch
+    authFetch,
+    googleLogin,
+    bindGoogleVehicle
   };
 
   return (

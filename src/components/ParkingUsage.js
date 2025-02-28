@@ -16,6 +16,7 @@ const ParkingUsage = () => {
   const [error, setError] = useState(null);
   const { user, authFetch } = useAuth();
   const [parkingRecords, setParkingRecords] = useState([]);
+  const [insufficientBalance, setInsufficientBalance] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -147,11 +148,25 @@ const ParkingUsage = () => {
       navigate('/payment-success');
     } catch (error) {
       console.error('支付失败:', error);
+      
+      // 检查是否是余额不足错误
+      if (error.message && error.message.includes('余额不足')) {
+        // 显示余额不足提示
+        setInsufficientBalance(true);
+        return;
+      }
+      
       setError(error.message || '支付失败');
       if (error.message.includes('401')) {
         navigate('/auth');
       }
     }
+  };
+
+  const handleTopUp = () => {
+    // 保存当前页面URL，用于充值后返回
+    localStorage.setItem('returnUrl', window.location.pathname + window.location.search);
+    navigate('/top-up');
   };
 
   if (isLoading) {
@@ -225,9 +240,26 @@ const ParkingUsage = () => {
             <p>使用时长：{formatTime(timer)}</p>
             <p>应付金额：¥{usage.total_amount}</p>
           </div>
-          <button onClick={handlePayment} className="payment-button">
-            立即支付
-          </button>
+          
+          {insufficientBalance ? (
+            <div className="insufficient-balance-alert">
+              <div className="alert-icon">⚠️</div>
+              <h4>余额不足</h4>
+              <p>您的账户余额不足以支付当前费用</p>
+              <div className="alert-actions">
+                <button onClick={handleTopUp} className="top-up-button">
+                  前往充值
+                </button>
+                <button onClick={() => setInsufficientBalance(false)} className="cancel-button">
+                  取消
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={handlePayment} className="payment-button">
+              立即支付
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -98,6 +98,55 @@ button {
   background-color: #1976D2;
 }
 
+.insufficient-balance-alert {
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  border-radius: 6px;
+  padding: 1.5rem;
+  margin: 1rem 0 2rem;
+  text-align: center;
+}
+
+.insufficient-balance-alert .alert-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.insufficient-balance-alert h4 {
+  color: #856404;
+  margin: 0.5rem 0;
+  font-size: 1.2rem;
+}
+
+.insufficient-balance-alert p {
+  color: #856404;
+  margin-bottom: 1.5rem;
+}
+
+.insufficient-balance-alert .alert-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.top-up-button {
+  background-color: #28a745;
+  color: white;
+}
+
+.top-up-button:hover {
+  background-color: #218838;
+}
+
+.cancel-button {
+  background-color: #6c757d;
+  color: white;
+}
+
+.cancel-button:hover {
+  background-color: #5a6268;
+}
+
 .loading {
   text-align: center;
   padding: 2rem;
