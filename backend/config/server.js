@@ -1,4 +1,6 @@
 const path = require('path');
+// 加载环境变量
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const config = {
   port: process.env.PORT || 3002,
@@ -7,6 +9,7 @@ const config = {
   staticPath: path.join(__dirname, '..', '..', 'public'),
   uploadDir: path.join(__dirname, '../uploads'),
   jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
   ssl: {
     key: path.join(__dirname, '..', 'ssl', 'nginx.key'),
     cert: path.join(__dirname, '..', 'ssl', 'nginx.crt')

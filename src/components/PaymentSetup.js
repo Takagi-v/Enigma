@@ -59,7 +59,7 @@ const PaymentSetup = () => {
 
               event.complete('success');
               alert('支付方式绑定成功！');
-              navigate(returnUrl);
+              window.history.back();
             } catch (err) {
               console.error('保存数字钱包支付方式失败:', err);
               event.complete('fail');
@@ -75,6 +75,7 @@ const PaymentSetup = () => {
     event.preventDefault();
     
     if (!stripe || !elements) {
+      setError('支付组件未准备就绪，请刷新页面重试');
       return;
     }
 
@@ -87,21 +88,28 @@ const PaymentSetup = () => {
 
       if (selectedMethod === 'card') {
         // 处理信用卡支付方式
+        const cardElement = elements.getElement(CardElement);
+        
+        // 创建支付方式
         const result = await stripe.createPaymentMethod({
           type: 'card',
-          card: elements.getElement(CardElement),
+          card: cardElement,
           billing_details: {
             name: user.fullName,
             email: user.email,
             phone: user.phone
           }
         });
-        createError = result.error;
+
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+
         paymentMethod = result.paymentMethod;
       }
 
-      if (createError) {
-        throw new Error(createError.message);
+      if (!paymentMethod?.id) {
+        throw new Error('创建支付方式失败');
       }
 
       // 保存支付方式到后端
@@ -124,13 +132,22 @@ const PaymentSetup = () => {
 
       if (responseData.success) {
         alert('支付方式绑定成功！');
-        navigate(returnUrl);
+        window.history.back();
       } else {
         throw new Error(responseData.error || '绑定支付方式失败');
       }
     } catch (err) {
       console.error('详细错误信息:', err);
-      setError(err.message || '绑定支付方式失败，请重试');
+      // 处理常见的 Stripe 错误
+      let errorMessage = err.message;
+      if (err.type === 'StripeCardError') {
+        errorMessage = '卡片验证失败：' + err.message;
+      } else if (err.type === 'StripeInvalidRequestError') {
+        errorMessage = '无效的请求：' + err.message;
+      } else if (err.type === 'StripeConnectionError') {
+        errorMessage = '网络连接失败，请检查网络后重试';
+      }
+      setError(errorMessage || '绑定支付方式失败，请重试');
     } finally {
       setProcessing(false);
     }

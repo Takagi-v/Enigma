@@ -7,6 +7,9 @@ const { connectDB, closeDB } = require('./models/db');
 const http = require('http');
 const app = require('./app');
 
+// 加载环境变量
+require('dotenv').config();
+
 // 创建 HTTP 服务器
 const server = http.createServer(app);
 

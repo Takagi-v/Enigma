@@ -11,7 +11,7 @@ router.get("/:username", authenticateToken, checkUserAccess, (req, res) => {
   const { username } = req.params;
 
   db().get(
-    `SELECT id, username, email, full_name, phone, avatar, bio, address, created_at
+    `SELECT id, username, email, full_name, phone, bio, address, created_at, balance, vehicle_plate
      FROM users 
      WHERE username = ?`,
     [username],
@@ -38,10 +38,11 @@ router.get("/:username", authenticateToken, checkUserAccess, (req, res) => {
         email: user.email,
         full_name: user.full_name,
         phone: user.phone,
-        avatar: user.avatar,
         bio: user.bio || '该用户很神秘',
         address: user.address,
-        created_at: user.created_at
+        created_at: user.created_at,
+        balance: user.balance || 0,
+        vehicle_plate: user.vehicle_plate
       });
     }
   );
@@ -50,17 +51,97 @@ router.get("/:username", authenticateToken, checkUserAccess, (req, res) => {
 // 更新用户信息
 router.put("/:username", authenticateToken, checkUserAccess, (req, res) => {
   const { username } = req.params;
-  const { full_name, phone, avatar, bio, address } = req.body;
+  const { full_name, phone, bio, address } = req.body;
 
+  // 验证请求数据
+  if (!full_name && !phone && !bio && !address) {
+    return res.status(400).json({
+      message: "请提供至少一个要更新的字段",
+      code: 'INVALID_REQUEST'
+    });
+  }
+
+  // 验证电话号码格式（如果提供）
+  if (phone) {
+    const phoneRegex = /^(\+?1)?[- ()]*([2-9][0-9]{2})[- )]*([2-9][0-9]{2})[- ]*([0-9]{4})$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({
+        message: "无效的电话号码格式",
+        code: 'INVALID_PHONE'
+      });
+    }
+
+    // 标准化手机号格式
+    const digits = phone.replace(/\D/g, '');
+    const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    
+    // 检查电话号码是否已被其他用户使用
+    db().get(
+      "SELECT username FROM users WHERE phone = ? AND username != ?",
+      [standardizedPhone, username],
+      (err, existingUser) => {
+        if (err) {
+          console.error("检查电话号码失败:", err);
+          return res.status(500).json({
+            message: "更新用户信息失败",
+            code: 'DB_ERROR'
+          });
+        }
+
+        if (existingUser) {
+          return res.status(409).json({
+            message: "该电话号码已被其他用户使用",
+            code: 'PHONE_ALREADY_EXISTS'
+          });
+        }
+
+        // 电话号码验证通过，继续更新用户信息
+        updateUserInfo(username, full_name, phone, bio, address, res);
+      }
+    );
+  } else {
+    // 如果没有提供电话号码，直接更新用户信息
+    updateUserInfo(username, full_name, phone, bio, address, res);
+  }
+});
+
+// 辅助函数：更新用户信息
+function updateUserInfo(username, full_name, phone, bio, address, res) {
+  // 构建更新语句
+  let updateFields = [];
+  let params = [];
+
+  if (full_name !== undefined) {
+    updateFields.push("full_name = ?");
+    params.push(full_name);
+  }
+
+  if (phone !== undefined) {
+    // 标准化手机号格式
+    const digits = phone.replace(/\D/g, '');
+    const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    
+    updateFields.push("phone = ?");
+    params.push(standardizedPhone);
+  }
+
+  if (bio !== undefined) {
+    updateFields.push("bio = ?");
+    params.push(bio);
+  }
+
+  if (address !== undefined) {
+    updateFields.push("address = ?");
+    params.push(address);
+  }
+
+  // 添加用户名作为查询条件
+  params.push(username);
+
+  // 执行更新
   db().run(
-    `UPDATE users 
-     SET full_name = COALESCE(?, full_name),
-         phone = COALESCE(?, phone),
-         avatar = COALESCE(?, avatar),
-         bio = COALESCE(?, bio),
-         address = COALESCE(?, address)
-     WHERE username = ?`,
-    [full_name, phone, avatar, bio, address, username],
+    `UPDATE users SET ${updateFields.join(", ")} WHERE username = ?`,
+    params,
     function(err) {
       if (err) {
         console.error("更新用户信息失败:", err);
@@ -77,13 +158,42 @@ router.put("/:username", authenticateToken, checkUserAccess, (req, res) => {
         });
       }
 
-      res.json({ 
-        message: "用户信息更新成功",
-        code: 'SUCCESS'
-      });
+      // 获取更新后的用户信息
+      db().get(
+        `SELECT id, username, email, full_name, phone, bio, address, created_at, balance, vehicle_plate
+         FROM users 
+         WHERE username = ?`,
+        [username],
+        (err, user) => {
+          if (err) {
+            console.error("获取更新后的用户信息失败:", err);
+            return res.status(200).json({ 
+              message: "用户信息更新成功，但获取更新后的信息失败",
+              code: 'UPDATE_SUCCESS_GET_FAILED'
+            });
+          }
+
+          res.json({ 
+            message: "用户信息更新成功",
+            code: 'SUCCESS',
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              full_name: user.full_name,
+              phone: user.phone,
+              bio: user.bio || '该用户很神秘',
+              address: user.address,
+              created_at: user.created_at,
+              balance: user.balance || 0,
+              vehicle_plate: user.vehicle_plate
+            }
+          });
+        }
+      );
     }
   );
-});
+}
 
 // 获取用户赠送余额
 router.get('/:userId/gift-balance', async (req, res) => {

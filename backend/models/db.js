@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const path = require('path');
+const fs = require('fs');
 
 let db = null;
 
@@ -12,6 +13,8 @@ function connectDB() {
   }
 
   const dbPath = path.join(__dirname, '../data/parking.db');
+  const dbExists = fs.existsSync(dbPath);
+  
   db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
       console.error('数据库连接错误:', err);
@@ -19,27 +22,35 @@ function connectDB() {
     }
     console.log('已连接到数据库');
     
-    // 创建表结构
-    createTables();
+    // 只有在数据库不存在时才创建表结构和测试数据
+    if (!dbExists) {
+      console.log('数据库文件不存在，创建新数据库和测试数据');
+      createTables(true);
+    } else {
+      console.log('数据库文件已存在，仅确保表结构完整');
+      createTables(false);
+    }
   });
 }
 
 // 创建表
-async function createTables() {
+async function createTables(createTestData = false) {
   const tables = [
     // 用户表
     `CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
+      password TEXT,
       email TEXT UNIQUE,
       full_name TEXT,
-      phone TEXT,
+      phone TEXT UNIQUE,
       avatar TEXT,
       bio TEXT DEFAULT '该用户很神秘',
       address TEXT,
+      vehicle_plate TEXT UNIQUE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      balance REAL DEFAULT 0
+      balance REAL DEFAULT 0,
+      google_id TEXT UNIQUE
     )`,
     
     // 停车位表
@@ -161,6 +172,32 @@ async function createTables() {
       notes TEXT,
       FOREIGN KEY (parking_spot_id) REFERENCES parking_spots(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+
+    // 交易表
+    `CREATE TABLE IF NOT EXISTS transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      amount REAL NOT NULL,
+      payment_intent_id TEXT,
+      status TEXT NOT NULL,
+      error_message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+
+    // 争议表
+    `CREATE TABLE IF NOT EXISTS disputes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      payment_intent_id TEXT NOT NULL,
+      amount REAL NOT NULL,
+      status TEXT NOT NULL,
+      reason TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      resolved_at DATETIME,
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )`
   ];
 
@@ -174,10 +211,14 @@ async function createTables() {
 
   // 创建默认管理员账号
   await createDefaultAdmin();
-  // 创建测试停车场数据
-  await createTestParkingSpots();
-  // 创建测试评论数据
-  await createTestReviews();
+  
+  // 只有在需要创建测试数据时才执行
+  if (createTestData) {
+    // 创建测试停车场数据
+    await createTestParkingSpots();
+    // 创建测试评论数据
+    await createTestReviews();
+  }
 }
 
 // 执行SQL查询的辅助函数
@@ -223,6 +264,20 @@ async function createDefaultAdmin() {
 
 // 创建测试停车场数据
 async function createTestParkingSpots() {
+  // 首先检查是否已有停车位数据
+  const existingSpots = await new Promise((resolve, reject) => {
+    db.get("SELECT COUNT(*) as count FROM parking_spots", (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+
+  // 如果已有数据，则不重新创建
+  if (existingSpots && existingSpots.count > 0) {
+    console.log(`数据库中已有${existingSpots.count}个停车位数据，跳过创建测试数据`);
+    return;
+  }
+
   // 定义一些基础数据用于随机组合
   const districts = [
     { name: '浦东新区', coordinates: ['31.2197,121.5440', '31.2297,121.5340', '31.2397,121.5240'] },
@@ -306,11 +361,9 @@ async function createTestParkingSpots() {
   try {
     // 清空现有数据
     await runQuery("DELETE FROM parking_spots");
-    await runQuery("DELETE FROM parking_usage");
     
     // 重置自增ID
     await runQuery("DELETE FROM sqlite_sequence WHERE name='parking_spots'");
-    await runQuery("DELETE FROM sqlite_sequence WHERE name='parking_usage'");
 
     // 插入新数据
     for (const spot of testSpots) {
@@ -343,6 +396,20 @@ async function createTestParkingSpots() {
 // 创建测试评论数据
 async function createTestReviews() {
   try {
+    // 首先检查是否已有评论数据
+    const existingReviews = await new Promise((resolve, reject) => {
+      db.get("SELECT COUNT(*) as count FROM reviews", (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    // 如果已有数据，则不重新创建
+    if (existingReviews && existingReviews.count > 0) {
+      console.log(`数据库中已有${existingReviews.count}条评论数据，跳过创建测试数据`);
+      return;
+    }
+
     // 清空现有评论数据
     await runQuery("DELETE FROM reviews");
     await runQuery("DELETE FROM sqlite_sequence WHERE name='reviews'");
