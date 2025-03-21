@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const serverConfig = require('../config/server');
 const { OAuth2Client } = require('google-auth-library');
+const twilio = require('twilio');
 
 // JWT密钥
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -60,12 +61,115 @@ const upload = multer({
 // 创建Google OAuth client
 const googleClient = new OAuth2Client();
 
+// 创建Twilio客户端
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID || 'your_account_sid',
+  process.env.TWILIO_AUTH_TOKEN || 'your_auth_token'
+);
+const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || 'your_twilio_phone_number';
+
+// 存储验证码的对象 (在生产环境中应该使用Redis等缓存服务)
+const verificationCodes = {};
+
+// 发送验证码
+router.post('/send-verification-code', async (req, res) => {
+  const { phone } = req.body;
+  
+  if (!phone) {
+    return res.status(400).json({ message: "手机号不能为空" });
+  }
+  
+  try {
+    // 验证手机号格式
+    const phoneRegex = /^(\+?1)?[- ()]*([2-9][0-9]{2})[- )]*([2-9][0-9]{2})[- ]*([0-9]{4})$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ message: "无效的电话号码格式" });
+    }
+    
+    // 标准化手机号格式
+    const digits = phone.replace(/\D/g, '');
+    const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    const formattedPhone = `+1${standardizedPhone}`;
+    
+    // 生成6位随机验证码
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // 在生产环境中使用Twilio发送短信
+    if (process.env.NODE_ENV === 'production') {
+      await twilioClient.messages.create({
+        body: `您的GoParkMe验证码是: ${verificationCode}`,
+        from: twilioPhoneNumber,
+        to: formattedPhone
+      });
+    } else {
+      // 开发环境下，只打印验证码
+      console.log(`开发环境 - 手机号: ${formattedPhone}, 验证码: ${verificationCode}`);
+    }
+    
+    // 存储验证码，设置5分钟过期
+    verificationCodes[standardizedPhone] = {
+      code: verificationCode,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
+    };
+    
+    return res.status(200).json({ message: "验证码已发送" });
+  } catch (error) {
+    console.error('发送验证码错误:', error);
+    return res.status(500).json({ message: "发送验证码失败" });
+  }
+});
+
+// 验证验证码
+router.post('/verify-code', async (req, res) => {
+  const { phone, code } = req.body;
+  
+  if (!phone || !code) {
+    return res.status(400).json({ message: "手机号和验证码不能为空" });
+  }
+  
+  try {
+    // 标准化手机号格式
+    const digits = phone.replace(/\D/g, '');
+    const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    
+    // 检查验证码是否存在且有效
+    const storedVerification = verificationCodes[standardizedPhone];
+    
+    if (!storedVerification) {
+      return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
+    }
+    
+    if (Date.now() > storedVerification.expiresAt) {
+      // 删除过期的验证码
+      delete verificationCodes[standardizedPhone];
+      return res.status(400).json({ message: "验证码已过期，请重新获取" });
+    }
+    
+    if (storedVerification.code !== code) {
+      return res.status(400).json({ message: "验证码不正确" });
+    }
+    
+    // 验证成功，删除验证码
+    delete verificationCodes[standardizedPhone];
+    
+    return res.status(200).json({ message: "验证成功" });
+  } catch (error) {
+    console.error('验证码验证错误:', error);
+    return res.status(500).json({ message: "验证码验证失败" });
+  }
+});
+
 // 注册路由
 router.post("/register", async (req, res) => {
-  const { username, password, full_name, phone, avatar, bio, address, vehicle_plate } = req.body;
+  const { username, password, full_name, phone, avatar, bio, address, vehicle_plate, verified } = req.body;
 
   if (!username || !password || !full_name || !phone || !vehicle_plate) {
     return res.status(400).json({ message: "所有必填字段都不能为空" });
+  }
+  
+  // 检查手机号是否已验证
+  if (!verified) {
+    return res.status(400).json({ message: "请先验证手机号" });
   }
 
   try {
@@ -535,6 +639,165 @@ router.post('/google-bind-vehicle', async (req, res) => {
   } catch (error) {
     console.error('Google绑定车牌错误:', error);
     res.status(500).json({ message: 'Google绑定车牌失败' });
+  }
+});
+
+// 重置密码请求
+router.post('/forgot-password', async (req, res) => {
+  const { phone } = req.body;
+  
+  if (!phone) {
+    return res.status(400).json({ message: "手机号不能为空" });
+  }
+  
+  try {
+    // 验证手机号格式
+    const phoneRegex = /^(\+?1)?[- ()]*([2-9][0-9]{2})[- )]*([2-9][0-9]{2})[- ]*([0-9]{4})$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ message: "无效的电话号码格式" });
+    }
+    
+    // 标准化手机号格式
+    const digits = phone.replace(/\D/g, '');
+    const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    
+    // 检查手机号是否已注册
+    const user = await new Promise((resolve, reject) => {
+      db().get("SELECT id FROM users WHERE phone = ?", [standardizedPhone], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "该手机号未注册" });
+    }
+    
+    // 生成6位随机验证码
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // 在生产环境中使用Twilio发送短信
+    if (process.env.NODE_ENV === 'production') {
+      await twilioClient.messages.create({
+        body: `您的GoParkMe重置密码验证码是: ${verificationCode}`,
+        from: twilioPhoneNumber,
+        to: `+1${standardizedPhone}`
+      });
+    } else {
+      // 开发环境下，只打印验证码
+      console.log(`开发环境 - 重置密码 - 手机号: +1${standardizedPhone}, 验证码: ${verificationCode}`);
+    }
+    
+    // 存储验证码，设置5分钟过期
+    verificationCodes[standardizedPhone] = {
+      code: verificationCode,
+      expiresAt: Date.now() + 5 * 60 * 1000, // 5分钟后过期
+      type: 'reset_password' // 标记这是重置密码的验证码
+    };
+    
+    return res.status(200).json({ message: "验证码已发送" });
+  } catch (error) {
+    console.error('发送重置密码验证码错误:', error);
+    return res.status(500).json({ message: "发送验证码失败" });
+  }
+});
+
+// 验证重置密码验证码
+router.post('/verify-reset-code', async (req, res) => {
+  const { phone, code } = req.body;
+  
+  if (!phone || !code) {
+    return res.status(400).json({ message: "手机号和验证码不能为空" });
+  }
+  
+  try {
+    // 标准化手机号格式
+    const digits = phone.replace(/\D/g, '');
+    const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    
+    // 检查验证码是否存在且有效
+    const storedVerification = verificationCodes[standardizedPhone];
+    
+    if (!storedVerification || storedVerification.type !== 'reset_password') {
+      return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
+    }
+    
+    if (Date.now() > storedVerification.expiresAt) {
+      // 删除过期的验证码
+      delete verificationCodes[standardizedPhone];
+      return res.status(400).json({ message: "验证码已过期，请重新获取" });
+    }
+    
+    if (storedVerification.code !== code) {
+      return res.status(400).json({ message: "验证码不正确" });
+    }
+    
+    // 验证成功，生成临时token
+    const token = jwt.sign(
+      { 
+        phone: standardizedPhone,
+        type: 'reset_password'
+      },
+      JWT_SECRET,
+      { expiresIn: '5m' } // 5分钟有效期
+    );
+    
+    // 删除验证码
+    delete verificationCodes[standardizedPhone];
+    
+    return res.status(200).json({ 
+      message: "验证成功",
+      token
+    });
+  } catch (error) {
+    console.error('验证重置密码验证码错误:', error);
+    return res.status(500).json({ message: "验证码验证失败" });
+  }
+});
+
+// 重置密码
+router.post('/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+  
+  if (!token || !newPassword) {
+    return res.status(400).json({ message: "token和新密码不能为空" });
+  }
+  
+  try {
+    // 验证token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    if (decoded.type !== 'reset_password') {
+      return res.status(400).json({ message: "无效的token" });
+    }
+    
+    // 验证密码格式
+    if (!/^\d{6}$/.test(newPassword)) {
+      return res.status(400).json({ message: "密码必须为6位数字" });
+    }
+    
+    // 加密新密码
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    // 更新密码
+    await new Promise((resolve, reject) => {
+      db().run(
+        "UPDATE users SET password = ? WHERE phone = ?",
+        [hashedPassword, decoded.phone],
+        function(err) {
+          if (err) reject(err);
+          resolve(this);
+        }
+      );
+    });
+    
+    return res.status(200).json({ message: "密码重置成功" });
+  } catch (error) {
+    console.error('重置密码错误:', error);
+    if (error.name === 'TokenExpiredError') {
+      return res.status(400).json({ message: "重置密码链接已过期，请重新获取验证码" });
+    }
+    return res.status(500).json({ message: "重置密码失败" });
   }
 });
 

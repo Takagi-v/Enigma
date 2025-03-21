@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/AdminDashboard.css';
 import config from '../../config';
+import ParkingLockControl from './ParkingLockControl';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -220,6 +221,12 @@ const AdminDashboard = () => {
         >
           停车位管理
         </button>
+        <button 
+          className={activeTab === 'parking-lock' ? 'active' : ''} 
+          onClick={() => setActiveTab('parking-lock')}
+        >
+          地锁控制
+        </button>
       </div>
 
       <div className="admin-content">
@@ -257,7 +264,7 @@ const AdminDashboard = () => {
               </table>
             )}
           </div>
-        ) : (
+        ) : activeTab === 'parking' ? (
           <div className="parking-spots-table">
             {editingSpot && (
               <div className="edit-form-overlay">
@@ -342,6 +349,8 @@ const AdminDashboard = () => {
               </table>
             )}
           </div>
+        ) : (
+          <ParkingLockControl />
         )}
       </div>
     </div>

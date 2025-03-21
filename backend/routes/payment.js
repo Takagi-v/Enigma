@@ -3,15 +3,21 @@ const router = express.Router();
 
 // 环境检查
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLIC_KEY;
+const STRIPE_PUBLIC_KEY = process.env.STRIPE_PUBLIC_KEY;
+
+console.log('后端加载的 Stripe 密钥:', {
+  STRIPE_SECRET_KEY: STRIPE_SECRET_KEY ? `${STRIPE_SECRET_KEY.slice(0, 7)}...${STRIPE_SECRET_KEY.slice(-4)}` : undefined,
+  STRIPE_PUBLIC_KEY: STRIPE_PUBLIC_KEY ? `${STRIPE_PUBLIC_KEY.slice(0, 7)}...${STRIPE_PUBLIC_KEY.slice(-4)}` : undefined,
+  REACT_APP_STRIPE_PUBLIC_KEY: process.env.REACT_APP_STRIPE_PUBLIC_KEY ? `${process.env.REACT_APP_STRIPE_PUBLIC_KEY.slice(0, 7)}...${process.env.REACT_APP_STRIPE_PUBLIC_KEY.slice(-4)}` : undefined
+});
 
 // 详细的环境检查
 if (!STRIPE_SECRET_KEY) {
   throw new Error('未配置 STRIPE_SECRET_KEY 环境变量');
 }
 
-if (!STRIPE_PUBLISHABLE_KEY) {
-  throw new Error('未配置 STRIPE_PUBLISHABLE_KEY 环境变量');
+if (!STRIPE_PUBLIC_KEY) {
+  throw new Error('未配置 STRIPE_PUBLIC_KEY 环境变量');
 }
 
 // 检查是否为生产环境
@@ -115,63 +121,76 @@ router.post('/save-method', authenticateToken, async (req, res) => {
   const { paymentMethodId, paymentType } = req.body;
   const userId = req.user.id;
 
-  console.log('开始处理保存支付方式请求:', {
+  console.log('收到保存支付方式请求:', {
     userId,
     paymentMethodId,
     paymentType,
-    environment: isProduction ? 'production' : 'development'
+    environment: isProduction ? 'production' : 'development',
+    headers: req.headers['content-type']
   });
 
   try {
-    // 1. 验证支付方式是否存在
+    // 1. 验证支付方式是否存在（带重试机制）
     let paymentMethod;
-    try {
-      console.log('正在验证支付方式:', paymentMethodId);
-      paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
-      console.log('支付方式验证结果:', {
-        type: paymentMethod.type,
-        status: paymentMethod.status,
-        card: paymentMethod.card ? {
-          brand: paymentMethod.card.brand,
-          last4: paymentMethod.card.last4
-        } : null
-      });
-      
-      // 检查支付方式类型
-      if (paymentType === 'card' && paymentMethod.type !== 'card') {
-        console.error('支付方式类型不匹配:', {
-          expected: 'card',
-          actual: paymentMethod.type
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1秒延迟
+
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`正在验证支付方式 (尝试 ${retryCount + 1}/${maxRetries}):`, paymentMethodId);
+        paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+        console.log('支付方式验证结果:', {
+          type: paymentMethod.type,
+          status: paymentMethod.status,
+          card: paymentMethod.card ? {
+            brand: paymentMethod.card.brand,
+            last4: paymentMethod.card.last4
+          } : null
         });
-        return res.status(400).json({
-          success: false,
-          error: '支付方式类型不匹配'
-        });
+        break; // 如果成功，跳出循环
+      } catch (error) {
+        retryCount++;
+        if (retryCount === maxRetries) {
+          console.error('验证支付方式失败（已达到最大重试次数）:', {
+            error: error.message,
+            type: error.type,
+            code: error.code,
+            decline_code: error.decline_code
+          });
+          return res.status(400).json({
+            success: false,
+            error: isProduction ? '无效的支付方式ID' : `支付方式验证失败: ${error.message}`,
+            details: !isProduction ? {
+              type: error.type,
+              code: error.code,
+              decline_code: error.decline_code
+            } : undefined
+          });
+        }
+        console.log(`验证失败，${retryDelay/1000}秒后重试...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
+    }
       
-      // 检查支付方式状态
-      if (paymentMethod.status === 'failed' || paymentMethod.status === 'canceled') {
-        console.error('支付方式状态无效:', paymentMethod.status);
-        return res.status(400).json({
-          success: false,
-          error: '支付方式状态无效'
-        });
-      }
-    } catch (error) {
-      console.error('验证支付方式失败:', {
-        error: error.message,
-        type: error.type,
-        code: error.code,
-        decline_code: error.decline_code
+    // 检查支付方式类型
+    if (paymentType === 'card' && paymentMethod.type !== 'card') {
+      console.error('支付方式类型不匹配:', {
+        expected: 'card',
+        actual: paymentMethod.type
       });
       return res.status(400).json({
         success: false,
-        error: isProduction ? '无效的支付方式ID' : `支付方式验证失败: ${error.message}`,
-        details: !isProduction ? {
-          type: error.type,
-          code: error.code,
-          decline_code: error.decline_code
-        } : undefined
+        error: '支付方式类型不匹配'
+      });
+    }
+    
+    // 检查支付方式状态
+    if (paymentMethod.status === 'failed' || paymentMethod.status === 'canceled') {
+      console.error('支付方式状态无效:', paymentMethod.status);
+      return res.status(400).json({
+        success: false,
+        error: '支付方式状态无效'
       });
     }
 
@@ -443,29 +462,13 @@ router.post('/webhook', express.raw({type: 'application/json'}), async (req, res
   let event;
 
   try {
-    // 添加调试日志
-    console.log('Webhook 请求头:', {
-      'stripe-signature': sig,
-      'content-type': req.headers['content-type']
-    });
-    console.log('Webhook Secret:', process.env.STRIPE_WEBHOOK_SECRET);
-    
     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
-    
-    console.log('Webhook 事件解析成功:', {
-      type: event.type,
-      id: event.id
-    });
   } catch (err) {
-    console.error('Webhook 签名验证失败:', {
-      error: err.message,
-      signature: sig,
-      secret: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10) + '...'
-    });
+    console.error('Webhook 签名验证失败:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 

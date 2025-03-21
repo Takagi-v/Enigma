@@ -50,7 +50,9 @@ const PaymentSetup = () => {
                 }),
               });
 
+              console.log('后端API响应状态:', response.status);
               const responseData = await response.json();
+              console.log('后端API响应数据:', responseData);
 
               if (!response.ok) {
                 event.complete('fail');
@@ -90,7 +92,10 @@ const PaymentSetup = () => {
         // 处理信用卡支付方式
         const cardElement = elements.getElement(CardElement);
         
-        // 创建支付方式
+        if (!cardElement._complete) {
+          throw new Error('请完整填写卡片信息');
+        }
+        
         const result = await stripe.createPaymentMethod({
           type: 'card',
           card: cardElement,
@@ -101,11 +106,18 @@ const PaymentSetup = () => {
           }
         });
 
-        if (result.error) {
-          throw new Error(result.error.message);
-        }
+        console.log('支付方式创建结果:', {
+          success: !!result.paymentMethod,
+          error: result.error,
+          paymentMethodId: result.paymentMethod?.id
+        });
 
+        createError = result.error;
         paymentMethod = result.paymentMethod;
+      }
+
+      if (createError) {
+        throw new Error(createError.message);
       }
 
       if (!paymentMethod?.id) {
@@ -124,7 +136,9 @@ const PaymentSetup = () => {
         }),
       });
 
+      console.log('后端API响应状态:', response.status);
       const responseData = await response.json();
+      console.log('后端API响应数据:', responseData);
 
       if (!response.ok) {
         throw new Error(responseData.error || '保存支付方式失败');

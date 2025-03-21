@@ -35,6 +35,7 @@
     "sqlite3": "^5.1.7",
     "stream-browserify": "^3.0.0",
     "stripe": "^17.6.0",
+    "twilio": "^5.4.5",
     "use-places-autocomplete": "^4.0.1",
     "util": "^0.12.5",
     "web-vitals": "^2.1.4",

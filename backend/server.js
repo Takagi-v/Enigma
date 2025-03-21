@@ -2,14 +2,13 @@ const https = require("https");
 const fs = require('fs');
 const path = require("path");
 const WebSocket = require("ws");
+// 加载环境变量 - 在引入配置前加载
+
 const serverConfig = require('./config/server');
 const { connectDB, closeDB } = require('./models/db');
 const http = require('http');
 const app = require('./app');
-
-// 加载环境变量
 require('dotenv').config();
-
 // 创建 HTTP 服务器
 const server = http.createServer(app);
 

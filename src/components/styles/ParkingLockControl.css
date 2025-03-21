@@ -1,0 +1,622 @@
+.parking-lock-control {
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.parking-lock-control h2 {
+  color: #333;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #2196F3;
+  padding-bottom: 10px;
+}
+
+.server-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.server-status {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  margin-left: 10px;
+  font-weight: bold;
+}
+
+.status-running {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.status-stopped {
+  background-color: #F44336;
+  color: white;
+}
+
+.server-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s, transform 0.1s;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-start {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.btn-start:hover:not(:disabled) {
+  background-color: #388E3C;
+}
+
+.btn-stop {
+  background-color: #F44336;
+  color: white;
+}
+
+.btn-stop:hover:not(:disabled) {
+  background-color: #D32F2F;
+}
+
+.btn-refresh {
+  background-color: #2196F3;
+  color: white;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background-color: #1976D2;
+}
+
+.view-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.view-mode-selector {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-primary {
+  background-color: #2196F3;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #1976D2;
+}
+
+.btn-secondary {
+  background-color: #90CAF9;
+  color: #0D47A1;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #64B5F6;
+}
+
+.btn.active {
+  border: 2px solid #1565C0;
+  padding: 6px 14px;
+}
+
+.refresh-control {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.refresh-control label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.refresh-control input {
+  width: 60px;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.operation-status {
+  padding: 10px 15px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.operation-status.success {
+  background-color: #E8F5E9;
+  color: #388E3C;
+  border-left: 4px solid #4CAF50;
+}
+
+.operation-status.error {
+  background-color: #FFEBEE;
+  color: #D32F2F;
+  border-left: 4px solid #F44336;
+}
+
+.error-message {
+  padding: 10px 15px;
+  margin-bottom: 20px;
+  background-color: #FFEBEE;
+  color: #D32F2F;
+  border-left: 4px solid #F44336;
+  border-radius: 4px;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+  font-size: 18px;
+  color: #666;
+}
+
+/* 设备列表样式 */
+.devices-list, .devices-status-list {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.devices-list h3, .devices-status-list h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.no-devices {
+  padding: 30px;
+  text-align: center;
+  color: #757575;
+  font-style: italic;
+}
+
+.devices-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.devices-table th,
+.devices-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.devices-table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+  color: #333;
+}
+
+.devices-table tr:hover {
+  background-color: #f9f9f9;
+}
+
+.device-serial-link {
+  color: #2196F3;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.device-serial-link:hover {
+  text-decoration: underline;
+}
+
+.heartbeat-time {
+  color: #757575;
+  font-size: 0.85em;
+  margin-left: 5px;
+}
+
+.device-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-open {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.btn-open:hover:not(:disabled) {
+  background-color: #388E3C;
+}
+
+.btn-close {
+  background-color: #F44336;
+  color: white;
+}
+
+.btn-close:hover:not(:disabled) {
+  background-color: #D32F2F;
+}
+
+.btn-more {
+  background-color: #607D8B;
+  color: white;
+}
+
+.btn-more:hover:not(:disabled) {
+  background-color: #455A64;
+}
+
+.btn-detail {
+  background-color: #673AB7;
+  color: white;
+}
+
+.btn-detail:hover:not(:disabled) {
+  background-color: #512DA8;
+}
+
+.btn-normal {
+  background-color: #2196F3;
+  color: white;
+}
+
+.btn-normal:hover:not(:disabled) {
+  background-color: #1976D2;
+}
+
+.btn-restart {
+  background-color: #FF9800;
+  color: white;
+}
+
+.btn-restart:hover:not(:disabled) {
+  background-color: #F57C00;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.9em;
+}
+
+/* 下拉菜单样式 */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  right: 0;
+  background-color: #f9f9f9;
+  min-width: 160px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  border-radius: 4px;
+}
+
+.dropdown-content button {
+  color: #333;
+  padding: 10px 16px;
+  text-decoration: none;
+  display: block;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.dropdown-content button:hover {
+  background-color: #f1f1f1;
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+/* 状态卡片视图 */
+.status-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.status-card {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.status-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.status-card-error {
+  border: 2px solid #F44336;
+}
+
+.status-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #eee;
+}
+
+.device-serial {
+  margin: 0;
+  font-weight: bold;
+  color: #333;
+  font-size: 1.1em;
+  word-break: break-all;
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-left: 5px;
+}
+
+.status-green {
+  background-color: #4CAF50;
+}
+
+.status-red {
+  background-color: #F44336;
+}
+
+.status-orange {
+  background-color: #FF9800;
+}
+
+.status-blue {
+  background-color: #2196F3;
+}
+
+.status-gray {
+  background-color: #9E9E9E;
+}
+
+.status-card-body {
+  padding: 15px;
+}
+
+.status-info {
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.status-label {
+  font-weight: bold;
+  color: #666;
+  margin-right: 5px;
+}
+
+.status-value {
+  color: #333;
+}
+
+.status-card-footer {
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 15px;
+  background-color: #f9f9f9;
+  border-top: 1px solid #eee;
+}
+
+.status-error-badge {
+  display: inline-block;
+  padding: 5px 10px;
+  margin-top: 10px;
+  background-color: #FFEBEE;
+  color: #D32F2F;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+/* 电池状态样式 */
+.battery-good {
+  color: #4CAF50;
+}
+
+.battery-medium {
+  color: #FF9800;
+}
+
+.battery-low {
+  color: #F44336;
+}
+
+/* 设备详情弹窗 */
+.device-detail-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.device-detail-content {
+  background-color: white;
+  border-radius: 8px;
+  max-width: 90%;
+  width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  background-color: white;
+  z-index: 10;
+}
+
+.detail-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.btn-close-detail {
+  border: none;
+  background: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+
+.device-detail-info {
+  padding: 20px;
+}
+
+.detail-section {
+  margin-bottom: 25px;
+}
+
+.detail-section h4 {
+  color: #333;
+  margin-bottom: 12px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee;
+}
+
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.detail-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.detail-table td:first-child {
+  width: 40%;
+  font-weight: bold;
+  color: #666;
+}
+
+.error-section {
+  background-color: #FFEBEE;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.error-list {
+  color: #D32F2F;
+}
+
+.error-item {
+  margin-top: 5px;
+}
+
+.detail-actions {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.text-danger {
+  color: #F44336;
+  font-weight: bold;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .server-control {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .view-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .refresh-control {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .device-actions {
+    flex-wrap: wrap;
+  }
+  
+  .dropdown-content {
+    right: auto;
+    left: 0;
+  }
+  
+  .status-cards-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .device-detail-content {
+    width: 95%;
+    max-width: 95%;
+  }
+  
+  .detail-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .detail-actions button {
+    flex: 1 0 40%;
+  }
+} 

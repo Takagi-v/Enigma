@@ -1,6 +1,6 @@
 const path = require('path');
 // 加载环境变量
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config();
 
 const config = {
   port: process.env.PORT || 3002,

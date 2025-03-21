@@ -1,13 +1,4 @@
-require('dotenv').config();
-
-// 添加环境变量调试日志
-console.log('环境变量加载情况：', {
-  NODE_ENV: process.env.NODE_ENV,
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY?.substring(0, 10) + '...',
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10) + '...',
-  ENV_FILE_PATH: require('path').resolve('.env')
-});
-
+require('dotenv').config({override: true});
 const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
@@ -50,18 +41,6 @@ app.use(cors(corsOptions));
 
 // 确保在任何body parser之前处理webhook
 app.use('/api/payment/webhook', express.raw({type: 'application/json'}));
-
-// 添加调试日志中间件
-app.use('/api/payment/webhook', (req, res, next) => {
-  console.log('收到 Webhook 请求:', {
-    method: req.method,
-    path: req.path,
-    contentType: req.headers['content-type'],
-    bodyType: typeof req.body,
-    bodyLength: req.body?.length
-  });
-  next();
-});
 
 // 其他路由使用JSON parser
 app.use(express.json());
