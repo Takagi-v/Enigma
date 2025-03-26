@@ -1,14 +1,22 @@
 import config from '../config';
 
-const PARKING_LOCK_API_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://www.goparkme.com/lock-api'
-  : 'http://localhost:5000/api';
+// 使用我们自己的后端代理
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? '/api/parking-locks'  // 生产环境使用相对路径
+  : 'http://localhost:3002/api/parking-locks'; // 开发环境使用本地后端
+
+// 获取管理员认证令牌
+const getAuthToken = () => localStorage.getItem('adminToken') || '';
 
 export const parkingLockService = {
   // 获取服务器状态
   getStatus: async () => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/status`);
+      const response = await fetch(`${API_BASE_URL}/status`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
       return await response.json();
     } catch (error) {
       console.error('获取地锁服务器状态失败:', error);
@@ -19,7 +27,11 @@ export const parkingLockService = {
   // 获取所有连接的设备
   getDevices: async () => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/devices`);
+      const response = await fetch(`${API_BASE_URL}/devices`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
       return await response.json();
     } catch (error) {
       console.error('获取地锁设备列表失败:', error);
@@ -30,7 +42,11 @@ export const parkingLockService = {
   // 获取指定设备的详细状态
   getDeviceStatus: async (deviceSerial) => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/device_status/${deviceSerial}`);
+      const response = await fetch(`${API_BASE_URL}/device_status/${deviceSerial}`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
       return await response.json();
     } catch (error) {
       console.error('获取设备状态失败:', error);
@@ -41,7 +57,11 @@ export const parkingLockService = {
   // 获取所有设备的详细状态
   getAllDeviceStatuses: async () => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/device_statuses`);
+      const response = await fetch(`${API_BASE_URL}/device_statuses`, {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
       return await response.json();
     } catch (error) {
       console.error('获取所有设备状态失败:', error);
@@ -52,10 +72,11 @@ export const parkingLockService = {
   // 开锁
   openLock: async (deviceSerial) => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/open_lock`, {
+      const response = await fetch(`${API_BASE_URL}/open_lock`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify({ deviceSerial }),
       });
@@ -69,10 +90,11 @@ export const parkingLockService = {
   // 关锁
   closeLock: async (deviceSerial) => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/close_lock`, {
+      const response = await fetch(`${API_BASE_URL}/close_lock`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify({ deviceSerial }),
       });
@@ -86,10 +108,11 @@ export const parkingLockService = {
   // 设置锁状态（0:正常, 1:保持开, 2:保持关）
   setLockState: async (deviceSerial, state) => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/set_state`, {
+      const response = await fetch(`${API_BASE_URL}/set_state`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify({ deviceSerial, state }),
       });
@@ -103,10 +126,11 @@ export const parkingLockService = {
   // 重启设备
   restartDevice: async (deviceSerial) => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/restart_device`, {
+      const response = await fetch(`${API_BASE_URL}/restart_device`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify({ deviceSerial }),
       });
@@ -120,10 +144,11 @@ export const parkingLockService = {
   // 同步时间
   syncTime: async (deviceSerial) => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/sync_time`, {
+      const response = await fetch(`${API_BASE_URL}/sync_time`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify({ deviceSerial }),
       });
@@ -134,36 +159,18 @@ export const parkingLockService = {
     }
   },
 
-  // 启动服务器
-  startServer: async (host = '18.220.204.146', port = 11457) => {
+  // 测试连接
+  testConnection: async () => {
     try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/start_server`, {
-        method: 'POST',
+      const response = await fetch(`${API_BASE_URL}/status`, {
         headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ host, port }),
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
       });
       return await response.json();
     } catch (error) {
-      console.error('启动服务器失败:', error);
-      throw error;
-    }
-  },
-
-  // 停止服务器
-  stopServer: async () => {
-    try {
-      const response = await fetch(`${PARKING_LOCK_API_URL}/stop_server`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      return await response.json();
-    } catch (error) {
-      console.error('停止服务器失败:', error);
-      throw error;
+      console.error('测试连接失败:', error);
+      return { success: false, error: error.message };
     }
   }
 }; 

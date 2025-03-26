@@ -6,7 +6,7 @@ import binascii
 import logging
 from flask import Flask, request, jsonify
 from parking_lock_server import ParkingLockServer
-from datetime import datetime
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -41,6 +41,137 @@ def get_devices():
         return jsonify({"success": True, "devices": devices})
     else:
         return jsonify({"success": False, "message": "Server not running"})
+
+@app.route('/api/device_status/<device_serial_hex>', methods=['GET'])
+def get_device_status(device_serial_hex):
+    """获取设备的详细状态信息"""
+    global lock_server
+    if not lock_server or not lock_server.is_running:
+        return jsonify({"success": False, "message": "Server not running"})
+    
+    try:
+        # 转换设备序列号从十六进制字符串到bytes
+        device_serial = binascii.unhexlify(device_serial_hex)
+        device_serial = bytes(device_serial)  # 确保是不可变的bytes类型
+        
+        # 使用服务器实例获取设备状态
+        hb = lock_server.get_device_status(device_serial)
+        
+        if hb:
+            # 构建响应数据
+            status_response = {
+                "success": True,
+                "serialNumber": binascii.hexlify(hb['serial_number']).decode('utf-8'),
+                "deviceStatus": {
+                    "code": hb['device_status'],
+                    "description": hb['device_status_description']
+                },
+                "carStatus": {
+                    "code": hb['car_status'],
+                    "description": hb['car_status_description']
+                },
+                "controlStatus": {
+                    "code": hb['control_status'],
+                    "description": hb['control_status_description']
+                },
+                "battery": {
+                    "3.7v": hb['battery_3_7v'],
+                    "12v": hb['battery_12v']
+                },
+                "signalStrength": hb['signal_strength'],
+                "flowNumber": hb['flow_number'],
+                "error": {
+                    "code": hb['error_code'],
+                    "descriptions": hb.get('error_descriptions', []),
+                    "hasError": hb['error_code'] > 0
+                },
+                "groundSensor": {
+                    "currentFrequency": hb['current_frequency'],
+                    "noCarBase": hb['no_car_base'],
+                    "carBase": hb['car_base'],
+                    "carRatio": hb['car_ratio'],
+                    "noCarRatio": hb['no_car_ratio']
+                },
+                "waterDetection": {
+                    "code": hb['water_detection'],
+                    "description": "有水" if hb['water_detection'] == 1 else "无水"
+                }
+            }
+            
+            return jsonify(status_response)
+        else:
+            return jsonify({
+                "success": False, 
+                "message": f"No heartbeat data available for device {device_serial_hex}"
+            })
+    except Exception as e:
+        logger.error(f"Error in get_device_status: {e}")
+        return jsonify({"success": False, "message": str(e)})
+
+@app.route('/api/device_statuses', methods=['GET'])
+def get_all_device_statuses():
+    """获取所有设备的详细状态信息"""
+    global lock_server
+    if not lock_server or not lock_server.is_running:
+        return jsonify({"success": False, "message": "Server not running"})
+    
+    try:
+        # 获取所有设备状态
+        device_status_list = lock_server.get_all_device_statuses()
+        
+        device_statuses = []
+        for hb in device_status_list:
+            # 构建设备状态对象
+            status = {
+                "serialNumber": binascii.hexlify(hb['serial_number']).decode('utf-8'),
+                "deviceStatus": {
+                    "code": hb['device_status'],
+                    "description": hb['device_status_description']
+                },
+                "carStatus": {
+                    "code": hb['car_status'],
+                    "description": hb['car_status_description']
+                },
+                "controlStatus": {
+                    "code": hb['control_status'],
+                    "description": hb['control_status_description']
+                },
+                "battery": {
+                    "3.7v": hb['battery_3_7v'],
+                    "12v": hb['battery_12v']
+                },
+                "signalStrength": hb['signal_strength'],
+                "flowNumber": hb['flow_number'],
+                "error": {
+                    "code": hb['error_code'],
+                    "descriptions": hb.get('error_descriptions', []),
+                    "hasError": hb['error_code'] > 0
+                },
+                "groundSensor": {
+                    "currentFrequency": hb['current_frequency'],
+                    "noCarBase": hb['no_car_base'],
+                    "carBase": hb['car_base'],
+                    "carRatio": hb['car_ratio'],
+                    "noCarRatio": hb['no_car_ratio']
+                },
+                "waterDetection": {
+                    "code": hb['water_detection'],
+                    "description": "有水" if hb['water_detection'] == 1 else "无水"
+                },
+                "lastHeartbeat": hb.get("last_heartbeat"),
+                "address": f"{hb['address'][0]}:{hb['address'][1]}" if 'address' in hb else "unknown"
+            }
+            
+            device_statuses.append(status)
+        
+        return jsonify({
+            "success": True,
+            "deviceCount": len(device_statuses),
+            "devices": device_statuses
+        })
+    except Exception as e:
+        logger.error(f"Error in get_all_device_statuses: {e}")
+        return jsonify({"success": False, "message": str(e)})
 
 @app.route('/api/open_lock', methods=['POST'])
 def open_lock():
@@ -158,7 +289,7 @@ def start_server():
     
     try:
         data = request.get_json()
-        host = data.get('host', '18.220.204.146')
+        host = data.get('host', '0.0.0.0')
         port = data.get('port', 11457)
         
         if lock_server and lock_server.is_running:
@@ -192,127 +323,6 @@ def stop_server():
     except Exception as e:
         logger.error(f"Error in stop_server: {e}")
         return jsonify({"success": False, "message": str(e)})
-    
-
-@app.route('/api/device_status/<device_serial_hex>', methods=['GET'])
-def get_device_status(device_serial_hex):
-    """获取指定设备的详细状态信息"""
-    global lock_server
-    if not lock_server or not lock_server.is_running:
-        return jsonify({"success": False, "message": "服务器未运行"})
-    
-    try:
-        device_serial = binascii.unhexlify(device_serial_hex)
-        
-        with lock_server.device_lock:
-            if device_serial not in lock_server.connected_devices:
-                return jsonify({"success": False, "message": "设备未连接"})
-            
-            device_info = lock_server.connected_devices[device_serial]
-            
-            if "heartbeat_data" not in device_info:
-                return jsonify({"success": False, "message": "该设备没有可用的心跳数据"})
-            
-            # 获取心跳数据
-            hb = device_info["heartbeat_data"]
-            
-            # 构建更易读的返回数据
-            status_data = {
-                "序列号": binascii.hexlify(hb["serial_number"]).decode('utf-8'),
-                "设备状态": {
-                    "代码": hb["device_status"],
-                    "描述": hb["device_status_description"]
-                },
-                "车辆状态": {
-                    "代码": hb["car_status"],
-                    "描述": hb["car_status_description"]
-                },
-                "常控状态": {
-                    "代码": hb["control_status"],
-                    "描述": hb["control_status_description"]
-                },
-                "电池": {
-                    "3.7v": hb["battery_3_7v"],
-                    "12v": hb["battery_12v"]
-                },
-                "信号强度": hb["signal_strength"],
-                "流水号": hb["flow_number"],
-                "进水检测": {
-                    "代码": hb["water_detection"],
-                    "描述": "有水" if hb["water_detection"] == 1 else "无水"
-                },
-                "错误": {
-                    "代码": hb["error_code"],
-                    "描述列表": hb["error_descriptions"]
-                },
-                "地感参数": {
-                    "当前频率": hb["current_frequency"],
-                    "无车基准": hb["no_car_base"],
-                    "有车基准": hb["car_base"],
-                    "有车万分比": hb["car_ratio"],
-                    "无车万分比": hb["no_car_ratio"]
-                },
-                "最后心跳时间": device_info["last_heartbeat"],
-                "最后心跳格式化时间": datetime.fromtimestamp(device_info["last_heartbeat"]).strftime('%Y-%m-%d %H:%M:%S')
-            }
-            
-            return jsonify({"success": True, "状态": status_data})
-    
-    except Exception as e:
-        logger.error(f"获取设备状态时出错: {e}")
-        return jsonify({"success": False, "message": str(e)})
-
-@app.route('/api/device_statuses', methods=['GET'])
-def get_all_device_statuses():
-    """获取所有设备的详细状态信息"""
-    global lock_server
-    if not lock_server or not lock_server.is_running:
-        return jsonify({"success": False, "message": "服务器未运行"})
-    
-    try:
-        devices_status = []
-        
-        with lock_server.device_lock:
-            for device_serial, device_info in lock_server.connected_devices.items():
-                device_data = {
-                    "序列号": binascii.hexlify(device_serial).decode('utf-8'),
-                    "地址": device_info["address"],
-                    "最后心跳时间": device_info["last_heartbeat"],
-                    "最后心跳格式化时间": datetime.fromtimestamp(device_info["last_heartbeat"]).strftime('%Y-%m-%d %H:%M:%S')
-                }
-                
-                # 添加心跳数据如果可用
-                if "heartbeat_data" in device_info:
-                    hb = device_info["heartbeat_data"]
-                    device_data.update({
-                        "设备状态": {
-                            "代码": hb["device_status"],
-                            "描述": hb["device_status_description"]
-                        },
-                        "车辆状态": {
-                            "代码": hb["car_status"],
-                            "描述": hb["car_status_description"]
-                        },
-                        "常控状态": {
-                            "代码": hb["control_status"],
-                            "描述": hb["control_status_description"]
-                        },
-                        "电池": {
-                            "3.7v": hb["battery_3_7v"],
-                            "12v": hb["battery_12v"]
-                        },
-                        "信号强度": hb["signal_strength"],
-                        "有错误": hb["error_code"] > 0,
-                        "错误数量": len(hb["error_descriptions"])
-                    })
-                
-                devices_status.append(device_data)
-        
-        return jsonify({"success": True, "设备列表": devices_status})
-    
-    except Exception as e:
-        logger.error(f"获取所有设备状态时出错: {e}")
-        return jsonify({"success": False, "message": str(e)})
 
 def main():
     """主函数"""
@@ -331,7 +341,7 @@ def main():
         logger.error("Failed to start parking lock server")
     
     # 启动API服务器
-    app.run(host=API_HOST, port=API_PORT)
+    app.run(host=API_HOST, port=API_PORT, debug=False)
 
 if __name__ == "__main__":
     main()

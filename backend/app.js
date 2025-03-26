@@ -15,6 +15,7 @@ const messagesRouter = require('./routes/messages');
 const adminRouter = require('./routes/admin');
 const couponsRouter = require('./routes/coupons');
 const paymentRoutes = require('./routes/payment');
+const parkingLockRouter = require('./routes/parkingLock');
 
 const app = express();
 
@@ -91,6 +92,7 @@ app.use('/api/messages', messagesRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/coupons', couponsRouter);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/parking-locks', parkingLockRouter);
 
 // 5. 静态文件服务（放在 API 路由之后）
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

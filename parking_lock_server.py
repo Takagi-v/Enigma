@@ -108,7 +108,8 @@ class ParkingLockProtocol:
             return None
         
         try:
-            serial_number = payload[:8]
+            # 使用bytes而不是bytearray作为键
+            serial_number = bytes(payload[:8])
             action_step = payload[8]
             water_detection = payload[9]  # 0x00: 无水, 0x01: 有水
             battery_3_7v = payload[10]  # 电池电量 (实际值)
@@ -493,6 +494,17 @@ class ParkingLockServer:
                 logger.info(f"Sent login response with timestamp {timestamp}")
             
             elif command == 0x81:  # 心跳数据
+                # 回应心跳
+                timestamp = int(time.time())
+                response_payload = struct.pack("<I", timestamp)
+                response_frame = ParkingLockProtocol.build_frame(0x81, response_payload)
+                
+                # 记录发送的完整帧
+                ParkingLockProtocol.log_frame(response_frame, "SEND", "心跳响应")
+                
+                client_socket.send(response_frame)
+                logger.debug(f"Sent heartbeat response with timestamp {timestamp}")
+                
                 # 解析心跳数据
                 heartbeat_data = ParkingLockProtocol.parse_heartbeat_data(payload)
                 if heartbeat_data:
@@ -512,9 +524,9 @@ class ParkingLockServer:
                                 
                                 if prev_status != current_status or prev_car != current_car:
                                     logger.info(f"Device {binascii.hexlify(serial_number)} status changed: "
-                                                f"Status {prev_status}({connected_devices[serial_number]['previous_status_desc']}) -> "
-                                                f"{current_status}({heartbeat_data['device_status_description']}), "
-                                                f"Car {prev_car} -> {current_car}")
+                                               f"Status {prev_status}({connected_devices[serial_number]['previous_status_desc']}) -> "
+                                               f"{current_status}({heartbeat_data['device_status_description']}), "
+                                               f"Car {prev_car} -> {current_car}")
                             
                             # 保存当前状态用于下次比较
                             connected_devices[serial_number]["previous_status"] = heartbeat_data["device_status"]
@@ -522,7 +534,6 @@ class ParkingLockServer:
                             connected_devices[serial_number]["previous_car_status"] = heartbeat_data["car_status"]
                             
                     logger.debug(f"Heartbeat processed from device {binascii.hexlify(serial_number)}")
-            
             elif command == 0x87:  # 确认订单（常降型设备）
                 # 回应确认订单
                 response_payload = bytes([0x01])  # 成功
@@ -654,6 +665,25 @@ class ParkingLockServer:
                     "last_heartbeat_seconds_ago": int(current_time - info["last_heartbeat"])
                 })
         return devices
+        
+    def get_device_status(self, device_serial):
+        """获取设备详细状态"""
+        with device_lock:
+            if device_serial in connected_devices and "heartbeat_data" in connected_devices[device_serial]:
+                return connected_devices[device_serial]["heartbeat_data"]
+        return None
+    
+    def get_all_device_statuses(self):
+        """获取所有设备的详细状态"""
+        device_statuses = []
+        with device_lock:
+            for serial, info in connected_devices.items():
+                if "heartbeat_data" in info:
+                    status_data = info["heartbeat_data"].copy()  # Make a copy to avoid reference issues
+                    status_data["address"] = info["address"]
+                    status_data["last_heartbeat"] = info["last_heartbeat"]
+                    device_statuses.append(status_data)
+        return device_statuses
 
 
 def main():
@@ -705,6 +735,9 @@ def main():
                         
                         device = devices[choice-1]
                         device_serial = binascii.unhexlify(device['serial'])
+                        
+                        # 使用bytes类型作为字典键
+                        device_serial = bytes(device_serial)
                         
                         with device_lock:
                             if device_serial in connected_devices and "heartbeat_data" in connected_devices[device_serial]:

@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { parkingLockService } from '../../services/parkingLockService';
 import '../styles/ParkingLockControl.css';
 
+// 根据环境设置API地址
+const PARKING_LOCK_API_URL = process.env.NODE_ENV === 'production'
+  ? '/api/parking-locks'  // 生产环境使用相对路径，通过后端代理
+  : 'http://localhost:3002/api/parking-locks'; // 开发环境使用本地后端代理
+
 const ParkingLockControl = () => {
   const [devices, setDevices] = useState([]);
   const [deviceStatuses, setDeviceStatuses] = useState([]);
@@ -72,7 +77,36 @@ const ParkingLockControl = () => {
 
       const response = await parkingLockService.getAllDeviceStatuses();
       if (response.success) {
-        setDeviceStatuses(response.设备列表 || []);
+        // 将API返回的设备数据映射到组件中使用的格式
+        const mappedDevices = (response.devices || []).map(device => ({
+          序列号: device.serialNumber,
+          最后心跳格式化时间: new Date().toLocaleString(), // 使用当前时间作为替代
+          设备状态: {
+            代码: device.deviceStatus.code,
+            描述: device.deviceStatus.description
+          },
+          车辆状态: {
+            代码: device.carStatus.code,
+            描述: device.carStatus.description
+          },
+          常控状态: {
+            代码: device.controlStatus.code,
+            描述: device.controlStatus.description
+          },
+          电池: {
+            '3.7v': device.battery['3.7v'],
+            '12v': device.battery['12v']
+          },
+          信号强度: device.signalStrength,
+          有错误: device.error.hasError,
+          错误: {
+            代码: device.error.code,
+            描述列表: device.error.descriptions
+          },
+          错误数量: device.error.descriptions ? device.error.descriptions.length : 0
+        }));
+        
+        setDeviceStatuses(mappedDevices);
         setError('');
       } else {
         setError(response.message || '获取设备状态列表失败');
@@ -89,7 +123,47 @@ const ParkingLockControl = () => {
       setDetailLoading(true);
       const response = await parkingLockService.getDeviceStatus(deviceSerial);
       if (response.success) {
-        setDeviceDetail(response.状态);
+        // 将API返回的字段映射到组件中使用的字段
+        const detailData = {
+          序列号: response.serialNumber,
+          最后心跳格式化时间: new Date().toLocaleString(), // 使用当前时间作为替代
+          设备状态: {
+            代码: response.deviceStatus.code,
+            描述: response.deviceStatus.description
+          },
+          车辆状态: {
+            代码: response.carStatus.code,
+            描述: response.carStatus.description
+          },
+          常控状态: {
+            代码: response.controlStatus.code,
+            描述: response.controlStatus.description
+          },
+          电池: {
+            '3.7v': response.battery['3.7v'],
+            '12v': response.battery['12v']
+          },
+          信号强度: response.signalStrength,
+          流水号: response.flowNumber,
+          错误: {
+            代码: response.error.code,
+            描述列表: response.error.descriptions,
+            有错误: response.error.hasError
+          },
+          地感参数: {
+            当前频率: response.groundSensor.currentFrequency,
+            无车基准: response.groundSensor.noCarBase,
+            有车基准: response.groundSensor.carBase,
+            有车万分比: response.groundSensor.carRatio,
+            无车万分比: response.groundSensor.noCarRatio
+          },
+          进水检测: {
+            代码: response.waterDetection.code,
+            描述: response.waterDetection.description
+          }
+        };
+        
+        setDeviceDetail(detailData);
         setError('');
       } else {
         setDeviceDetail(null);
@@ -149,42 +223,71 @@ const ParkingLockControl = () => {
     }, 3000);
   };
 
-  // 启动服务器
-  const handleStartServer = async () => {
+  // 测试API连接
+  const testApiConnection = async () => {
     try {
       setLoading(true);
-      const response = await parkingLockService.startServer();
-      if (response.success) {
-        showOperationResult('服务器启动成功');
-        await refreshData();
+      setError('');
+      showOperationResult('正在测试API连接...');
+      
+      const response = await parkingLockService.testConnection();
+      
+      if (response.status) {
+        showOperationResult(`API连接测试成功! 服务器状态: ${response.status}`);
+        await fetchServerStatus();
       } else {
-        showOperationResult(`服务器启动失败: ${response.message}`, true);
+        setError('API返回无效数据，请检查服务器状态');
       }
     } catch (error) {
-      console.error('启动服务器失败:', error);
-      showOperationResult('启动服务器时发生错误', true);
+      console.error('API连接测试失败:', error);
+      setError('无法连接到地锁服务器，请确保服务已启动');
     } finally {
       setLoading(false);
     }
   };
 
-  // 停止服务器
-  const handleStopServer = async () => {
-    try {
-      setLoading(true);
-      const response = await parkingLockService.stopServer();
-      if (response.success) {
-        showOperationResult('服务器已停止');
-        await refreshData();
-      } else {
-        showOperationResult(`停止服务器失败: ${response.message}`, true);
-      }
-    } catch (error) {
-      console.error('停止服务器失败:', error);
-      showOperationResult('停止服务器时发生错误', true);
-    } finally {
-      setLoading(false);
+  // 获取设备状态颜色
+  const getStatusColor = (deviceStatus) => {
+    if (!deviceStatus) return 'gray';
+    
+    switch (deviceStatus.deviceStatus?.code) {
+      case 1: return 'green'; // 上升到位
+      case 2: return 'red'; // 下降到位
+      case 3: case 4: case 6: return 'orange'; // 错误状态
+      case 5: return 'blue'; // 正在动作
+      default: return 'gray';
     }
+  };
+  
+  // 获取车辆状态显示
+  const getCarStatusDisplay = (carStatus) => {
+    if (!carStatus) return '';
+    return carStatus === 1 ? '有车' : '无车';
+  };
+
+  // 获取电池状态类名
+  const getBatteryClass = (level) => {
+    if (level === undefined) return '';
+    if (level > 80) return 'battery-good';
+    if (level > 30) return 'battery-medium';
+    return 'battery-low';
+  };
+
+  // 切换视图模式
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    setSelectedDevice(null);
+  };
+
+  // 查看设备详情
+  const handleViewDeviceDetail = (deviceSerial) => {
+    setSelectedDevice(deviceSerial);
+  };
+
+  // 关闭设备详情面板
+  const handleCloseDetail = () => {
+    setSelectedDevice(null);
+    setDeviceDetail(null);
   };
 
   // 开锁
@@ -287,50 +390,6 @@ const ParkingLockControl = () => {
     }
   };
 
-  // 切换视图模式
-  const handleViewModeChange = (mode) => {
-    setViewMode(mode);
-    setSelectedDevice(null);
-  };
-
-  // 查看设备详情
-  const handleViewDeviceDetail = (deviceSerial) => {
-    setSelectedDevice(deviceSerial);
-  };
-
-  // 关闭设备详情面板
-  const handleCloseDetail = () => {
-    setSelectedDevice(null);
-    setDeviceDetail(null);
-  };
-
-  // 获取设备状态颜色
-  const getStatusColor = (deviceStatus) => {
-    if (!deviceStatus) return 'gray';
-    
-    switch (deviceStatus.设备状态?.代码) {
-      case 1: return 'green'; // 上升到位
-      case 2: return 'red'; // 下降到位
-      case 3: case 4: case 6: return 'orange'; // 错误状态
-      case 5: return 'blue'; // 正在动作
-      default: return 'gray';
-    }
-  };
-  
-  // 获取车辆状态显示
-  const getCarStatusDisplay = (carStatus) => {
-    if (!carStatus) return '';
-    return carStatus === 1 ? '有车' : '无车';
-  };
-
-  // 获取电池状态类名
-  const getBatteryClass = (level) => {
-    if (level === undefined) return '';
-    if (level > 80) return 'battery-good';
-    if (level > 30) return 'battery-medium';
-    return 'battery-low';
-  };
-
   return (
     <div className="parking-lock-control">
       <h2>地锁控制系统</h2>
@@ -341,22 +400,19 @@ const ParkingLockControl = () => {
           <span className={`status-badge ${serverStatus.status === 'running' ? 'status-running' : 'status-stopped'}`}>
             {serverStatus.status === 'running' ? '运行中' : '已停止'}
           </span>
+          <div className="api-url-info">
+            API地址: {PARKING_LOCK_API_URL}
+          </div>
         </div>
         
         <div className="server-buttons">
           <button 
-            onClick={handleStartServer} 
-            disabled={serverStatus.status === 'running' || loading}
-            className="btn btn-start"
+            onClick={testApiConnection} 
+            disabled={loading}
+            className="btn btn-test"
+            title="测试API连接"
           >
-            启动服务器
-          </button>
-          <button 
-            onClick={handleStopServer} 
-            disabled={serverStatus.status !== 'running' || loading}
-            className="btn btn-stop"
-          >
-            停止服务器
+            测试连接
           </button>
         </div>
       </div>
