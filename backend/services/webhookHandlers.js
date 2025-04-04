@@ -66,7 +66,7 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
             payment_intent_id,
             status,
             created_at
-          ) VALUES (?, 'top_up', ?, ?, 'succeeded', DATETIME('now'))`,
+          ) VALUES (?, 'top_up', ?, ?, 'succeeded', DATETIME('now', 'utc'))`,
           [userId, amount, paymentIntent.id],
           function(err) {
             if (err) {
@@ -134,7 +134,7 @@ async function handlePaymentIntentFailed(paymentIntent) {
           status,
           error_message,
           created_at
-        ) VALUES (?, 'top_up', ?, ?, 'failed', ?, DATETIME('now'))`,
+        ) VALUES (?, 'top_up', ?, ?, 'failed', ?, DATETIME('now', 'utc'))`,
         [userId, amount, paymentIntent.id, paymentIntent.last_payment_error?.message],
         (err) => {
           if (err) reject(err);
@@ -169,7 +169,7 @@ async function handlePaymentIntentCanceled(paymentIntent) {
           payment_intent_id,
           status,
           created_at
-        ) VALUES (?, 'top_up', ?, ?, 'canceled', DATETIME('now'))`,
+        ) VALUES (?, 'top_up', ?, ?, 'canceled', DATETIME('now', 'utc'))`,
         [userId, amount, paymentIntent.id],
         (err) => {
           if (err) reject(err);
@@ -231,7 +231,7 @@ async function handleChargeRefunded(charge) {
             payment_intent_id,
             status,
             created_at
-          ) VALUES (?, 'refund', ?, ?, 'succeeded', DATETIME('now'))`,
+          ) VALUES (?, 'refund', ?, ?, 'succeeded', DATETIME('now', 'utc'))`,
           [userId, amount, paymentIntentId],
           (err) => {
             if (err) reject(err);
@@ -285,7 +285,7 @@ async function handleDisputeCreated(dispute) {
           status,
           reason,
           created_at
-        ) VALUES (?, ?, ?, ?, ?, DATETIME('now'))`,
+        ) VALUES (?, ?, ?, ?, ?, DATETIME('now', 'utc'))`,
         [userId, paymentIntentId, amount, dispute.status, dispute.reason],
         (err) => {
           if (err) reject(err);
@@ -327,7 +327,7 @@ async function handleDisputeClosed(dispute) {
         db().run(
           `UPDATE disputes 
            SET status = ?,
-               resolved_at = DATETIME('now')
+               resolved_at = DATETIME('now', 'utc')
            WHERE payment_intent_id = ?`,
           [dispute.status, paymentIntentId],
           (err) => {

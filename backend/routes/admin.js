@@ -195,7 +195,7 @@ router.put("/users/:id", authenticateAdmin, async (req, res) => {
       db().run(
         `UPDATE users 
          SET full_name = ?, phone = ?, bio = ?, address = ?,
-         updated_at = DATETIME('now')
+         updated_at = DATETIME('now', 'utc')
          WHERE id = ?`,
         [full_name, phone, bio, address, id],
         function(err) {
@@ -226,7 +226,7 @@ router.put("/parking-spots/:id", authenticateAdmin, async (req, res) => {
       db().run(
         `UPDATE parking_spots 
          SET location = ?, price = ?, status = ?, description = ?,
-         updated_at = DATETIME('now')
+         updated_at = DATETIME('now', 'utc')
          WHERE id = ?`,
         [location, price, status, description, id],
         function(err) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import parkingService from '../services/parkingService';
+import config from '../config';
 import './styles/ParkingUsage.css';
 
 const ParkingUsage = () => {
@@ -55,17 +56,22 @@ const ParkingUsage = () => {
           const records = await parkingService.getParkingRecords(authFetch);
           const currentUsage = records.records.find(record => record.id === parseInt(usageId));
           if (currentUsage) {
+            // 明确将后端返回的UTC时间转为本地时间
+            const startTime = new Date(currentUsage.start_time + 'Z');
+            const endTime = currentUsage.end_time ? new Date(currentUsage.end_time + 'Z') : null;
+            
             setUsage({
               id: currentUsage.id,
-              start_time: new Date(currentUsage.start_time),
-              end_time: currentUsage.end_time ? new Date(currentUsage.end_time) : null,
+              start_time: startTime,
+              end_time: endTime,
               total_amount: currentUsage.total_amount
             });
             
             // 如果是使用中的记录，计算已经过去的时间
             if (currentUsage.status === 'active') {
-              const startTime = new Date(currentUsage.start_time);
-              const elapsedSeconds = Math.floor((new Date() - startTime) / 1000);
+              // 计算从开始时间到现在的秒数
+              const now = new Date();
+              const elapsedSeconds = Math.floor((now - startTime) / 1000);
               setTimer(elapsedSeconds);
             }
           }
@@ -87,6 +93,7 @@ const ParkingUsage = () => {
   useEffect(() => {
     let interval;
     if (usage && !usage.end_time) {
+      // 设置1秒钟更新一次计时器
       interval = setInterval(() => {
         setTimer(prev => prev + 1);
       }, 1000);
@@ -97,7 +104,7 @@ const ParkingUsage = () => {
   const handleStart = async () => {
     try {
       // 检查用户是否已绑定支付方式
-      const response = await authFetch(`${process.env.REACT_APP_API_URL}/api/payment/status`);
+      const response = await authFetch(`${config.API_URL}/payment/status`);
       const paymentStatus = await response.json();
 
       if (!paymentStatus.hasPaymentMethod) {
@@ -108,11 +115,17 @@ const ParkingUsage = () => {
       }
 
       const data = await parkingService.startParking(id, authFetch, user.vehicle_plate);
+      
+      // 使用当前时间作为开始时间
+      const startTime = new Date();
+      
       setUsage({
         id: data.usage_id,
-        start_time: new Date(),
+        start_time: startTime,
         end_time: null
       });
+      // 重置计时器
+      setTimer(0);
       await fetchParkingRecords();
     } catch (error) {
       console.error('开始使用停车场失败:', error);
@@ -126,9 +139,13 @@ const ParkingUsage = () => {
   const handleEnd = async () => {
     try {
       const data = await parkingService.endParking(id, authFetch);
+      
+      // 使用当前时间作为结束时间，不做UTC转换
+      const endTime = new Date();
+      
       setUsage(prev => ({
         ...prev,
-        end_time: new Date(),
+        end_time: endTime,
         total_amount: data.total_amount
       }));
       await fetchParkingRecords();
@@ -195,7 +212,9 @@ const ParkingUsage = () => {
 
   const calculateEstimatedCost = () => {
     if (!usage || !parkingSpot.hourly_rate) return 0;
+    // 由于计时器是前端实时计算的，直接使用小时数乘以费率
     const hours = timer / 3600;
+    // 取整，确保金额计算和后端保持一致
     return Math.ceil(hours * parkingSpot.hourly_rate);
   };
 

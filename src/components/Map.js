@@ -209,6 +209,28 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     }
     
     try {
+      // 先获取停车位详情，检查是否正在被使用中
+      const spotResponse = await fetch(`${config.API_URL}/parking-spots/${spotId}`);
+      if (spotResponse.ok) {
+        const spotData = await spotResponse.json();
+        // 如果停车位状态为 occupied，表示正在被使用中
+        if (spotData.status === 'occupied') {
+          const status = {
+            reservationStatus: 'occupied',
+            hasReservations: false
+          };
+          
+          // 更新缓存
+          setReservationCache(prev => ({
+            ...prev,
+            [spotId]: status
+          }));
+          
+          return status;
+        }
+      }
+      
+      // 如果不是被使用中，检查是否有预约
       const response = await fetch(`${config.API_URL}/parking-spots/${spotId}/reservations`);
       if (response.ok) {
         const reservationsData = await response.json();
@@ -644,10 +666,12 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
             }}>¥{selectedMarker.price}/小时</p>
             <p style={{
               margin: '4px 0',
-              color: selectedMarker.reservationStatus === 'reserved' ? '#faad14' : '#52c41a',
+              color: selectedMarker.reservationStatus === 'reserved' ? '#faad14' : 
+                     selectedMarker.reservationStatus === 'occupied' ? '#ff4d4f' : '#52c41a',
               fontSize: '13px'
             }}>
-              {selectedMarker.reservationStatus === 'reserved' ? '被预约中' : '空闲'}
+              {selectedMarker.reservationStatus === 'reserved' ? '被预约中' : 
+               selectedMarker.reservationStatus === 'occupied' ? '正在被使用中' : '空闲'}
             </p>
             <p style={{
               margin: '4px 0',
@@ -852,7 +876,8 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
                           </div>
                           <div className="spot-detail">
                             <span className={`status ${spot.reservationStatus || spot.status}`}>
-                              {spot.reservationStatus === 'reserved' ? '被预约中' : '空闲'}
+                              {spot.reservationStatus === 'reserved' ? '被预约中' : 
+                               spot.reservationStatus === 'occupied' ? '正在被使用中' : '空闲'}
                             </span>
                           </div>
                           <div className="spot-detail">

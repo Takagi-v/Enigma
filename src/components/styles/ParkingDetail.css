@@ -85,22 +85,30 @@
 }
 
 .status {
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-size: 14px;
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
   font-weight: 500;
+  text-align: center;
 }
 
 .status.available {
-  background-color: #f6ffed;
-  color: #52c41a;
-  border: 1px solid #b7eb8f;
+  background-color: #e6f7ff;
+  color: #1890ff;
+  border: 1px solid #91d5ff;
 }
 
-.status.in_use {
+.status.occupied {
   background-color: #fff1f0;
-  color: #f5222d;
+  color: #ff4d4f;
   border: 1px solid #ffa39e;
+}
+
+.status.reserved {
+  background-color: #fff7e6;
+  color: #fa8c16;
+  border: 1px solid #ffd591;
 }
 
 .action-buttons {

@@ -120,10 +120,15 @@ function ParkingDetail() {
           );
           setReservations(todayReservations);
           
-          // 检查当前状态
-          const reservationStatus = checkCurrentReservation(todayReservations);
-          setCurrentStatus(reservationStatus.status);
-          setNextAvailableTime(reservationStatus.nextAvailable);
+          // 如果停车位状态为 'occupied'，表示正在被使用中
+          if (data.status === 'occupied') {
+            setCurrentStatus('occupied');
+          } else {
+            // 否则，检查是否有预约
+            const reservationStatus = checkCurrentReservation(todayReservations);
+            setCurrentStatus(reservationStatus.status);
+            setNextAvailableTime(reservationStatus.nextAvailable);
+          }
         }
       } catch (err) {
         setError(err.message);
@@ -357,7 +362,7 @@ function ParkingDetail() {
             </div>
             <div className="status-section">
               <span className={`status ${currentStatus}`}>
-                {currentStatus === 'available' ? '空闲' : '被预约中'}
+                {currentStatus === 'available' ? '空闲' : currentStatus === 'occupied' ? '正在被使用中' : '被预约中'}
               </span>
               {currentStatus === 'available' && (
                 <div className="action-buttons">

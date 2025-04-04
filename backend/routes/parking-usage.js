@@ -91,7 +91,7 @@ router.post("/:spotId/start", authenticateToken, (req, res) => {
           // 开启事务
           db().run("BEGIN TRANSACTION");
 
-          // 创建使用记录
+          // 创建使用记录，明确指定使用UTC时间
           db().run(
             `INSERT INTO parking_usage (
               parking_spot_id, 
@@ -99,7 +99,7 @@ router.post("/:spotId/start", authenticateToken, (req, res) => {
               start_time,
               vehicle_plate,
               status
-            ) VALUES (?, ?, datetime('now'), ?, 'active')`,
+            ) VALUES (?, ?, datetime('now', 'utc'), ?, 'active')`,
             [spotId, userId, vehicle_plate],
             function(err) {
               if (err) {
@@ -180,64 +180,78 @@ router.post("/:spotId/end", authenticateToken, (req, res) => {
       // 开启事务
       db().run("BEGIN TRANSACTION");
 
-      // 计算费用
-      const startTime = new Date(usage.start_time);
-      const endTime = new Date();
-      const hours = (endTime - startTime) / (1000 * 60 * 60);
-      const totalAmount = Math.ceil(hours * usage.hourly_rate);
-
-      console.log('计算费用:', { 
-        startTime, 
-        endTime, 
-        hours, 
-        hourlyRate: usage.hourly_rate, 
-        totalAmount 
-      });
-
-      // 更新使用记录
-      db().run(
-        `UPDATE parking_usage 
-         SET end_time = datetime('now'),
-             total_amount = ?,
-             status = 'completed',
-             payment_status = 'pending'
-         WHERE id = ?`,
-        [totalAmount, usage.id],
-        (err) => {
+      // 使用SQLite的日期时间函数计算时间差和费用，明确使用UTC时间
+      db().get(
+        `SELECT 
+          ROUND((julianday('now', 'utc') - julianday(start_time)) * 24) AS hours,
+          ROUND((julianday('now', 'utc') - julianday(start_time)) * 24 * ?) AS amount
+        FROM parking_usage WHERE id = ?`, 
+        [usage.hourly_rate, usage.id], 
+        (err, calculation) => {
           if (err) {
-            console.error('更新使用记录失败:', err);
+            console.error('计算费用失败:', err);
             db().run("ROLLBACK");
             return res.status(500).json({ 
-              message: "更新使用记录失败",
+              message: "计算费用失败",
               code: 'DB_ERROR'
             });
           }
 
-          // 更新停车位状态
+          // 取整费用
+          const totalAmount = Math.ceil(calculation.amount);
+
+          console.log('计算费用:', { 
+            hourlyRate: usage.hourly_rate,
+            hours: calculation.hours,
+            totalAmount 
+          });
+
+          // 更新使用记录，明确使用UTC时间
           db().run(
-            "UPDATE parking_spots SET status = 'available', current_user_id = NULL WHERE id = ?",
-            [spotId],
+            `UPDATE parking_usage 
+             SET end_time = datetime('now', 'utc'),
+                 total_amount = ?,
+                 status = 'completed',
+                 payment_status = 'pending'
+             WHERE id = ?`,
+            [totalAmount, usage.id],
             (err) => {
               if (err) {
-                console.error('更新停车位状态失败:', err);
+                console.error('更新使用记录失败:', err);
                 db().run("ROLLBACK");
                 return res.status(500).json({ 
-                  message: "更新停车位状态失败",
+                  message: "更新使用记录失败",
                   code: 'DB_ERROR'
                 });
               }
 
-              db().run("COMMIT");
-              console.log('成功结束使用停车位:', { 
-                usageId: usage.id, 
-                spotId, 
-                totalAmount 
-              });
-              res.json({
-                message: "结束使用停车位",
-                total_amount: totalAmount,
-                code: 'SUCCESS'
-              });
+              // 更新停车位状态
+              db().run(
+                "UPDATE parking_spots SET status = 'available', current_user_id = NULL WHERE id = ?",
+                [spotId],
+                (err) => {
+                  if (err) {
+                    console.error('更新停车位状态失败:', err);
+                    db().run("ROLLBACK");
+                    return res.status(500).json({ 
+                      message: "更新停车位状态失败",
+                      code: 'DB_ERROR'
+                    });
+                  }
+
+                  db().run("COMMIT");
+                  console.log('成功结束使用停车位:', { 
+                    usageId: usage.id, 
+                    spotId, 
+                    totalAmount 
+                  });
+                  res.json({
+                    message: "结束使用停车位",
+                    total_amount: totalAmount,
+                    code: 'SUCCESS'
+                  });
+                }
+              );
             }
           );
         }
@@ -337,7 +351,7 @@ router.post("/:usageId/payment", authenticateToken, async (req, res) => {
             `UPDATE coupons
              SET amount = amount - ?,
                  status = CASE WHEN amount - ? <= 0 THEN 'used' ELSE status END,
-                 used_at = CASE WHEN amount - ? <= 0 THEN DATETIME('now') ELSE used_at END
+                 used_at = CASE WHEN amount - ? <= 0 THEN DATETIME('now', 'utc') ELSE used_at END
              WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
             [giftBalanceUsed, giftBalanceUsed, giftBalanceUsed, usage.user_id],
             err => {
@@ -368,7 +382,7 @@ router.post("/:usageId/payment", authenticateToken, async (req, res) => {
           `UPDATE parking_usage 
            SET payment_status = 'paid',
                payment_method = 'balance',
-               payment_time = DATETIME('now')
+               payment_time = DATETIME('now', 'utc')
            WHERE id = ?`,
           [usageId],
           err => {

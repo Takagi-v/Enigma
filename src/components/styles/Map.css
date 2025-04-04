@@ -453,9 +453,9 @@ html, body {
 }
 
 .status.occupied, .status.in_use {
-  background-color: #fff2e8;
-  color: #fa8c16;
-  border: 1px solid #ffbb96;
+  background-color: #fff1f0;
+  color: #ff4d4f;
+  border: 1px solid #ffa39e;
 }
 
 .status.reserved {
