@@ -292,9 +292,4 @@ router.delete("/parking-spots/:id", authenticateAdmin, async (req, res) => {
   }
 });
 
-// 测试路由
-router.get("/test", authenticateAdmin, (req, res) => {
-  res.json({ message: "Admin API is working" });
-});
-
 module.exports = router; 

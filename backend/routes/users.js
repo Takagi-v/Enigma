@@ -217,4 +217,38 @@ router.get('/:userId/gift-balance', async (req, res) => {
   }
 });
 
+// 获取用户的预约列表
+router.get('/:userId/reservations', authenticateToken, async (req, res) => {
+  try {
+    // 验证用户是否有权限访问
+    if (req.user.id !== parseInt(req.params.userId) && !req.user.isAdmin) {
+      return res.status(403).json({ error: '无权访问该用户的预约记录' });
+    }
+
+    const reservations = await new Promise((resolve, reject) => {
+      db().all(
+        `SELECT 
+           r.*,
+           p.location,
+           p.price,
+           p.hourly_rate
+         FROM reservations r
+         JOIN parking_spots p ON r.parking_spot_id = p.id
+         WHERE r.user_id = ?
+         ORDER BY r.reservation_date DESC, r.start_time DESC`,
+        [req.params.userId],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+
+    res.json(reservations);
+  } catch (error) {
+    console.error('获取用户预约列表失败:', error);
+    res.status(500).json({ error: '获取用户预约列表失败' });
+  }
+});
+
 module.exports = router; 

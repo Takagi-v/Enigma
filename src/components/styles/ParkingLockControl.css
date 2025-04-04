@@ -91,12 +91,12 @@
   cursor: not-allowed;
 }
 
-.btn-test {
+.btn-system-check {
   background-color: #4285f4;
   color: white;
 }
 
-.btn-test:hover:not(:disabled) {
+.btn-system-check:hover:not(:disabled) {
   background-color: #3b78e7;
 }
 

@@ -397,7 +397,7 @@ const ParkingLockControl = () => {
       <div className="server-control">
         <div className="server-status">
           <span>服务器状态: </span>
-          <span className={`status-badge ${serverStatus.status === 'running' ? 'status-running' : 'status-stopped'}`}>
+          <span className={`status-indicator ${serverStatus.status === 'running' ? 'running' : 'stopped'}`}>
             {serverStatus.status === 'running' ? '运行中' : '已停止'}
           </span>
           <div className="api-url-info">
@@ -407,9 +407,9 @@ const ParkingLockControl = () => {
         
         <div className="server-buttons">
           <button 
-            onClick={testApiConnection} 
+            onClick={testApiConnection}
             disabled={loading}
-            className="btn btn-test"
+            className="btn btn-system-check"
             title="测试API连接"
           >
             测试连接

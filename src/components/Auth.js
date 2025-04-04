@@ -8,25 +8,6 @@ import './styles/Auth.css';
 import config from '../config';
 import { useAuth } from '../contexts/AuthContext';
 
-// 测试密码生成逻辑
-function testPasswordGeneration(phoneNumber) {
-  const digits = phoneNumber.replace(/\D/g, '');
-  // 如果以1开头（美国国家代码），则去掉
-  const phoneDigits = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
-  const password = phoneDigits.length >= 6 ? phoneDigits.substring(phoneDigits.length - 6) : phoneDigits.padStart(6, '0');
-  console.log(`手机号: ${phoneNumber}, 数字: ${phoneDigits}, 密码: ${password}`);
-  return password;
-}
-
-// 运行一些测试
-console.log('密码生成测试:');
-testPasswordGeneration('212-555-1230'); // 应该返回 551230
-testPasswordGeneration('(212) 555-1230'); // 应该返回 551230
-testPasswordGeneration('2125551230'); // 应该返回 551230
-testPasswordGeneration('+12125551230'); // 应该返回 551230
-testPasswordGeneration('12125551230'); // 应该返回 551230
-testPasswordGeneration('12345'); // 应该返回 012345 (不足6位时补0)
-
 // 添加验证规则
 const VALIDATION_RULES = {
   username: {

@@ -5,6 +5,7 @@ import Reviews from './Reviews';
 import './styles/Profile.css';
 import config from '../config';
 import couponService from '../services/couponService';
+import moment from 'moment';
 
 function Profile() {
   const { user, authFetch } = useAuth();
@@ -16,6 +17,7 @@ function Profile() {
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [giftBalance, setGiftBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
+  const [reservations, setReservations] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,13 +32,14 @@ function Profile() {
         setLoading(true);
         setError(null);
         
-        // 并行获取所有数据
+        // 并行获取所有数据，包括预约数据
         await Promise.all([
           fetchParkingRecords(),
           fetchCoupons(),
           fetchPaymentMethod(),
           fetchGiftBalance(),
-          fetchTransactions()
+          fetchTransactions(),
+          fetchReservations()
         ]);
       } catch (err) {
         console.error('获取数据失败:', err);
@@ -52,6 +55,24 @@ function Profile() {
 
     checkAuth();
   }, [user, navigate]);
+
+  const fetchReservations = async () => {
+    if (!user) return;
+
+    try {
+      const response = await authFetch(`${config.API_URL}/users/${user.id}/reservations`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || '获取预约记录失败');
+      }
+      
+      setReservations(data || []);
+    } catch (error) {
+      console.error('获取预约记录失败:', error);
+      throw new Error('获取预约记录失败');
+    }
+  };
 
   const fetchParkingRecords = async () => {
     if (!user) return;
@@ -156,7 +177,9 @@ function Profile() {
     const statusMap = {
       'active': '使用中',
       'completed': '已完成',
-      'cancelled': '已取消'
+      'cancelled': '已取消',
+      'pending': '待确认',
+      'confirmed': '已确认'
     };
     return statusMap[status] || status;
   };
@@ -169,6 +192,32 @@ function Profile() {
       'refunded': '已退款'
     };
     return statusMap[status] || status;
+  };
+
+  // 取消预约
+  const handleCancelReservation = async (reservationId) => {
+    try {
+      // 查找预约对应的停车位ID
+      const reservation = reservations.find(r => r.id === reservationId);
+      if (!reservation) {
+        throw new Error('找不到预约信息');
+      }
+
+      const response = await authFetch(`${config.API_URL}/parking-spots/${reservation.parking_spot_id}/reservations/${reservationId}/cancel`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '取消预约失败');
+      }
+
+      // 刷新预约列表
+      await fetchReservations();
+    } catch (error) {
+      console.error('取消预约失败:', error);
+      alert(error.message || '取消预约失败');
+    }
   };
 
   if (loading) {
@@ -282,6 +331,50 @@ function Profile() {
         </button>
       </div>
 
+      <div className="reservations-section">
+        <h3>我的预约</h3>
+        {reservations.length === 0 ? (
+          <p className="no-records">暂无预约记录</p>
+        ) : (
+          <div className="reservations-list">
+            {reservations.map(reservation => (
+              <div key={reservation.id} className={`reservation-item ${reservation.status}`}>
+                <div className="reservation-header">
+                  <h4>{reservation.location || '停车位预约'}</h4>
+                  <span className={`status ${reservation.status}`}>
+                    {getStatusText(reservation.status)}
+                  </span>
+                </div>
+                <div className="reservation-details">
+                  <p><strong>日期:</strong> {moment(reservation.reservation_date).format('YYYY-MM-DD')}</p>
+                  <p><strong>时间:</strong> {reservation.start_time.substring(0, 5)} - {reservation.end_time.substring(0, 5)}</p>
+                  <p><strong>费用:</strong> ¥{reservation.total_amount}</p>
+                  {reservation.notes && <p><strong>备注:</strong> {reservation.notes}</p>}
+                </div>
+                <div className="reservation-actions">
+                  {(reservation.status === 'pending' || reservation.status === 'confirmed') && (
+                    <button 
+                      className="cancel-btn"
+                      onClick={() => handleCancelReservation(reservation.id)}
+                    >
+                      取消
+                    </button>
+                  )}
+                  {(reservation.status !== 'cancelled') && (
+                    <button 
+                      className="view-btn"
+                      onClick={() => navigate(`/parking/${reservation.parking_spot_id}`)}
+                    >
+                      查看
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="parking-records-section">
         <h3>停车记录</h3>
         {parkingRecords.length === 0 ? (
@@ -313,12 +406,12 @@ function Profile() {
                     </span>
                   </div>
                   <div className="record-details">
-                    <p>开始时间：{formatTime(record.start_time)}</p>
-                    <p>结束时间：{formatTime(record.end_time)}</p>
-                    <p>费用：¥{record.total_amount || '计费中'}</p>
-                    <p>支付状态：{getPaymentStatusText(record.payment_status)}</p>
+                    <p><strong>开始:</strong> {formatTime(record.start_time).split(' ')[1]}</p>
+                    <p><strong>结束:</strong> {formatTime(record.end_time).split(' ')[1] || '未结束'}</p>
+                    <p><strong>费用:</strong> ¥{record.total_amount || '计费中'}</p>
+                    <p><strong>状态:</strong> {getPaymentStatusText(record.payment_status)}</p>
                     {record.vehicle_plate && (
-                      <p>车牌号：{record.vehicle_plate}</p>
+                      <p><strong>车牌:</strong> {record.vehicle_plate}</p>
                     )}
                   </div>
                   {record.status === 'completed' && record.payment_status === 'paid' && !record.rating && (

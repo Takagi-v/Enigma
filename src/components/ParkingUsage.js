@@ -107,7 +107,7 @@ const ParkingUsage = () => {
         return;
       }
 
-      const data = await parkingService.startParking(id, authFetch, 'TEST123');
+      const data = await parkingService.startParking(id, authFetch, user.vehicle_plate);
       setUsage({
         id: data.usage_id,
         start_time: new Date(),

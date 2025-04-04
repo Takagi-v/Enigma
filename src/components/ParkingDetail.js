@@ -47,7 +47,49 @@ function ParkingDetail() {
   const [error, setError] = useState(null);
   const [reservationModalVisible, setReservationModalVisible] = useState(false);
   const [reservations, setReservations] = useState([]);
+  const [currentStatus, setCurrentStatus] = useState('available');
+  const [nextAvailableTime, setNextAvailableTime] = useState(null);
   const [form] = Form.useForm();
+
+  // 检查当前时间是否有预约
+  const checkCurrentReservation = (reservations) => {
+    const now = moment();
+    
+    // 检查是否有当前时间段的预约
+    const currentReservation = reservations.find(r => {
+      if (r.status === 'cancelled') return false;
+      
+      const startTime = moment(`${r.reservation_date} ${r.start_time}`);
+      const endTime = moment(`${r.reservation_date} ${r.end_time}`);
+      
+      return now.isBetween(startTime, endTime, null, '[)');
+    });
+    
+    if (currentReservation) {
+      return { 
+        status: 'reserved', 
+        reservation: currentReservation 
+      };
+    }
+    
+    // 查找下一个可用时间
+    const futureReservations = reservations
+      .filter(r => r.status !== 'cancelled')
+      .filter(r => moment(`${r.reservation_date} ${r.start_time}`).isAfter(now))
+      .sort((a, b) => {
+        return moment(`${a.reservation_date} ${a.start_time}`).diff(moment(`${b.reservation_date} ${b.start_time}`));
+      });
+    
+    if (futureReservations.length > 0) {
+      const nextReservation = futureReservations[0];
+      return {
+        status: 'available',
+        nextAvailable: moment(`${nextReservation.reservation_date} ${nextReservation.start_time}`)
+      };
+    }
+    
+    return { status: 'available', nextAvailable: null };
+  };
 
   // 将 today 移到 useEffect 内部
   useEffect(() => {
@@ -77,6 +119,11 @@ function ParkingDetail() {
             moment(r.reservation_date).isSame(today, 'day')
           );
           setReservations(todayReservations);
+          
+          // 检查当前状态
+          const reservationStatus = checkCurrentReservation(todayReservations);
+          setCurrentStatus(reservationStatus.status);
+          setNextAvailableTime(reservationStatus.nextAvailable);
         }
       } catch (err) {
         setError(err.message);
@@ -102,6 +149,11 @@ function ParkingDetail() {
       return;
     }
 
+    if (currentStatus === 'reserved') {
+      message.error('该停车位当前已被预约，无法立即使用');
+      return;
+    }
+
     const timeCheck = checkParkingTime(parkingSpot.opening_hours);
     if (timeCheck.isNearClosing) {
       Modal.confirm({
@@ -122,6 +174,14 @@ function ParkingDetail() {
       navigate('/auth');
       return;
     }
+    
+    // 如果有下一个可预约时间，设置为表单默认值
+    if (nextAvailableTime) {
+      form.setFieldsValue({
+        startTime: nextAvailableTime
+      });
+    }
+    
     setReservationModalVisible(true);
   };
 
@@ -168,15 +228,102 @@ function ParkingDetail() {
           moment(r.reservation_date).isSame(today, 'day')
         );
         setReservations(todayReservations);
+
+        // 更新当前状态
+        const reservationStatus = checkCurrentReservation(todayReservations);
+        setCurrentStatus(reservationStatus.status);
+        setNextAvailableTime(reservationStatus.nextAvailable);
       }
     } catch (error) {
       message.error(error.message);
     }
   };
 
+  // 检查指定时间是否与现有预约冲突
+  const isTimeConflictWithReservations = (time) => {
+    if (!time) return false;
+    
+    return reservations.some(reservation => {
+      if (reservation.status === 'cancelled') return false;
+      
+      const startTime = moment(`${reservation.reservation_date} ${reservation.start_time}`);
+      const endTime = moment(`${reservation.reservation_date} ${reservation.end_time}`);
+      
+      return time.isBetween(startTime, endTime, null, '[)');
+    });
+  };
+  
+  // 获取下一个可预约的时间点
+  const getDisabledHours = () => {
+    const now = moment();
+    const disabledHours = Array.from({ length: now.hour() }, (_, i) => i);
+    
+    // 添加已预约时间段
+    reservations.forEach(reservation => {
+      if (reservation.status === 'cancelled') return;
+      
+      const startHour = parseInt(reservation.start_time.split(':')[0]);
+      const endHour = parseInt(reservation.end_time.split(':')[0]);
+      
+      for (let hour = startHour; hour < endHour; hour++) {
+        if (!disabledHours.includes(hour)) {
+          disabledHours.push(hour);
+        }
+      }
+    });
+    
+    return disabledHours;
+  };
+  
+  // 对于指定小时，禁用已预约的分钟
+  const getDisabledMinutes = (hour) => {
+    const now = moment();
+    let disabledMinutes = [];
+    
+    // 如果是当前小时，禁用已过去的分钟
+    if (hour === now.hour()) {
+      disabledMinutes = Array.from({ length: now.minute() }, (_, i) => i);
+    }
+    
+    // 添加已预约时间段的分钟
+    reservations.forEach(reservation => {
+      if (reservation.status === 'cancelled') return;
+      
+      const startHour = parseInt(reservation.start_time.split(':')[0]);
+      const startMinute = parseInt(reservation.start_time.split(':')[1]);
+      const endHour = parseInt(reservation.end_time.split(':')[0]);
+      const endMinute = parseInt(reservation.end_time.split(':')[1]);
+      
+      if (hour === startHour) {
+        for (let minute = startMinute; minute < 60; minute++) {
+          if (!disabledMinutes.includes(minute)) {
+            disabledMinutes.push(minute);
+          }
+        }
+      } else if (hour === endHour) {
+        for (let minute = 0; minute < endMinute; minute++) {
+          if (!disabledMinutes.includes(minute)) {
+            disabledMinutes.push(minute);
+          }
+        }
+      } else if (hour > startHour && hour < endHour) {
+        disabledMinutes = Array.from({ length: 60 }, (_, i) => i);
+      }
+    });
+    
+    return disabledMinutes;
+  };
+
   const handleTimeSelect = (time) => {
+    // 检查所选时间是否与预约冲突
+    const timeObj = moment(time, 'HH:mm');
+    if (isTimeConflictWithReservations(timeObj)) {
+      message.error('该时间段已被预约，请选择其他时间');
+      return;
+    }
+    
     form.setFieldsValue({
-      startTime: moment(time, 'HH:mm')
+      startTime: timeObj
     });
     setReservationModalVisible(true);
   };
@@ -209,10 +356,10 @@ function ParkingDetail() {
               <h2 className="price">¥{parkingSpot.price}/小时</h2>
             </div>
             <div className="status-section">
-              <span className={`status ${parkingSpot.status}`}>
-                {parkingSpot.status === 'available' ? '空闲' : '使用中'}
+              <span className={`status ${currentStatus}`}>
+                {currentStatus === 'available' ? '空闲' : '被预约中'}
               </span>
-              {parkingSpot.status === 'available' && (
+              {currentStatus === 'available' && (
                 <div className="action-buttons">
                   <Button
                     type="primary"
@@ -229,6 +376,19 @@ function ParkingDetail() {
                     onClick={handleReserve}
                   >
                     预定
+                  </Button>
+                </div>
+              )}
+              {currentStatus === 'reserved' && nextAvailableTime && (
+                <div className="next-available">
+                  <span>下次可用时间: {nextAvailableTime.format('HH:mm')}</span>
+                  <Button
+                    type="default"
+                    size="large"
+                    className="reserve-button"
+                    onClick={handleReserve}
+                  >
+                    预约下一时段
                   </Button>
                 </div>
               )}
@@ -333,6 +493,9 @@ function ParkingDetail() {
                   if (value.isBefore(now)) {
                     return Promise.reject(new Error('不能选择过去的时间'));
                   }
+                  if (isTimeConflictWithReservations(value)) {
+                    return Promise.reject(new Error('该时间段已被预约'));
+                  }
                   return Promise.resolve();
                 },
               }),
@@ -342,17 +505,8 @@ function ParkingDetail() {
               format="HH:mm" 
               style={{ width: '100%' }}
               minuteStep={30}
-              disabledHours={() => {
-                const now = moment();
-                return Array.from({ length: now.hour() }, (_, i) => i);
-              }}
-              disabledMinutes={(hour) => {
-                const now = moment();
-                if (hour === now.hour()) {
-                  return Array.from({ length: now.minute() }, (_, i) => i);
-                }
-                return [];
-              }}
+              disabledHours={getDisabledHours}
+              disabledMinutes={getDisabledMinutes}
             />
           </Form.Item>
 
@@ -369,6 +523,13 @@ function ParkingDetail() {
                   if (value.isBefore(getFieldValue('startTime'))) {
                     return Promise.reject(new Error('结束时间必须晚于开始时间'));
                   }
+                  // 检查结束时间是否与其他预约冲突
+                  const startTime = getFieldValue('startTime');
+                  for (let time = moment(startTime); time.isBefore(value); time.add(30, 'minutes')) {
+                    if (isTimeConflictWithReservations(time)) {
+                      return Promise.reject(new Error('预约时间段内有冲突的预约'));
+                    }
+                  }
                   return Promise.resolve();
                 },
               }),
@@ -378,6 +539,32 @@ function ParkingDetail() {
               format="HH:mm" 
               style={{ width: '100%' }}
               minuteStep={30}
+              disabledHours={() => {
+                const startTime = form.getFieldValue('startTime');
+                if (!startTime) return [];
+                
+                // 获取基本禁用时间
+                const baseDisabledHours = getDisabledHours();
+                // 结束时间不能早于开始时间
+                const startHour = startTime.hour();
+                return baseDisabledHours.filter(hour => hour < startHour);
+              }}
+              disabledMinutes={(hour) => {
+                const startTime = form.getFieldValue('startTime');
+                if (!startTime) return [];
+                
+                const startHour = startTime.hour();
+                let disabledMinutes = getDisabledMinutes(hour);
+                
+                // 如果是相同小时，结束分钟必须大于开始分钟
+                if (hour === startHour) {
+                  const startMinute = startTime.minute();
+                  const minutesBeforeStart = Array.from({ length: startMinute }, (_, i) => i);
+                  disabledMinutes = [...new Set([...disabledMinutes, ...minutesBeforeStart])];
+                }
+                
+                return disabledMinutes;
+              }}
             />
           </Form.Item>
 

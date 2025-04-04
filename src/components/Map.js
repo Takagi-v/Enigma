@@ -8,6 +8,7 @@ import usePlacesAutocomplete, {
   getGeocode,
   getLatLng,
 } from "use-places-autocomplete";
+import moment from 'moment';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -127,6 +128,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   const [isUserInitiated, setIsUserInitiated] = useState(false);
   const [touchStartY, setTouchStartY] = useState(0);
   const [isLoadingSpots, setIsLoadingSpots] = useState(false);
+  const [reservationCache, setReservationCache] = useState({});
   const minHeight = 200;
   const maxHeight = window.innerHeight * 0.8;
 
@@ -199,6 +201,52 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     enabled: mode !== 'detail', // 在详情模式下禁用
   });
 
+  // 检查停车位的预约状态
+  const checkSpotReservationStatus = async (spotId) => {
+    // 如果已经缓存了预约数据，直接使用
+    if (reservationCache[spotId]) {
+      return reservationCache[spotId];
+    }
+    
+    try {
+      const response = await fetch(`${config.API_URL}/parking-spots/${spotId}/reservations`);
+      if (response.ok) {
+        const reservationsData = await response.json();
+        // 过滤今天的预约
+        const today = moment().startOf('day');
+        const todayReservations = reservationsData.filter(r => 
+          moment(r.reservation_date).isSame(today, 'day') && r.status !== 'cancelled'
+        );
+        
+        // 检查是否有当前时间段的预约
+        const currentReservation = todayReservations.find(r => {
+          const now = moment();
+          const startTime = moment(`${r.reservation_date} ${r.start_time}`);
+          const endTime = moment(`${r.reservation_date} ${r.end_time}`);
+          
+          return now.isBetween(startTime, endTime, null, '[)');
+        });
+        
+        const status = {
+          reservationStatus: currentReservation ? 'reserved' : 'available',
+          hasReservations: todayReservations.length > 0
+        };
+        
+        // 更新缓存
+        setReservationCache(prev => ({
+          ...prev,
+          [spotId]: status
+        }));
+        
+        return status;
+      }
+    } catch (error) {
+      console.error(`获取停车位 ${spotId} 预约数据失败:`, error);
+    }
+    
+    return { reservationStatus: 'available', hasReservations: false };
+  };
+
   // 获取停车位数据
   useEffect(() => {
     const fetchParkingSpots = async () => {
@@ -206,9 +254,12 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
       try {
         const response = await fetch(`${config.API_URL}/parking-spots`);
         const data = await response.json();
+        
+        // 设置基本的停车位数据，不包含预约状态
         setParkingSpots(data.spots || []);
+        
         if (currentPoint) {
-          await updateSortedSpots(currentPoint.lat, currentPoint.lng);
+          await updateSortedSpots(currentPoint.lat, currentPoint.lng, data.spots || []);
         }
       } catch (error) {
         console.error('获取停车位失败:', error);
@@ -221,6 +272,58 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
       fetchParkingSpots();
     }
   }, [mode, currentPoint]);
+
+  // 当选择某个标记时，获取其预约数据
+  useEffect(() => {
+    if (selectedMarker) {
+      checkSpotReservationStatus(selectedMarker.id).then(status => {
+        setSelectedMarker({
+          ...selectedMarker,
+          ...status
+        });
+      });
+    }
+  }, [selectedMarker]);
+
+  // 当抽屉显示时，获取前10个停车位的预约状态
+  useEffect(() => {
+    const fetchReservationStatus = async () => {
+      if (drawerVisible && sortedSpots.length > 0) {
+        // 仅获取前10个停车位的预约数据（优化性能）
+        const visibleSpots = sortedSpots.slice(0, 10);
+        
+        const spotsWithStatus = await Promise.all(visibleSpots.map(async (spot) => {
+          const status = await checkSpotReservationStatus(spot.id);
+          return {
+            ...spot,
+            ...status
+          };
+        }));
+        
+        // 更新已排序的停车位
+        setSortedSpots(prevSpots => {
+          // 创建ID到状态的映射
+          const statusMap = {};
+          spotsWithStatus.forEach(spot => {
+            statusMap[spot.id] = {
+              reservationStatus: spot.reservationStatus,
+              hasReservations: spot.hasReservations
+            };
+          });
+          
+          // 更新所有停车位
+          return prevSpots.map(spot => {
+            if (statusMap[spot.id]) {
+              return { ...spot, ...statusMap[spot.id] };
+            }
+            return spot;
+          });
+        });
+      }
+    };
+    
+    fetchReservationStatus();
+  }, [drawerVisible, sortedSpots.length]);
 
   // 计算距离的函数
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -236,10 +339,10 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   };
 
   // 更新排序后的停车位
-  const updateSortedSpots = async (lat, lng) => {
+  const updateSortedSpots = async (lat, lng, spots = parkingSpots) => {
     setIsCalculating(true);
     try {
-      const spotsWithDistance = parkingSpots
+      const spotsWithDistance = spots
         .filter(spot => spot?.coordinates)
         .map(spot => {
           const [spotLat, spotLng] = spot.coordinates.split(',').map(Number);
@@ -541,10 +644,10 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
             }}>¥{selectedMarker.price}/小时</p>
             <p style={{
               margin: '4px 0',
-              color: '#52c41a',
+              color: selectedMarker.reservationStatus === 'reserved' ? '#faad14' : '#52c41a',
               fontSize: '13px'
             }}>
-              {selectedMarker.status === 'available' ? '空闲' : '使用中'}
+              {selectedMarker.reservationStatus === 'reserved' ? '被预约中' : '空闲'}
             </p>
             <p style={{
               margin: '4px 0',
@@ -748,8 +851,8 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
                             <span className="spot-distance">{spot.distance.toFixed(1)}km</span>
                           </div>
                           <div className="spot-detail">
-                            <span className={`status ${spot.status}`}>
-                              {spot.status === 'available' ? '空闲' : '使用中'}
+                            <span className={`status ${spot.reservationStatus || spot.status}`}>
+                              {spot.reservationStatus === 'reserved' ? '被预约中' : '空闲'}
                             </span>
                           </div>
                           <div className="spot-detail">
