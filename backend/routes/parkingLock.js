@@ -5,10 +5,10 @@
 const express = require('express');
 const router = express.Router();
 const parkingLockService = require('../services/parkingLockService');
-const { verifyToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, authenticateAdmin } = require('../middleware/auth');
 
 // 使用验证中间件，确保只有已登录用户可以访问地锁API
-router.use(verifyToken);
+router.use(authenticateToken);
 
 // 获取服务器状态
 router.get('/status', async (req, res) => {
@@ -56,7 +56,7 @@ router.get('/device_statuses', async (req, res) => {
 });
 
 // 以下操作需要管理员权限
-router.use(requireAdmin);
+router.use(authenticateAdmin);
 
 // 开锁
 router.post('/open_lock', async (req, res) => {

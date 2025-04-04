@@ -66,7 +66,10 @@ const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID || 'your_account_sid',
   process.env.TWILIO_AUTH_TOKEN || 'your_auth_token'
 );
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || 'your_twilio_phone_number';
+// Twilio Verify Service SID
+const twilioVerifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+// 如果仍需要直接发送SMS，保留phone number配置（对于Verify API不需要）
+const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
 // 存储验证码的对象 (在生产环境中应该使用Redis等缓存服务)
 const verificationCodes = {};
@@ -91,26 +94,34 @@ router.post('/send-verification-code', async (req, res) => {
     const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
     const formattedPhone = `+1${standardizedPhone}`;
     
-    // 生成6位随机验证码
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // 在生产环境中使用Twilio发送短信
+    // 在生产环境中使用Twilio Verify发送验证码
     if (process.env.NODE_ENV === 'production') {
-      await twilioClient.messages.create({
-        body: `您的GoParkMe验证码是: ${verificationCode}`,
-        from: twilioPhoneNumber,
-        to: formattedPhone
-      });
+      // 使用Verify API发送验证码
+      await twilioClient.verify.v2.services(twilioVerifyServiceSid)
+        .verifications
+        .create({
+          to: formattedPhone,
+          channel: 'sms'
+        });
+      
+      // 当使用Verify API时，不需要自己生成和存储验证码，
+      // Twilio会负责验证码的生成、发送和验证
+      // 但为了与开发环境保持一致，我们只保存验证状态
+      verificationCodes[standardizedPhone] = {
+        verifyRequested: true,
+        expiresAt: Date.now() + 10 * 60 * 1000 // 10分钟后过期
+      };
     } else {
-      // 开发环境下，只打印验证码
+      // 开发环境下，生成6位随机验证码并打印
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       console.log(`开发环境 - 手机号: ${formattedPhone}, 验证码: ${verificationCode}`);
+      
+      // 存储验证码，设置5分钟过期
+      verificationCodes[standardizedPhone] = {
+        code: verificationCode,
+        expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
+      };
     }
-    
-    // 存储验证码，设置5分钟过期
-    verificationCodes[standardizedPhone] = {
-      code: verificationCode,
-      expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
-    };
     
     return res.status(200).json({ message: "验证码已发送" });
   } catch (error) {
@@ -131,26 +142,58 @@ router.post('/verify-code', async (req, res) => {
     // 标准化手机号格式
     const digits = phone.replace(/\D/g, '');
     const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    const formattedPhone = `+1${standardizedPhone}`;
     
-    // 检查验证码是否存在且有效
-    const storedVerification = verificationCodes[standardizedPhone];
-    
-    if (!storedVerification) {
-      return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
-    }
-    
-    if (Date.now() > storedVerification.expiresAt) {
-      // 删除过期的验证码
+    // 在生产环境中使用Twilio Verify验证验证码
+    if (process.env.NODE_ENV === 'production') {
+      // 检查验证状态是否存在
+      const storedVerification = verificationCodes[standardizedPhone];
+      if (!storedVerification || !storedVerification.verifyRequested) {
+        return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
+      }
+      
+      // 检查是否过期
+      if (Date.now() > storedVerification.expiresAt) {
+        // 删除过期的验证状态
+        delete verificationCodes[standardizedPhone];
+        return res.status(400).json({ message: "验证码已过期，请重新获取" });
+      }
+      
+      // 使用Verify API验证验证码
+      const verification_check = await twilioClient.verify.v2.services(twilioVerifyServiceSid)
+        .verificationChecks
+        .create({
+          to: formattedPhone,
+          code: code
+        });
+      
+      if (verification_check.status !== 'approved') {
+        return res.status(400).json({ message: "验证码不正确" });
+      }
+      
+      // 验证成功，删除验证状态
       delete verificationCodes[standardizedPhone];
-      return res.status(400).json({ message: "验证码已过期，请重新获取" });
+    } else {
+      // 开发环境下的验证逻辑
+      const storedVerification = verificationCodes[standardizedPhone];
+      
+      if (!storedVerification) {
+        return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
+      }
+      
+      if (Date.now() > storedVerification.expiresAt) {
+        // 删除过期的验证码
+        delete verificationCodes[standardizedPhone];
+        return res.status(400).json({ message: "验证码已过期，请重新获取" });
+      }
+      
+      if (storedVerification.code !== code) {
+        return res.status(400).json({ message: "验证码不正确" });
+      }
+      
+      // 验证成功，删除验证码
+      delete verificationCodes[standardizedPhone];
     }
-    
-    if (storedVerification.code !== code) {
-      return res.status(400).json({ message: "验证码不正确" });
-    }
-    
-    // 验证成功，删除验证码
-    delete verificationCodes[standardizedPhone];
     
     return res.status(200).json({ message: "验证成功" });
   } catch (error) {
@@ -660,6 +703,7 @@ router.post('/forgot-password', async (req, res) => {
     // 标准化手机号格式
     const digits = phone.replace(/\D/g, '');
     const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+    const formattedPhone = `+1${standardizedPhone}`;
     
     // 检查手机号是否已注册
     const user = await new Promise((resolve, reject) => {
@@ -673,27 +717,34 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(400).json({ message: "该手机号未注册" });
     }
     
-    // 生成6位随机验证码
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // 在生产环境中使用Twilio发送短信
+    // 在生产环境中使用Twilio Verify发送验证码
     if (process.env.NODE_ENV === 'production') {
-      await twilioClient.messages.create({
-        body: `您的GoParkMe重置密码验证码是: ${verificationCode}`,
-        from: twilioPhoneNumber,
-        to: `+1${standardizedPhone}`
-      });
+      // 使用Verify API发送验证码
+      await twilioClient.verify.v2.services(twilioVerifyServiceSid)
+        .verifications
+        .create({
+          to: formattedPhone,
+          channel: 'sms'
+        });
+      
+      // 存储验证状态，设置10分钟过期
+      verificationCodes[standardizedPhone] = {
+        verifyRequested: true,
+        expiresAt: Date.now() + 10 * 60 * 1000, // 10分钟后过期
+        type: 'reset_password' // 标记这是重置密码的验证码
+      };
     } else {
-      // 开发环境下，只打印验证码
-      console.log(`开发环境 - 重置密码 - 手机号: +1${standardizedPhone}, 验证码: ${verificationCode}`);
+      // 开发环境下，生成6位随机验证码并打印
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      console.log(`开发环境 - 重置密码 - 手机号: ${formattedPhone}, 验证码: ${verificationCode}`);
+      
+      // 存储验证码，设置5分钟过期
+      verificationCodes[standardizedPhone] = {
+        code: verificationCode,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5分钟后过期
+        type: 'reset_password' // 标记这是重置密码的验证码
+      };
     }
-    
-    // 存储验证码，设置5分钟过期
-    verificationCodes[standardizedPhone] = {
-      code: verificationCode,
-      expiresAt: Date.now() + 5 * 60 * 1000, // 5分钟后过期
-      type: 'reset_password' // 标记这是重置密码的验证码
-    };
     
     return res.status(200).json({ message: "验证码已发送" });
   } catch (error) {
