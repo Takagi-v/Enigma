@@ -219,9 +219,15 @@ const TopUp = () => {
           <div className="gift-promotion">
             <div className="gift-banner">
               <span className="gift-icon">🎁</span>
-              <span className="gift-text">首次充值$10即可获得$20赠送余额！</span>
+              <span className="gift-text">首次充值$10即可获得$10赠送余额！</span>
             </div>
             <p className="gift-note">注意：这是您唯一一次获得赠送余额的机会</p>
+          </div>
+        )}
+
+        {!hasReceivedGift && (
+          <div className="minimum-amount-notice">
+            <p>首次充值最低金额: $10</p>
           </div>
         )}
 

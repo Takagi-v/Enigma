@@ -16,6 +16,7 @@ function Profile() {
   const [coupons, setCoupons] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [giftBalance, setGiftBalance] = useState(0);
+  const [userBalance, setUserBalance] = useState(0);
   const [transactions, setTransactions] = useState([]);
   const [reservations, setReservations] = useState([]);
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ function Profile() {
           fetchCoupons(),
           fetchPaymentMethod(),
           fetchGiftBalance(),
+          fetchUserBalance(),
           fetchTransactions(),
           fetchReservations()
         ]);
@@ -145,6 +147,24 @@ function Profile() {
     } catch (error) {
       console.error('获取赠送余额失败:', error);
       throw new Error('获取赠送余额失败');
+    }
+  };
+
+  const fetchUserBalance = async () => {
+    if (!user) return;
+
+    try {
+      const response = await authFetch(`${config.API_URL}/users/${user.id}/balance`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || '获取用户余额失败');
+      }
+      
+      setUserBalance(data.balance);
+    } catch (error) {
+      console.error('获取用户余额失败:', error);
+      throw new Error('获取用户余额失败');
     }
   };
 
@@ -312,8 +332,8 @@ function Profile() {
           <h3>My Balance</h3>
           <div className="balance-info">
             <p>Gift Balance: <span className="gift-balance">${giftBalance}</span></p>
-            <p>Account Balance: <span className="actual-balance">${user.balance || 0}</span></p>
-            <p>Total Balance: <span className="total-balance">${(giftBalance + (user.balance || 0))}</span></p>
+            <p>Account Balance: <span className="actual-balance">${userBalance}</span></p>
+            <p>Total Balance: <span className="total-balance">${(giftBalance + userBalance)}</span></p>
             <button 
               className="top-up-button"
               onClick={() => navigate('/top-up')}

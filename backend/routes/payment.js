@@ -5,25 +5,10 @@ const router = express.Router();
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_PUBLIC_KEY = process.env.STRIPE_PUBLIC_KEY;
 
-console.log('后端加载的 Stripe 密钥:', {
-  STRIPE_SECRET_KEY: STRIPE_SECRET_KEY ? `${STRIPE_SECRET_KEY.slice(0, 7)}...${STRIPE_SECRET_KEY.slice(-4)}` : undefined,
-  STRIPE_PUBLIC_KEY: STRIPE_PUBLIC_KEY ? `${STRIPE_PUBLIC_KEY.slice(0, 7)}...${STRIPE_PUBLIC_KEY.slice(-4)}` : undefined,
-  REACT_APP_STRIPE_PUBLIC_KEY: process.env.REACT_APP_STRIPE_PUBLIC_KEY ? `${process.env.REACT_APP_STRIPE_PUBLIC_KEY.slice(0, 7)}...${process.env.REACT_APP_STRIPE_PUBLIC_KEY.slice(-4)}` : undefined
-});
-
-// 详细的环境检查
-if (!STRIPE_SECRET_KEY) {
-  throw new Error('未配置 STRIPE_SECRET_KEY 环境变量');
-}
-
-if (!STRIPE_PUBLIC_KEY) {
-  throw new Error('未配置 STRIPE_PUBLIC_KEY 环境变量');
-}
 
 // 检查是否为生产环境
 const isProduction = process.env.NODE_ENV === 'production';
 console.log('当前环境:', isProduction ? 'production' : 'development');
-console.log('Stripe密钥类型:', STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'test' : 'live');
 
 
 const stripe = require('stripe')(STRIPE_SECRET_KEY);

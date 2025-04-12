@@ -217,6 +217,31 @@ router.get('/:userId/gift-balance', async (req, res) => {
   }
 });
 
+// 获取用户实际余额
+router.get('/:userId/balance', authenticateToken, async (req, res) => {
+  try {
+    // 验证用户是否有权限访问
+    if (req.user.id !== parseInt(req.params.userId) && !req.user.isAdmin) {
+      return res.status(403).json({ error: '无权访问该用户的余额信息' });
+    }
+
+    const balance = await new Promise((resolve, reject) => {
+      db().get(
+        'SELECT balance FROM users WHERE id = ?',
+        [req.params.userId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row ? row.balance || 0 : 0);
+        }
+      );
+    });
+    res.json({ balance });
+  } catch (error) {
+    console.error('获取用户余额失败:', error);
+    res.status(500).json({ error: '获取用户余额失败' });
+  }
+});
+
 // 获取用户的预约列表
 router.get('/:userId/reservations', authenticateToken, async (req, res) => {
   try {

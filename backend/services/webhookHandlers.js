@@ -81,6 +81,34 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
         );
       });
 
+      // 3. 如果是首次充值，添加赠送余额记录
+      if (isFirstTopUp) {
+        const giftAmount = 10; 
+        console.log(`首次充值，准备添加 $${giftAmount} 赠送余额记录`);
+        await new Promise((resolve, reject) => {
+          db().run(
+            `INSERT INTO coupons (
+              user_id,
+              type,
+              amount,
+              description,
+              status,
+              created_at
+            ) VALUES (?, 'gift_balance', ?, '首次充值赠送余额', 'valid', DATETIME('now', 'utc'))`,
+            [userId, giftAmount],
+            function(err) {
+              if (err) {
+                console.error('添加赠送余额记录失败:', err);
+                reject(err);
+              } else {
+                console.log(`赠送余额记录添加成功，新记录ID: ${this.lastID}`);
+                resolve();
+              }
+            }
+          );
+        });
+      }
+
       // 提交事务
       console.log('准备提交事务...');
       await new Promise((resolve, reject) => {
