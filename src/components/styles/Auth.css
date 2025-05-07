@@ -574,3 +574,142 @@ input.error {
   color: #40a9ff;
   text-decoration: underline;
 }
+
+/* 用户协议相关样式 */
+.agreement-container {
+  margin-bottom: 20px;
+}
+
+.agreement-checkbox-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.agreement-checkbox-container input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+  margin-bottom: 0;
+}
+
+.agreement-checkbox-container label {
+  margin-right: 4px;
+}
+
+.agreement-link {
+  background: none;
+  border: none;
+  color: #1890ff;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+.agreement-link:hover {
+  color: #40a9ff;
+}
+
+.agreement-modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.agreement-modal-content {
+  background-color: #fff;
+  margin: 5% auto;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  width: 80%;
+  max-width: 800px;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.agreement-text {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 10px;
+  margin: 15px 0;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+
+.agreement-text h2 {
+  font-size: 22px;
+  margin-bottom: 15px;
+}
+
+.agreement-text h3 {
+  font-size: 18px;
+  margin: 20px 0 10px;
+}
+
+.agreement-text p {
+  margin-bottom: 12px;
+}
+
+.agreement-text ul {
+  margin-left: 20px;
+  margin-bottom: 15px;
+}
+
+.agreement-text li {
+  margin-bottom: 8px;
+}
+
+.agreement-close-btn {
+  display: block;
+  margin: 20px auto 0;
+  padding: 10px 20px;
+  background-color: #1890ff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.agreement-close-btn:hover {
+  background-color: #40a9ff;
+}
+
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  .agreement-modal-content {
+    width: 90%;
+    margin: 10% auto;
+    padding: 15px;
+  }
+  
+  .agreement-text {
+    max-height: 50vh;
+  }
+}

@@ -54,6 +54,7 @@ function Auth() {
     verificationCode: '',
     newPassword: '',
     confirmPassword: '',
+    agreementChecked: false,
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -98,6 +99,14 @@ function Auth() {
     validateField(name, value);
   };
 
+  const handleCheckboxChange = (e) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: checked
+    }));
+  };
+
   const validateForm = () => {
     const currentStep = registrationStep;
     let isValid = true;
@@ -123,6 +132,10 @@ function Auth() {
       }
       if (!validateField('vehiclePlate', formData.vehicle_plate)) {
         newErrors.vehicle_plate = VALIDATION_RULES.vehiclePlate.message;
+        isValid = false;
+      }
+      if (!formData.agreementChecked) {
+        newErrors.agreementChecked = '请阅读并勾选同意注册协议';
         isValid = false;
       }
     }
@@ -353,28 +366,37 @@ function Auth() {
   };
 
   const handleQuickRegistration = async (e) => {
-    e.preventDefault();
+    e && e.preventDefault();
     
-    if (!formData.phone || !VALIDATION_RULES.phone.pattern.test(formData.phone)) {
-      setError('请输入正确的美国手机号码');
-      return;
-    }
-
-    if (!formData.vehicle_plate || !VALIDATION_RULES.vehiclePlate.pattern.test(formData.vehicle_plate)) {
-      setError('请输入正确的美国车牌号');
-      return;
-    }
-
-    // 如果手机号未验证
+    // 如果手机号还未验证
     if (!phoneVerified) {
       if (!codeSent) {
+        // 发送验证码
         sendVerificationCode();
+        return;
       } else {
+        // 验证验证码
         verifyCode();
+        return;
       }
+    }
+    
+    // 验证必填字段
+    if (!formData.phone) {
+      setError('手机号不能为空');
       return;
     }
-
+    
+    if (!formData.vehicle_plate) {
+      setError('车牌号不能为空');
+      return;
+    }
+    
+    if (!formData.agreementChecked) {
+      setError('请阅读并勾选同意注册协议');
+      return;
+    }
+    
     setError('');
     setIsLoading(true);
 
@@ -490,12 +512,16 @@ function Auth() {
   const handleGoogleUserBindVehiclePlate = async (e) => {
     e.preventDefault();
     
-    if (!formData.vehicle_plate || !VALIDATION_RULES.vehiclePlate.pattern.test(formData.vehicle_plate)) {
-      setError('请输入正确的美国车牌号');
+    if (!formData.vehicle_plate) {
+      setError('请输入车牌号');
       return;
     }
     
-    setError('');
+    if (!formData.agreementChecked) {
+      setError('请阅读并勾选同意注册协议');
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -661,6 +687,117 @@ function Auth() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const renderAgreement = () => {
+    return (
+      <div className="agreement-container">
+        <div className="agreement-checkbox-container">
+          <input
+            type="checkbox"
+            id="agreementChecked"
+            name="agreementChecked"
+            checked={formData.agreementChecked}
+            onChange={handleCheckboxChange}
+          />
+          <label htmlFor="agreementChecked">我已阅读并同意</label>
+          <button 
+            type="button" 
+            className="agreement-link"
+            onClick={() => document.getElementById('agreementModal').style.display = 'block'}
+          >
+            《注册使用协议》
+          </button>
+        </div>
+        {fieldErrors.agreementChecked && <span className="error-message">{fieldErrors.agreementChecked}</span>}
+        
+        <div id="agreementModal" className="agreement-modal">
+          <div className="agreement-modal-content">
+            <span className="close" onClick={() => document.getElementById('agreementModal').style.display = 'none'}>&times;</span>
+            <h2>注册使用协议</h2>
+            <div className="agreement-text">
+              <p><strong>最后更新日期： [2025年4月18日]</strong></p>
+              <p>欢迎使用 Goparkme（以下简称"本平台"或"我们"）！</p>
+              <p>本协议是您（以下简称"用户"或"您"）与 Goparkme之间关于注册和使用本平台所提供服务的法律协议。</p>
+              <p>在您点击"同意"按钮完成注册程序前，请务必仔细阅读、充分理解本协议各条款内容，特别是免除或者限制责任的条款、法律适用和争议解决条款。</p>
+              <p>如果您不同意本协议的任何内容，或者无法准确理解本协议任何条款的含义，请不要进行后续操作。一旦您点击"同意"并完成注册，即表示您已充分阅读、理解并接受本协议的全部内容，并同意作为协议一方受其约束。</p>
+              
+              <h3>1. 服务描述</h3>
+              <p>1.1 本平台是一个信息共享平台，旨在连接拥有闲置停车位（通常是住宅停车场或车道）的业主（以下简称"车位主"）与寻找停车位的驾驶员（即"用户"）。</p>
+              <p>1.2 车位主可以在其闲置停车位安装由我们提供的指定地锁，并将停车位信息（位置、可用时间、价格等）发布在本平台上。</p>
+              <p>1.3 注册用户可以通过本平台浏览、搜索车位信息，并根据显示的价格和时间预订并支付停车费用。</p>
+              <p>1.4 本平台提供信息发布、搜索、预订、支付处理等技术服务，以促进车位主与用户之间的交易。</p>
+              
+              <h3>2. 用户资格与义务</h3>
+              <p>2.1 您确认，在您完成注册程序或以其他本平台允许的方式实际使用服务时，您应当是具备完全民事权利能力和完全民事行为能力的自然人、法人或其他组织。若您不具备前述主体资格，则您及您的监护人应承担因此而导致的一切后果，且本平台有权注销您的账户。</p>
+              <p>2.2 您需要提供准确、最新、完整的注册信息，并及时更新。</p>
+              <p>2.3 您对您的账户和密码负有保管责任，并对通过您的账户进行的所有活动承担责任。</p>
+              <p>2.4 保险要求（重要条款）：</p>
+              <ul>
+                <li>您确认并承诺，在使用本平台任何服务前，您已为您计划用于停泊的车辆购买了符合当地（您计划停车地点所属司法管辖区）所有法律要求的有效汽车保险，包括但不限于责任险。</li>
+                <li>您理解并同意，维持有效的、符合当地法律要求的汽车保险是使用本平台服务的前提条件。如果您未能持有或维持此类保险，您将无权使用本平台的任何服务。</li>
+                <li>您同意在本平台要求时，提供您的保险证明。</li>
+                <li>您同意，对于因使用停车位而可能发生的任何车辆损坏、被盗、个人物品损失、对车位主财产（包括房屋、车道、地锁等）造成的损坏、或其他任何事故或损失，均由您和/或您的保险公司承担责任。</li>
+              </ul>
+              <p>2.5 您同意遵守所有适用的地方、州和联邦法律法规，包括但不限于交通规则和停车规定。</p>
+              <p>2.6 您同意按照预订的时间使用和离开停车位，尊重车位主的财产，不进行任何非法或滋扰活动。</p>
+              
+              <h3>3. 服务使用规范</h3>
+              <p>3.1 您应通过本平台完成停车位的预订和支付流程。</p>
+              <p>3.2 您应妥善使用车位主提供的停车位及相关设施（如地锁），如因您的原因造成损坏，您应承担赔偿责任。</p>
+              <p>3.3 您停放的车辆尺寸和类型应符合车位主在平台上描述的要求。</p>
+              
+              <h3>4. 费用与支付</h3>
+              <p>4.1 您同意按照本平台公示的价格支付停车费用。</p>
+              <p>4.2 支付将通过本平台指定的第三方支付渠道进行。您同意遵守相关支付服务的条款和条件。</p>
+              <p>4.3 退款政策（如有）将另行规定或在本平台相关页面公示。</p>
+              
+              <h3>5. 责任限制与免责声明</h3>
+              <p>5.1 本平台仅作为信息发布和交易促成平台，并非停车服务的直接提供者，也不是车位主或用户的代理人。</p>
+              <p>5.2 本平台不对以下事项承担任何责任：</p>
+              <ul>
+                <li>任何用户车辆的损坏、被盗或车内物品的损失。</li>
+                <li>用户在使用停车位过程中对车位主财产（包括但不限于房屋、车道、景观、地锁）造成的任何碰撞、损坏。</li>
+                <li>因使用停车位或进出停车位而导致的任何人身伤害。</li>
+                <li>车位主提供信息的准确性、完整性或及时性（尽管我们会进行合理审核）。</li>
+                <li>停车位的实际可用性、安全性或适用性。</li>
+                <li>用户与车位主之间的任何争议。</li>
+              </ul>
+              <p>5.3 您明确同意，所有因停车引起的风险、责任和索赔，包括但不限于车辆损坏、财产损失、人身伤害等，均由涉及的用户、车位主及其各自的保险公司根据适用的法律和保险条款处理。本平台不参与任何保险索赔过程，也不承担任何赔偿责任。</p>
+              <p>5.4 您自行负责确保您的车辆已根据当地法律充分投保。因未投保或保险不足导致的任何损失或责任，由您自行承担。</p>
+              
+              <h3>6. 保险确认</h3>
+              <p>您确认持有并将在使用本平台服务期间始终维持有效的、符合您计划停车所在地所有法律要求的汽车保险。您理解，这是使用本平台服务的强制性条件。如未持有有效保险，您不得使用此服务。</p>
+              
+              <h3>7. 知识产权</h3>
+              <p>本平台及其所有内容，包括但不限于文字、图像、标识、用户界面、软件等，其知识产权归本平台或相关权利人所有。未经事先书面许可，您不得复制、修改、传播或以其他方式使用。</p>
+              
+              <h3>8. 协议的终止</h3>
+              <p>8.1 您可以随时通过平台指定的方式注销账户。</p>
+              <p>8.2 如果您违反本协议的任何条款，特别是关于保险要求的条款，本平台有权随时暂停或终止向您提供服务，并注销您的账户，且无需承担任何责任。</p>
+              
+              <h3>9. 隐私政策</h3>
+              <p>我们重视您的隐私。关于我们如何收集、使用、存储和保护您的个人信息，请参阅我们的《隐私政策》。《隐私政策》是本协议不可分割的一部分。</p>
+              
+              <h3>10. 协议修改</h3>
+              <p>本平台有权根据需要不时地修订本协议及/或各类规则，并在本平台公示。修订后的协议和规则一经公布，立即生效。如您在协议修订后继续使用本平台服务，则表示您已接受修订后的协议。</p>
+            </div>
+            <button 
+              type="button" 
+              className="agreement-close-btn"
+              onClick={() => {
+                document.getElementById('agreementModal').style.display = 'none';
+                if (!formData.agreementChecked) {
+                  setFormData(prev => ({...prev, agreementChecked: true}));
+                }
+              }}
+            >
+              我已阅读并同意
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderRegistrationChoice = () => {
@@ -931,6 +1068,7 @@ function Auth() {
                 value={formData.address}
                 onChange={handleInputChange}
               />
+              {renderAgreement()}
               <button 
                 type="submit" 
                 disabled={isLoading}
@@ -1073,6 +1211,8 @@ function Auth() {
           注册后，您的用户名将自动生成，密码为您手机号的后6位数字。
         </p>
         
+        {renderAgreement()}
+        
         {error && <div className="error-message">{error}</div>}
         
         <div className="form-actions">
@@ -1113,6 +1253,9 @@ function Auth() {
             required
           />
           {fieldErrors.vehicle_plate && <div className="field-error">{fieldErrors.vehicle_plate}</div>}
+          
+          {renderAgreement()}
+          
           <button type="submit" disabled={isLoading}>
             {isLoading ? '处理中...' : '完成注册'}
           </button>
