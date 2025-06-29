@@ -3,6 +3,8 @@ const router = express.Router();
 const { db } = require('../models/db');
 const { authenticateToken } = require('../middleware/auth');
 
+const API_BASE_URL = 'http://www.goparkme.com/api';
+
 // 获取停车位列表
 router.get("/", (req, res) => {
   const { page, limit, sort = 'created_at', order = 'DESC' } = req.query;

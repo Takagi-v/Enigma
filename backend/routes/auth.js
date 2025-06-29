@@ -385,6 +385,78 @@ router.post("/login", (req, res) => {
   });
 });
 
+// 移动端登录路由
+router.post("/mobile-login", (req, res) => {
+  const { account, password } = req.body;
+
+  if (!account || !password) {
+    return res.status(400).json({ message: "账号和密码不能为空" });
+  }
+
+  // 判断是手机号还是用户名
+  const isPhone = /^(\+?1)?[- ()]*([2-9][0-9]{2})[- )]*([2-9][0-9]{2})[- ]*([0-9]{4})$/.test(account);
+  const query = isPhone ? 
+    "SELECT * FROM users WHERE phone = ?" : 
+    "SELECT * FROM users WHERE username = ?";
+
+  // 如果是手机号，需要标准化格式
+  let searchAccount = account;
+  if (isPhone) {
+    // 提取纯数字
+    const digits = account.replace(/\D/g, '');
+    // 如果以1开头（美国国家代码），则去掉
+    searchAccount = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
+  }
+
+  db().get(query, [searchAccount], async (err, user) => {
+    if (err) {
+      return res.status(500).json({ message: "登录过程中出错" });
+    }
+    
+    if (!user) {
+      return res.status(401).json({ message: "账号或密码错误" });
+    }
+
+    try {
+      const match = await bcrypt.compare(password, user.password);
+      if (match) {
+        // 生成JWT token
+        const token = jwt.sign(
+          { 
+            id: user.id,
+            username: user.username
+          },
+          JWT_SECRET,
+          { expiresIn: '24h' }
+        );
+
+        // 返回用户信息和token（不包含密码）
+        const { password: _, ...userWithoutPassword } = user;
+        
+        res.json({ 
+          message: "登录成功",
+          token: token, // for mobile client
+          user: {
+            id: user.id,
+            username: user.username,
+            fullName: user.full_name,
+            phone: user.phone,
+            avatar: user.avatar,
+            bio: user.bio,
+            address: user.address,
+            email: user.email,
+            vehiclePlate: user.vehicle_plate
+          }
+        });
+      } else {
+        res.status(401).json({ message: "账号或密码错误" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "登录过程中出错" });
+    }
+  });
+});
+
 // 头像上传路由
 router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
   try {
