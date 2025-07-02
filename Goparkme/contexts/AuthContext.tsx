@@ -9,7 +9,12 @@ interface User {
   id: number;
   username: string;
   email: string;
-  // ... 其他用户字段
+  fullName?: string;
+  phone?: string;
+  avatar?: string;
+  bio?: string;
+  address?: string;
+  vehiclePlate?: string;
 }
 
 // 定义AuthContext类型
@@ -19,6 +24,7 @@ interface AuthContextType {
   onLogout: () => Promise<void>;
   user: User | null;
   isLoading: boolean;
+  loading: boolean; // 添加兼容性
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -27,6 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   onLogout: async () => {},
   user: null,
   isLoading: true,
+  loading: true,
 });
 
 export const useAuth = () => {
@@ -40,6 +47,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     const loadTokenAndUser = async () => {
@@ -60,6 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Failed to load token or user', e);
       } finally {
         setIsLoading(false);
+        setInitialLoadComplete(true);
       }
     };
     loadTokenAndUser();
@@ -82,9 +91,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    setAuthState({ token: null, authenticated: false });
-    setUser(null);
+    try {
+      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      setAuthState({ token: null, authenticated: false });
+      setUser(null);
+      // 保持initialLoadComplete为true，避免页面重新加载
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const value = {
@@ -92,7 +106,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     onLogout: logout,
     authState,
     user,
-    isLoading,
+    isLoading: !initialLoadComplete, // 只有首次加载时为true
+    loading: !initialLoadComplete, // 添加兼容性
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -5,6 +5,10 @@ import { parkingAPI } from '../../services/api'; // 确保路径正确
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons'; // 使用Expo的图标库
 import { useLocation, getDistanceFromLatLonInKm } from '../../contexts/LocationContext';
+import { useAuth } from '../../contexts/AuthContext';
+import ReservationModal from '../../components/ReservationModal';
+import ParkingTimeline from '../../components/ParkingTimeline';
+import AuthModal from '../../components/AuthModal';
 
 // 定义停车位数据类型
 interface ParkingSpot {
@@ -20,33 +24,26 @@ interface ParkingSpot {
   // ... 其他你需要的字段
 }
 
-// 简化的时间轴组件
-const Timeline = ({ openingHours, reservations }: { openingHours: string, reservations: any[] }) => {
-  // 此处为简化版实现，仅展示预定时间段
-  return (
-    <View style={styles.timelineContainer}>
-      <Text style={styles.timelineTitle}>今日预定情况 ({openingHours})</Text>
-      {reservations.length > 0 ? (
-        reservations.map(res => (
-          <View key={res.id} style={styles.reservationBlock}>
-            <Text style={styles.reservationTime}>{res.start_time} - {res.end_time}</Text>
-            <Text style={styles.reservationStatus}>{res.status}</Text>
-          </View>
-        ))
-      ) : (
-        <Text style={styles.noReservations}>今日暂无预定</Text>
-      )}
-    </View>
-  );
-};
+// 预约数据接口
+interface Reservation {
+  id: number;
+  start_time: string;
+  end_time: string;
+  status: 'active' | 'confirmed' | 'cancelled';
+  username?: string;
+}
 
 
 export default function ParkingDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [spot, setSpot] = useState<ParkingSpot | null>(null);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const { location } = useLocation();
 
   useEffect(() => {
@@ -59,13 +56,13 @@ export default function ParkingDetailScreen() {
     const fetchSpotDetails = async () => {
       try {
         setLoading(true);
-        const spotData = await parkingAPI.getParkingSpotById(id);
-        
-        // 假设API返回的数据中包含reservations，如果没有，需要额外获取
-        // const reservationsData = await fetchReservations(id); 
-        // spotData.reservations = reservationsData;
+        const [spotData, reservationsData] = await Promise.all([
+          parkingAPI.getParkingSpotById(id),
+          parkingAPI.getReservations(id)
+        ]);
 
         setSpot(spotData);
+        setReservations(reservationsData || []);
       } catch (err) {
         console.error(err);
         setError('获取停车位详情失败');
@@ -77,6 +74,24 @@ export default function ParkingDetailScreen() {
 
     fetchSpotDetails();
   }, [id]);
+
+  // 处理预约功能
+  const handleReserve = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    setShowReservationModal(true);
+  };
+
+  const handleReservationCreated = () => {
+    // 重新获取预约数据
+    if (id && typeof id === 'string') {
+      parkingAPI.getReservations(id)
+        .then(data => setReservations(data || []))
+        .catch(err => console.error('获取预约数据失败:', err));
+    }
+  };
 
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" /></View>;
@@ -130,7 +145,7 @@ export default function ParkingDetailScreen() {
           <TouchableOpacity style={styles.button} onPress={() => { /* TODO: handleUse */ }}>
             <Text style={styles.buttonText}>立即使用</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.reserveButton]} onPress={() => { /* TODO: handleReserve */ }}>
+          <TouchableOpacity style={[styles.button, styles.reserveButton]} onPress={handleReserve}>
             <Text style={styles.buttonText}>预定</Text>
           </TouchableOpacity>
         </View>
@@ -143,8 +158,16 @@ export default function ParkingDetailScreen() {
         <InfoRow icon="information-circle-outline" label="描述" value={spot.description} />
       </View>
 
-      {/* 简化的时间轴 */}
-      <Timeline openingHours={spot.opening_hours} reservations={[]} />
+      {/* 时间轴 */}
+      <ParkingTimeline 
+        openingHours={spot.opening_hours} 
+        reservations={reservations} 
+        onTimeSlotPress={(timeSlot) => {
+          if (timeSlot.status === 'available') {
+            handleReserve();
+          }
+        }}
+      />
 
       {/* 地图 */}
       <View style={styles.mapContainer}>
@@ -163,6 +186,26 @@ export default function ParkingDetailScreen() {
           <Marker coordinate={{ latitude: lat, longitude: lng }} />
         </MapView>
       </View>
+
+      {/* 预约弹窗 */}
+      <ReservationModal
+        visible={showReservationModal}
+        onClose={() => setShowReservationModal(false)}
+        parkingSpot={spot ? {
+          id: spot.id,
+          location: spot.location,
+          hourly_rate: spot.hourly_rate,
+          opening_hours: spot.opening_hours,
+        } : null}
+        onReservationCreated={handleReservationCreated}
+      />
+
+      {/* 登录弹窗 */}
+      <AuthModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => setShowAuthModal(false)}
+      />
     </ScrollView>
   );
 }
@@ -211,11 +254,5 @@ const styles = StyleSheet.create({
   infoValue: { fontSize: 16, color: '#333', marginTop: 2 },
   mapContainer: { height: 200, marginTop: 10 },
   map: { ...StyleSheet.absoluteFillObject },
-  errorText: { color: 'red', fontSize: 16, textAlign: 'center' },
-  timelineContainer: { marginTop: 10, backgroundColor: 'white', padding: 20 },
-  timelineTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-  reservationBlock: { backgroundColor: '#e9ecef', padding: 10, borderRadius: 5, marginBottom: 5 },
-  reservationTime: { fontWeight: '500' },
-  reservationStatus: { fontStyle: 'italic', color: '#6c757d' },
-  noReservations: { color: '#6c757d' }
+  errorText: { color: 'red', fontSize: 16, textAlign: 'center' }
 }); 

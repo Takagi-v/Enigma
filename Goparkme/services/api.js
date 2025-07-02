@@ -1,6 +1,17 @@
 // API服务配置
 const API_BASE_URL = 'https://www.goparkme.com/api';
 
+// 从安全存储获取token的辅助函数
+const getAuthToken = async () => {
+  try {
+    const { getItemAsync } = await import('expo-secure-store');
+    return await getItemAsync('authToken');
+  } catch (error) {
+    console.warn('Failed to get auth token:', error);
+    return null;
+  }
+};
+
 // 通用请求函数
 const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -12,11 +23,20 @@ const apiRequest = async (endpoint, options = {}) => {
     ...options,
   };
 
+  // 如果需要认证且没有提供Authorization头，自动添加token
+  if (options.requireAuth && !defaultOptions.headers.Authorization) {
+    const token = await getAuthToken();
+    if (token) {
+      defaultOptions.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
   try {
     const response = await fetch(url, defaultOptions);
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
     }
     
     return await response.json();
@@ -54,6 +74,28 @@ export const parkingAPI = {
   getParkingSpotById: async (id) => {
     return await apiRequest(`/parking-spots/${id}`);
   },
+
+  // 获取停车位的预约列表
+  getReservations: async (spotId) => {
+    return await apiRequest(`/parking-spots/${spotId}/reservations`);
+  },
+
+  // 创建预约
+  createReservation: async (spotId, reservationData) => {
+    return await apiRequest(`/parking-spots/${spotId}/reserve`, {
+      method: 'POST',
+      body: JSON.stringify(reservationData),
+      requireAuth: true,
+    });
+  },
+
+  // 取消预约
+  cancelReservation: async (spotId, reservationId) => {
+    return await apiRequest(`/parking-spots/${spotId}/reservations/${reservationId}/cancel`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  },
 };
 
 // 用户相关API
@@ -80,6 +122,13 @@ export const userAPI = {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
+    });
+  },
+
+  // 获取用户的预约列表
+  getUserReservations: async (userId) => {
+    return await apiRequest(`/users/${userId}/reservations`, {
+      requireAuth: true,
     });
   },
 };
