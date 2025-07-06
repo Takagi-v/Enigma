@@ -84,6 +84,21 @@ export default function ParkingDetailScreen() {
     setShowReservationModal(true);
   };
 
+  // 处理立即使用功能
+  const handleUse = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    
+    if (spot?.status !== 'available') {
+      Alert.alert('提示', '该停车位当前不可用');
+      return;
+    }
+    
+    router.push(`/parking-use?spotId=${id}` as any);
+  };
+
   const handleReservationCreated = () => {
     // 重新获取预约数据
     if (id && typeof id === 'string') {
@@ -142,7 +157,11 @@ export default function ParkingDetailScreen() {
           {spot.status === 'available' ? '空闲' : spot.status === 'occupied' ? '使用中' : '已预定'}
         </Text>
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.button} onPress={() => { /* TODO: handleUse */ }}>
+          <TouchableOpacity 
+            style={[styles.button, spot.status !== 'available' && styles.buttonDisabled]} 
+            onPress={handleUse}
+            disabled={spot.status !== 'available'}
+          >
             <Text style={styles.buttonText}>立即使用</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.button, styles.reserveButton]} onPress={handleReserve}>
@@ -245,6 +264,7 @@ const styles = StyleSheet.create({
   status_reserved: { backgroundColor: '#fff3cd', color: '#856404' },
   actionButtons: { flexDirection: 'row' },
   button: { backgroundColor: '#007AFF', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, marginLeft: 10 },
+  buttonDisabled: { backgroundColor: '#ccc' },
   reserveButton: { backgroundColor: '#5bc0de' },
   buttonText: { color: 'white', fontWeight: 'bold' },
   infoSection: { marginTop: 10, backgroundColor: 'white', padding: 20 },

@@ -3,6 +3,46 @@ const router = express.Router();
 const { db } = require('../models/db');
 const { authenticateToken } = require('../middleware/auth');
 
+// 获取当前使用状态
+router.get("/current", authenticateToken, (req, res) => {
+  const userId = req.user.id;
+  console.log('获取用户当前使用状态，用户ID:', userId);
+
+  const query = `
+    SELECT 
+      pu.*,
+      ps.location,
+      ps.hourly_rate
+    FROM parking_usage pu
+    JOIN parking_spots ps ON pu.parking_spot_id = ps.id
+    WHERE pu.user_id = ? AND pu.status = 'active'
+    ORDER BY pu.start_time DESC
+    LIMIT 1
+  `;
+
+  db().get(query, [userId], (err, record) => {
+    if (err) {
+      console.error('获取当前使用状态失败:', err);
+      return res.status(500).json({ 
+        message: "获取当前使用状态失败",
+        code: 'DB_ERROR'
+      });
+    }
+
+    if (!record) {
+      return res.json({ usage: null });
+    }
+
+    console.log('找到当前使用记录:', record);
+    res.json({ 
+      usage: {
+        ...record,
+        total_amount: record.total_amount ? parseFloat(record.total_amount) : null
+      }
+    });
+  });
+});
+
 // 获取用户的停车记录
 router.get("/my", authenticateToken, (req, res) => {
   const userId = req.user.id;

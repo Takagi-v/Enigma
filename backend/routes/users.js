@@ -6,6 +6,22 @@ const { authenticateToken, checkUserAccess } = require('../middleware/auth');
 // JWT密钥
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+// 获取用户个人资料接口（用于移动端）
+router.get('/profile', authenticateToken, (req, res) => {
+  // 直接返回从token中获取的用户信息
+  // req.user 已经在 authenticateToken 中间件中设置
+  res.json({
+    id: req.user.id,
+    username: req.user.username,
+    email: req.user.email,
+    fullName: req.user.fullName,
+    phone: req.user.phone,
+    avatar: req.user.avatar,
+    bio: req.user.bio || '该用户很神秘',
+    address: req.user.address
+  });
+});
+
 // 获取用户信息
 router.get("/:username", authenticateToken, checkUserAccess, (req, res) => {
   const { username } = req.params;
@@ -273,6 +289,155 @@ router.get('/:userId/reservations', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('获取用户预约列表失败:', error);
     res.status(500).json({ error: '获取用户预约列表失败' });
+  }
+});
+
+// 获取当前用户的预约列表
+router.get('/my/reservations', authenticateToken, async (req, res) => {
+  try {
+    const reservations = await new Promise((resolve, reject) => {
+      db().all(
+        `SELECT 
+           r.*,
+           p.location,
+           p.price,
+           p.hourly_rate
+         FROM reservations r
+         JOIN parking_spots p ON r.parking_spot_id = p.id
+         WHERE r.user_id = ?
+         ORDER BY r.reservation_date DESC, r.start_time DESC`,
+        [req.user.id],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+
+    res.json(reservations);
+  } catch (error) {
+    console.error('获取用户预约列表失败:', error);
+    res.status(500).json({ error: '获取用户预约列表失败' });
+  }
+});
+
+// 获取当前用户余额
+router.get('/my/balance', authenticateToken, async (req, res) => {
+  try {
+    const balance = await new Promise((resolve, reject) => {
+      db().get(
+        'SELECT balance FROM users WHERE id = ?',
+        [req.user.id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row ? row.balance || 0 : 0);
+        }
+      );
+    });
+    res.json({ balance });
+  } catch (error) {
+    console.error('获取用户余额失败:', error);
+    res.status(500).json({ error: '获取用户余额失败' });
+  }
+});
+
+// 获取当前用户赠送余额
+router.get('/my/gift-balance', authenticateToken, async (req, res) => {
+  try {
+    const giftBalance = await new Promise((resolve, reject) => {
+      db().get(
+        `SELECT COALESCE(SUM(amount), 0) as gift_balance 
+         FROM coupons 
+         WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
+        [req.user.id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row ? row.gift_balance : 0);
+        }
+      );
+    });
+    res.json({ gift_balance: giftBalance });
+  } catch (error) {
+    console.error('获取赠送余额失败:', error);
+    res.status(500).json({ error: '获取赠送余额失败' });
+  }
+});
+
+// 修改密码
+router.put('/my/password', authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ 
+      message: '当前密码和新密码不能为空',
+      code: 'INVALID_REQUEST'
+    });
+  }
+  
+  // 验证新密码格式
+  if (!/^\d{6}$/.test(newPassword)) {
+    return res.status(400).json({ 
+      message: '新密码必须为6位数字',
+      code: 'INVALID_PASSWORD_FORMAT'
+    });
+  }
+  
+  try {
+    const bcrypt = require('bcrypt');
+    
+    // 获取当前用户信息
+    const user = await new Promise((resolve, reject) => {
+      db().get(
+        'SELECT id, password FROM users WHERE id = ?',
+        [req.user.id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+    
+    if (!user) {
+      return res.status(404).json({ 
+        message: '用户不存在',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+    
+    // 验证当前密码
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({ 
+        message: '当前密码不正确',
+        code: 'INVALID_CURRENT_PASSWORD'
+      });
+    }
+    
+    // 加密新密码
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    
+    // 更新密码
+    await new Promise((resolve, reject) => {
+      db().run(
+        'UPDATE users SET password = ? WHERE id = ?',
+        [hashedNewPassword, req.user.id],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this);
+        }
+      );
+    });
+    
+    res.json({ 
+      message: '密码修改成功',
+      code: 'SUCCESS'
+    });
+  } catch (error) {
+    console.error('修改密码失败:', error);
+    res.status(500).json({ 
+      message: '修改密码失败',
+      code: 'DB_ERROR'
+    });
   }
 });
 

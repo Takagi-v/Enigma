@@ -11,36 +11,34 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { userAPI, parkingAPI } from '../services/api';
+import { userAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useProtectedRoute } from '../hooks/useProtectedRoute';
 import AuthModal from '../components/AuthModal';
 
-interface Reservation {
+interface ParkingRecord {
   id: number;
   parking_spot_id: number;
-  reservation_date: string;
   start_time: string;
-  end_time: string;
-  total_amount: number;
-  status: 'active' | 'confirmed' | 'cancelled';
-  notes?: string;
+  end_time: string | null;
+  total_amount: number | null;
+  status: 'active' | 'completed' | 'cancelled';
+  vehicle_plate?: string;
   location: string;
   hourly_rate: number;
-  created_at: string;
 }
 
-export default function ReservationsScreen() {
+export default function ParkingRecordsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { isLoading: authLoading, showAuthModal, setShowAuthModal } = useProtectedRoute();
-  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [records, setRecords] = useState<ParkingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!authLoading && user) {
-      fetchReservations();
+      fetchParkingRecords();
     }
   }, [user, authLoading]);
 
@@ -48,20 +46,20 @@ export default function ReservationsScreen() {
   useFocusEffect(
     React.useCallback(() => {
       if (!authLoading && user) {
-        fetchReservations();
+        fetchParkingRecords();
       }
     }, [user, authLoading])
   );
 
-  const fetchReservations = async () => {
+  const fetchParkingRecords = async () => {
     if (!user) return;
 
     try {
-      const data = await userAPI.getUserReservations(user.id);
-      setReservations(data || []);
+      const data = await userAPI.getUserParkingUsage();
+      setRecords(data.records || []);
     } catch (error) {
-      console.error('获取预约列表失败:', error);
-      Alert.alert('错误', '获取预约列表失败');
+      console.error('获取停车记录失败:', error);
+      Alert.alert('错误', '获取停车记录失败');
     } finally {
       setLoading(false);
     }
@@ -69,55 +67,42 @@ export default function ReservationsScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchReservations();
+    await fetchParkingRecords();
     setRefreshing(false);
   };
 
-  const handleCancelReservation = (reservation: Reservation) => {
-    Alert.alert(
-      '取消预约',
-      `确定要取消 ${reservation.location} 的预约吗？`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确定',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await parkingAPI.cancelReservation(
-                reservation.parking_spot_id,
-                reservation.id
-              );
-              Alert.alert('成功', '预约已取消');
-              fetchReservations(); // 刷新列表
-            } catch (error) {
-              console.error('取消预约失败:', error);
-              Alert.alert('失败', '取消预约失败，请稍后重试');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN', {
+  const formatDateTime = (dateTimeStr: string) => {
+    const date = new Date(dateTimeStr);
+    return date.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
-  const formatTime = (timeStr: string) => {
-    return timeStr.substring(0, 5); // 只显示 HH:MM
+  const calculateDuration = (startTime: string, endTime: string | null) => {
+    if (!endTime) return '进行中';
+    
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const diffMs = end.getTime() - start.getTime();
+    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours < 1) {
+      const diffMinutes = Math.ceil(diffMs / (1000 * 60));
+      return `${diffMinutes}分钟`;
+    }
+    
+    return `${diffHours}小时`;
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
         return '#007AFF';
-      case 'confirmed':
+      case 'completed':
         return '#28a745';
       case 'cancelled':
         return '#6c757d';
@@ -129,19 +114,14 @@ export default function ReservationsScreen() {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'active':
-        return '进行中';
-      case 'confirmed':
-        return '已确认';
+        return '使用中';
+      case 'completed':
+        return '已完成';
       case 'cancelled':
         return '已取消';
       default:
         return '未知';
     }
-  };
-
-  const isUpcoming = (date: string, startTime: string) => {
-    const reservationDateTime = new Date(`${date} ${startTime}`);
-    return reservationDateTime > new Date();
   };
 
   if (authLoading || loading) {
@@ -157,105 +137,100 @@ export default function ReservationsScreen() {
     <View style={styles.container}>
       {/* 头部 */}
       <View style={styles.header}>
-        <Text style={styles.title}>我的预约</Text>
+        <Text style={styles.title}>停车记录</Text>
       </View>
 
-      {reservations.length === 0 ? (
+      {records.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="calendar-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>暂无预约记录</Text>
-          <Text style={styles.emptySubtext}>去地图找个停车位预约吧</Text>
+          <Ionicons name="car-outline" size={64} color="#ccc" />
+          <Text style={styles.emptyText}>暂无停车记录</Text>
+          <Text style={styles.emptySubtext}>开始使用停车位后记录会显示在这里</Text>
           <TouchableOpacity
             style={styles.exploreButton}
             onPress={() => router.push('/(tabs)/' as any)}
           >
-            <Text style={styles.exploreButtonText}>浏览停车位</Text>
+            <Text style={styles.exploreButtonText}>寻找停车位</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
-          style={styles.content}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-          {reservations.map((reservation) => (
-            <View key={reservation.id} style={styles.reservationCard}>
+          {records.map((record) => (
+            <View key={record.id} style={styles.recordCard}>
               <View style={styles.cardHeader}>
-                <Text style={styles.locationText}>{reservation.location}</Text>
-                <Text
-                  style={[
-                    styles.statusBadge,
-                    { color: getStatusColor(reservation.status) },
-                  ]}
-                >
-                  {getStatusText(reservation.status)}
+                <Text style={styles.locationText}>{record.location}</Text>
+                <Text style={[styles.statusBadge, { color: getStatusColor(record.status) }]}>
+                  {getStatusText(record.status)}
                 </Text>
               </View>
 
               <View style={styles.cardContent}>
                 <View style={styles.infoRow}>
-                  <Ionicons name="calendar-outline" size={16} color="#666" />
+                  <Ionicons name="time-outline" size={16} color="#666" />
                   <Text style={styles.infoText}>
-                    {formatDate(reservation.reservation_date)}
+                    开始: {formatDateTime(record.start_time)}
                   </Text>
                 </View>
 
+                {record.end_time && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="checkmark-circle-outline" size={16} color="#666" />
+                    <Text style={styles.infoText}>
+                      结束: {formatDateTime(record.end_time)}
+                    </Text>
+                  </View>
+                )}
+
                 <View style={styles.infoRow}>
-                  <Ionicons name="time-outline" size={16} color="#666" />
+                  <Ionicons name="hourglass-outline" size={16} color="#666" />
                   <Text style={styles.infoText}>
-                    {formatTime(reservation.start_time)} - {formatTime(reservation.end_time)}
+                    时长: {calculateDuration(record.start_time, record.end_time)}
                   </Text>
                 </View>
+
+                {record.vehicle_plate && (
+                  <View style={styles.infoRow}>
+                    <Ionicons name="car-outline" size={16} color="#666" />
+                    <Text style={styles.infoText}>车牌: {record.vehicle_plate}</Text>
+                  </View>
+                )}
 
                 <View style={styles.infoRow}>
                   <Ionicons name="cash-outline" size={16} color="#666" />
-                  <Text style={styles.infoText}>¥{reservation.total_amount}</Text>
+                  <Text style={styles.infoText}>
+                    费用: {record.total_amount ? `¥${record.total_amount}` : '计算中'}
+                  </Text>
                 </View>
-
-                {reservation.notes && (
-                  <View style={styles.infoRow}>
-                    <Ionicons name="document-text-outline" size={16} color="#666" />
-                    <Text style={styles.infoText}>{reservation.notes}</Text>
-                  </View>
-                )}
               </View>
 
               <View style={styles.cardActions}>
                 <TouchableOpacity
                   style={styles.detailButton}
-                  onPress={() => router.push(`/parking/${reservation.parking_spot_id}`)}
+                  onPress={() => router.push(`/parking/${record.parking_spot_id}` as any)}
                 >
-                  <Text style={styles.detailButtonText}>查看详情</Text>
+                  <Text style={styles.detailButtonText}>查看停车位</Text>
                 </TouchableOpacity>
-
-                {reservation.status !== 'cancelled' &&
-                  isUpcoming(reservation.reservation_date, reservation.start_time) && (
-                    <TouchableOpacity
-                      style={styles.cancelButton}
-                      onPress={() => handleCancelReservation(reservation)}
-                    >
-                      <Text style={styles.cancelButtonText}>取消预约</Text>
-                    </TouchableOpacity>
-                  )}
               </View>
             </View>
           ))}
-                 </ScrollView>
-       )}
+        </ScrollView>
+      )}
 
-       {/* 登录弹窗 */}
-       <AuthModal
-         visible={showAuthModal}
-         onClose={() => setShowAuthModal(false)}
-         onSuccess={() => {
-           setShowAuthModal(false);
-           fetchReservations(); // 登录成功后获取预约数据
-         }}
-       />
-     </View>
-   );
- }
+      {/* 登录弹窗 */}
+      <AuthModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          setShowAuthModal(false);
+          fetchParkingRecords();
+        }}
+      />
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -285,10 +260,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-  },
-  content: {
-    flex: 1,
-    padding: 16,
   },
   emptyState: {
     flex: 1,
@@ -320,11 +291,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  reservationCard: {
+  recordCard: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    margin: 16,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -369,32 +341,18 @@ const styles = StyleSheet.create({
   },
   cardActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
   detailButton: {
-    flex: 1,
     backgroundColor: '#f8f9fa',
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginRight: 8,
   },
   detailButtonText: {
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '600',
   },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#dc3545',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    color: 'white',
-    fontWeight: '600',
-  },
-});
+}); 

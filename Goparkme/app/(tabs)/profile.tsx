@@ -1,67 +1,102 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { userAPI } from '../../services/api';
 import AuthModal from '../../components/AuthModal';
+import { useParkingStatus } from '../../hooks/useParkingStatus';
 
 export default function ProfileScreen() {
-  const { user, onLogout, isLoading } = useAuth();
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { user, onLogout } = useAuth();
   const router = useRouter();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [balance, setBalance] = useState(0);
+  const [recentReservations, setRecentReservations] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const { currentUsage, hasActiveUsage, goToTimer, showUsageAlert } = useParkingStatus();
 
-  // 如果正在加载，显示加载状态
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>正在加载个人信息...</Text>
-      </View>
-    );
-  }
+  const fetchUserStats = async () => {
+    if (!user) return;
+    
+    setStatsLoading(true);
+    try {
+      const [balanceResponse, reservationsResponse] = await Promise.all([
+        userAPI.getUserBalance(),
+        userAPI.getUserReservations()
+      ]);
+      
+      setBalance(balanceResponse.data.balance || 0);
+      setRecentReservations(reservationsResponse.data.slice(0, 3) || []);
+    } catch (error) {
+      console.error('获取用户统计信息失败:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // 页面聚焦时刷新数据
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        fetchUserStats();
+      }
+    }, [user])
+  );
+
+  const handleLogout = async () => {
+    await onLogout();
+    router.replace('/(tabs)' as any);
+  };
 
   // 如果用户未登录，显示引导页面
   if (!user) {
     return (
-      <View style={styles.container}>
-        <View style={styles.unauthenticatedContainer}>
+      <SafeAreaView style={styles.container}>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.unauthenticatedContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.logoSection}>
             <View style={styles.logo}>
-              <Ionicons name="person-outline" size={60} color="#007AFF" />
+              <Ionicons name="car" size={60} color="#007AFF" />
             </View>
-            <Text style={styles.welcomeTitle}>欢迎使用 GoParkMe</Text>
-            <Text style={styles.welcomeSubtitle}>
-              登录后即可享受完整的停车服务
+            <Text style={styles.appName}>停车易</Text>
+            <Text style={styles.welcomeText}>
+              欢迎使用停车易！登录后享受更多功能
             </Text>
           </View>
 
           <View style={styles.featuresSection}>
+            <Text style={styles.featuresTitle}>功能特色</Text>
             <View style={styles.featureItem}>
-              <Ionicons name="calendar-outline" size={24} color="#007AFF" />
-              <Text style={styles.featureText}>管理预约记录</Text>
+              <Ionicons name="location" size={20} color="#007AFF" />
+              <Text style={styles.featureText}>智能找车位</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="car-outline" size={24} color="#007AFF" />
-              <Text style={styles.featureText}>查看停车历史</Text>
+              <Ionicons name="time" size={20} color="#007AFF" />
+              <Text style={styles.featureText}>在线预约</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="wallet-outline" size={24} color="#007AFF" />
-              <Text style={styles.featureText}>管理账户余额</Text>
+              <Ionicons name="card" size={20} color="#007AFF" />
+              <Text style={styles.featureText}>便捷支付</Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons name="settings-outline" size={24} color="#007AFF" />
-              <Text style={styles.featureText}>个性化设置</Text>
+              <Ionicons name="shield-checkmark" size={20} color="#007AFF" />
+              <Text style={styles.featureText}>安全保障</Text>
             </View>
           </View>
 
-          <View style={styles.authButtonsSection}>
-            <TouchableOpacity
+          <View style={styles.authButtons}>
+            <TouchableOpacity 
               style={styles.loginButton}
               onPress={() => setShowAuthModal(true)}
             >
               <Text style={styles.loginButtonText}>登录</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity
+            <TouchableOpacity 
               style={styles.registerButton}
               onPress={() => {
                 setShowAuthModal(true);
@@ -75,15 +110,14 @@ export default function ProfileScreen() {
           <Text style={styles.guestModeText}>
             或者继续以游客身份浏览停车位
           </Text>
-        </View>
 
-        {/* 登录弹窗 */}
-        <AuthModal
-          visible={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          onSuccess={() => setShowAuthModal(false)}
-        />
-      </View>
+          <AuthModal
+            visible={showAuthModal}
+            onClose={() => setShowAuthModal(false)}
+            onSuccess={() => setShowAuthModal(false)}
+          />
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -92,72 +126,156 @@ export default function ProfileScreen() {
       icon: 'calendar-outline',
       title: '我的预约',
       subtitle: '查看和管理预约记录',
-             onPress: () => router.push('/reservations' as any),
+      onPress: () => router.push('/reservations' as any),
     },
     {
       icon: 'car-outline',
       title: '停车记录',
       subtitle: '查看历史停车记录',
-      onPress: () => {}, // TODO: 实现停车记录页面
+      onPress: () => router.push('/parking-records' as any),
     },
     {
       icon: 'wallet-outline',
       title: '账户余额',
       subtitle: '充值和消费记录',
-      onPress: () => {}, // TODO: 实现余额页面
+      onPress: () => router.push('/balance' as any),
     },
     {
       icon: 'settings-outline',
       title: '设置',
       subtitle: '账户设置和偏好',
-      onPress: () => {}, // TODO: 实现设置页面
+      onPress: () => router.push('/settings' as any),
     },
   ];
 
   return (
-    <ScrollView style={styles.container}>
-      {/* 用户信息卡片 */}
-      <View style={styles.userCard}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={40} color="#007AFF" />
+    <SafeAreaView style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 用户信息卡片 */}
+        <View style={styles.userCard}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={40} color="#007AFF" />
+          </View>
+          <View style={styles.userInfo}>
+            <Text style={styles.username}>{user.fullName || user.username || '用户'}</Text>
+            <Text style={styles.userEmail}>{user.email}</Text>
+            {user.phone && (
+              <Text style={styles.userPhone}>{user.phone}</Text>
+            )}
+          </View>
         </View>
-        <View style={styles.userInfo}>
-          <Text style={styles.username}>{user.fullName || user.username || '用户'}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
-          {user.phone && (
-            <Text style={styles.userPhone}>{user.phone}</Text>
-          )}
-        </View>
-      </View>
 
-      {/* 菜单项 */}
-      <View style={styles.menuSection}>
-        {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.menuItem}
-            onPress={item.onPress}
-          >
-            <View style={styles.menuIcon}>
-              <Ionicons name={item.icon as any} size={24} color="#007AFF" />
+        {/* 停车状态卡片 */}
+        {hasActiveUsage && currentUsage && (
+          <View style={styles.parkingStatusCard}>
+            <View style={styles.parkingStatusHeader}>
+              <View style={styles.parkingStatusIndicator}>
+                <View style={styles.parkingStatusDot} />
+                <Text style={styles.parkingStatusTitle}>正在使用停车位</Text>
+              </View>
+              <TouchableOpacity onPress={goToTimer}>
+                <Ionicons name="chevron-forward" size={20} color="#007AFF" />
+              </TouchableOpacity>
             </View>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-              <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+            
+            <View style={styles.parkingStatusInfo}>
+              <View style={styles.parkingStatusItem}>
+                <Ionicons name="location" size={16} color="#666" />
+                <Text style={styles.parkingStatusText}>{currentUsage.location}</Text>
+              </View>
+              <View style={styles.parkingStatusItem}>
+                <Ionicons name="car" size={16} color="#666" />
+                <Text style={styles.parkingStatusText}>{currentUsage.vehicle_plate}</Text>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            
+            <TouchableOpacity style={styles.parkingStatusButton} onPress={goToTimer}>
+              <Text style={styles.parkingStatusButtonText}>查看详情</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 统计信息卡片 */}
+        <View style={styles.statsCard}>
+          <View style={styles.statsHeader}>
+            <Text style={styles.statsTitle}>我的数据</Text>
+            {statsLoading && <ActivityIndicator size="small" color="#007AFF" />}
+          </View>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>¥{balance.toFixed(2)}</Text>
+              <Text style={styles.statLabel}>账户余额</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{recentReservations.length}</Text>
+              <Text style={styles.statLabel}>最近预约</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statLabel}>积分</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 最近预约 */}
+        {recentReservations.length > 0 && (
+          <View style={styles.recentSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>最近预约</Text>
+              <TouchableOpacity onPress={() => router.push('/reservations' as any)}>
+                <Text style={styles.seeAllText}>查看全部</Text>
+              </TouchableOpacity>
+            </View>
+            {recentReservations.map((reservation: any, index) => (
+              <View key={index} style={styles.reservationItem}>
+                <View style={styles.reservationIcon}>
+                  <Ionicons name="car" size={20} color="#007AFF" />
+                </View>
+                <View style={styles.reservationInfo}>
+                  <Text style={styles.reservationLocation}>{reservation.location}</Text>
+                  <Text style={styles.reservationTime}>
+                    {reservation.reservation_date} {reservation.start_time.substring(0, 5)} - {reservation.end_time.substring(0, 5)}
+                  </Text>
+                </View>
+                <Text style={styles.reservationAmount}>¥{reservation.total_amount}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* 菜单项 */}
+        <View style={styles.menuSection}>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.menuItem}
+              onPress={item.onPress}
+            >
+              <View style={styles.menuIcon}>
+                <Ionicons name={item.icon as any} size={24} color="#007AFF" />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={styles.menuTitle}>{item.title}</Text>
+                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 登出按钮 */}
+        <View style={styles.logoutSection}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#ff3b30" />
+            <Text style={styles.logoutText}>登出</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* 登出按钮 */}
-      <View style={styles.logoutSection}>
-        <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#ff3b30" />
-          <Text style={styles.logoutText}>登出</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -166,6 +284,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f7',
   },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingBottom: 20,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -173,6 +297,97 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f5f5f7',
   },
+  // 未登录状态样式
+  unauthenticatedContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  logoSection: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f0f8ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  appName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  welcomeText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  featuresSection: {
+    width: '100%',
+    marginBottom: 40,
+  },
+  featuresTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 20,
+  },
+  featureText: {
+    fontSize: 16,
+    color: '#666',
+    marginLeft: 15,
+  },
+  authButtons: {
+    width: '100%',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  loginButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 25,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  loginButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  registerButton: {
+    backgroundColor: 'white',
+    borderRadius: 25,
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  registerButtonText: {
+    color: '#007AFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  guestModeText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  // 已登录状态样式
   userCard: {
     backgroundColor: 'white',
     padding: 20,
@@ -213,11 +428,180 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  parkingStatusCard: {
+    backgroundColor: '#f0f8ff',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#007AFF20',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  parkingStatusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  parkingStatusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  parkingStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00ff00',
+    marginRight: 8,
+  },
+  parkingStatusTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  parkingStatusInfo: {
+    marginBottom: 12,
+  },
+  parkingStatusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  parkingStatusText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+  },
+  parkingStatusButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  parkingStatusButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  statsCard: {
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  recentSection: {
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  seeAllText: {
+    fontSize: 14,
+    color: '#007AFF',
+  },
+  reservationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  reservationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f8ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  reservationInfo: {
+    flex: 1,
+  },
+  reservationLocation: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 4,
+  },
+  reservationTime: {
+    fontSize: 14,
+    color: '#666',
+  },
+  reservationAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
   menuSection: {
     backgroundColor: 'white',
     marginHorizontal: 16,
+    marginBottom: 16,
     borderRadius: 12,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   menuItem: {
     flexDirection: 'row',
@@ -240,7 +624,7 @@ const styles = StyleSheet.create({
   },
   menuTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#333',
     marginBottom: 2,
   },
@@ -249,106 +633,26 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   logoutSection: {
-    margin: 16,
-    marginTop: 32,
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
   logoutButton: {
     backgroundColor: 'white',
-    padding: 16,
     borderRadius: 12,
+    padding: 16,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ff3b30',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   logoutText: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#ff3b30',
+    fontWeight: '500',
     marginLeft: 8,
-  },
-  // 未登录状态的样式
-  unauthenticatedContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    justifyContent: 'center',
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#f0f8ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  welcomeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  featuresSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  featureText: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 12,
-  },
-  authButtonsSection: {
-    marginBottom: 20,
-  },
-  loginButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  registerButton: {
-    backgroundColor: 'white',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#007AFF',
-  },
-  registerButtonText: {
-    color: '#007AFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  guestModeText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    lineHeight: 20,
   },
 }); 

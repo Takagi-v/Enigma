@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import ParkingListDrawer from '../../components/ParkingListDrawer';
 import { ParkingSpot } from '../../types';
 import { useLocation } from '../../contexts/LocationContext';
+import { useParkingStatus } from '../../hooks/useParkingStatus';
 
 // 定义停车位数据类型 - 已被移除
 // interface ParkingSpot {
@@ -22,6 +23,7 @@ export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
   const { location } = useLocation();
+  const { hasActiveUsage, showUsageAlert } = useParkingStatus();
 
   // 获取停车位数据
   const fetchParkingSpots = async () => {
@@ -183,6 +185,13 @@ export default function MapScreen() {
 
       {/* 自定义悬浮按钮容器 */}
       <View style={styles.floatingButtonsContainer}>
+        {/* 停车状态按钮 */}
+        {hasActiveUsage && (
+          <TouchableOpacity style={[styles.iconButton, styles.parkingActiveButton]} onPress={showUsageAlert}>
+            <Ionicons name="car" size={32} color="white" />
+          </TouchableOpacity>
+        )}
+        
         {/* 打开抽屉的按钮 */}
         <TouchableOpacity style={styles.iconButton} onPress={() => bottomSheetRef.current?.snapToIndex(0)}>
           <Ionicons name="menu" size={32} color="black" />
@@ -273,5 +282,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 5,
+  },
+  parkingActiveButton: {
+    backgroundColor: '#007AFF',
   },
 });

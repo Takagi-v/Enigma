@@ -5,7 +5,7 @@ const API_BASE_URL = 'https://www.goparkme.com/api';
 const getAuthToken = async () => {
   try {
     const { getItemAsync } = await import('expo-secure-store');
-    return await getItemAsync('authToken');
+    return await getItemAsync('my-jwt');
   } catch (error) {
     console.warn('Failed to get auth token:', error);
     return null;
@@ -96,6 +96,30 @@ export const parkingAPI = {
       requireAuth: true,
     });
   },
+
+  // 开始使用停车位
+  startParking: async (spotId, vehiclePlate) => {
+    return await apiRequest(`/parking-spots/usage/${spotId}/start`, {
+      method: 'POST',
+      body: JSON.stringify({ vehicle_plate: vehiclePlate }),
+      requireAuth: true,
+    });
+  },
+
+  // 结束使用停车位
+  endParking: async (spotId) => {
+    return await apiRequest(`/parking-spots/usage/${spotId}/end`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  },
+
+  // 获取当前使用状态
+  getCurrentUsage: async () => {
+    return await apiRequest('/parking-spots/usage/current', {
+      requireAuth: true,
+    });
+  },
 };
 
 // 用户相关API
@@ -117,17 +141,57 @@ export const userAPI = {
   },
 
   // 获取用户信息
-  getUserProfile: async (token) => {
+  getUserProfile: async () => {
     return await apiRequest('/users/profile', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      requireAuth: true,
+    });
+  },
+
+  // 更新用户资料
+  updateUserProfile: async (username, userData) => {
+    return await apiRequest(`/users/${username}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+      requireAuth: true,
     });
   },
 
   // 获取用户的预约列表
-  getUserReservations: async (userId) => {
-    return await apiRequest(`/users/${userId}/reservations`, {
+  getUserReservations: async () => {
+    return await apiRequest('/users/my/reservations', {
+      requireAuth: true,
+    });
+  },
+
+  // 获取用户余额
+  getUserBalance: async () => {
+    return await apiRequest('/users/my/balance', {
+      requireAuth: true,
+    });
+  },
+
+  // 获取用户赠送余额
+  getUserGiftBalance: async () => {
+    return await apiRequest('/users/my/gift-balance', {
+      requireAuth: true,
+    });
+  },
+
+  // 获取用户停车记录
+  getUserParkingUsage: async () => {
+    return await apiRequest('/parking-spots/usage/my', {
+      requireAuth: true,
+    });
+  },
+
+  // 修改密码
+  changePassword: async (currentPassword, newPassword) => {
+    return await apiRequest('/users/my/password', {
+      method: 'PUT',
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+      }),
       requireAuth: true,
     });
   },
