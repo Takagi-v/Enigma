@@ -68,6 +68,7 @@ async function createTables(createTestData = false) {
       average_rating REAL DEFAULT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       opening_hours TEXT DEFAULT '00:00-23:59',
+      lock_serial_number TEXT,
       FOREIGN KEY (owner_username) REFERENCES users(username),
       FOREIGN KEY (current_user_id) REFERENCES users(id)
     )`,
@@ -82,6 +83,7 @@ async function createTables(createTestData = false) {
       total_amount REAL,
       payment_status TEXT DEFAULT 'pending',
       status TEXT DEFAULT 'active',
+      lock_closure_status TEXT DEFAULT 'not_applicable',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       vehicle_plate TEXT,
@@ -264,132 +266,67 @@ async function createDefaultAdmin() {
 
 // 创建测试停车场数据
 async function createTestParkingSpots() {
-  // 首先检查是否已有停车位数据
-  const existingSpots = await new Promise((resolve, reject) => {
-    db.get("SELECT COUNT(*) as count FROM parking_spots", (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
+  const defaultUser = { username: 'testuser1', password: 'password123', email: 'testuser1@example.com', fullName: '测试用户一', phone: '13800138000' };
+  try {
+    const user = await new Promise((resolve, reject) => {
+      db.get("SELECT * FROM users WHERE username = ?", [defaultUser.username], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
     });
-  });
 
-  // 如果已有数据，则不重新创建
-  if (existingSpots && existingSpots.count > 0) {
-    console.log(`数据库中已有${existingSpots.count}个停车位数据，跳过创建测试数据`);
-    return;
+    if (!user) {
+      const hashedPassword = await bcrypt.hash(defaultUser.password, 10);
+      await runQuery(`INSERT INTO users (username, password, email, full_name, phone, balance) VALUES (?, ?, ?, ?, ?, ?)`, 
+        [defaultUser.username, hashedPassword, defaultUser.email, defaultUser.fullName, defaultUser.phone, 100]);
+    }
+  } catch (error) {
+    console.error('创建测试用户失败:', error);
   }
 
-  // 定义一些基础数据用于随机组合
-  const districts = [
-    { name: '浦东新区', coordinates: ['31.2197,121.5440', '31.2297,121.5340', '31.2397,121.5240'] },
-    { name: '徐汇区', coordinates: ['31.1847,121.4372', '31.1947,121.4272', '31.2047,121.4172'] },
-    { name: '静安区', coordinates: ['31.2204,121.4737', '31.2304,121.4637', '31.2404,121.4537'] },
-    { name: '黄浦区', coordinates: ['31.2204,121.4837', '31.2304,121.4737', '31.2404,121.4637'] },
-    { name: '长宁区', coordinates: ['31.2204,121.4237', '31.2304,121.4137', '31.2404,121.4037'] },
-    { name: '虹口区', coordinates: ['31.2604,121.4837', '31.2704,121.4737', '31.2804,121.4637'] },
-    { name: '杨浦区', coordinates: ['31.2907,121.5185', '31.3007,121.5085', '31.3107,121.4985'] },
-    { name: '普陀区', coordinates: ['31.2504,121.4237', '31.2604,121.4137', '31.2704,121.4037'] }
+  const testSpots = [
+    {
+      owner_username: 'testuser1',
+      location: '123 Main St, New York, NY',
+      coordinates: '40.7128,-74.0060',
+      price: 15.5,
+      description: '这是一个宽敞的停车位，位于市中心，交通便利。',
+      status: 'available',
+      hourly_rate: 15.5,
+      contact: '123-456-7890',
+      opening_hours: '08:00-22:00',
+      lock_serial_number: 'd4c3b2a190877654' // 添加一个测试用的地锁序列号
+    },
+    {
+      owner_username: 'testuser1',
+      location: '456 Oak Ave, Los Angeles, CA',
+      coordinates: '34.0522,-118.2437',
+      price: 12.0,
+      description: '安静的社区，靠近公园。',
+      status: 'available',
+      hourly_rate: 12.0,
+      contact: '987-654-3210',
+      opening_hours: '24/7',
+      lock_serial_number: null
+    }
   ];
 
-  const locations = {
-    '浦东新区': ['陆家嘴环路', '张杨路', '世纪大道', '金科路', '川沙路'],
-    '徐汇区': ['虹桥路', '衡山路', '天钥桥路', '龙华路', '肇嘉浜路'],
-    '静安区': ['南京西路', '延安中路', '威海路', '成都北路', '北京西路'],
-    '黄浦区': ['人民大道', '南京东路', '西藏中路', '福州路', '中山东路'],
-    '长宁区': ['天山路', '娄山关路', '遵义路', '仙霞路', '延安西路'],
-    '虹口区': ['四川北路', '大连路', '临平路', '海伦路', '四平路'],
-    '杨浦区': ['控江路', '淞沪路', '杨树浦路', '黄兴路', '军工路'],
-    '普陀区': ['真北路', '曹杨路', '武宁路', '长寿路', '金沙江路']
-  };
-
-  const descriptions = [
-    '地铁站附近，交通便利',
-    '商圈中心，购物方便',
-    '小区内部停车位，安全可靠',
-    '办公楼下停车场，适合上班族',
-    '医院附近停车位，方便就医',
-    '学校周边停车场，接送方便',
-    '商场地下停车场，购物方便',
-    '住宅区停车位，24小时保安',
-    '酒店停车场，配套设施完善',
-    '公园旁停车场，环境优美'
-  ];
-
-  // 定义一些常见的开放时段
-  const openingHoursList = [
-    '00:00-23:59',
-    '06:00-22:00',
-    '07:00-21:00',
-    '08:00-20:00',
-    '09:00-18:00',
-    '10:00-22:00',
-    '07:30-23:30'
-  ];
-
-  const testSpots = [];
-  let spotId = 1;
-
-  // 为每个区域生成多个停车位
-  districts.forEach(district => {
-    locations[district.name].forEach((street, streetIndex) => {
-      // 为每条街道生成2-3个停车位
-      const spotsCount = 2 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < spotsCount; i++) {
-        const buildingNumber = Math.floor(Math.random() * 2000) + 1;
-        const hourlyRate = Math.floor(Math.random() * 15) + 5; // 5-20元每小时
-        const description = descriptions[Math.floor(Math.random() * descriptions.length)];
-        const coordinates = district.coordinates[Math.floor(Math.random() * district.coordinates.length)];
-        const opening_hours = openingHoursList[Math.floor(Math.random() * openingHoursList.length)];
-        
-        testSpots.push({
-          owner_username: 'admin',
-          location: `上海市${district.name}${street}${buildingNumber}号`,
-          coordinates: coordinates,
-          price: hourlyRate,
-          hourly_rate: hourlyRate,
-          description: `${description}，位于${district.name}${street}，周边配套齐全`,
-          status: 'available',
-          contact: `1380013${(8000 + spotId).toString().padStart(4, '0')}`,
-          current_user_id: null,
-          opening_hours: opening_hours
-        });
-        
-        spotId++;
-      }
-    });
-  });
-
-  try {
-    // 清空现有数据
-    await runQuery("DELETE FROM parking_spots");
-    
-    // 重置自增ID
-    await runQuery("DELETE FROM sqlite_sequence WHERE name='parking_spots'");
-
-    // 插入新数据
-    for (const spot of testSpots) {
+  for (const spot of testSpots) {
+    try {
       await runQuery(
-        `INSERT INTO parking_spots (
-          owner_username, location, coordinates, price, 
-          description, status, contact, hourly_rate,
-          current_user_id, opening_hours
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO parking_spots (owner_username, location, coordinates, price, description, status, hourly_rate, contact, opening_hours, lock_serial_number) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          spot.owner_username,
-          spot.location,
-          spot.coordinates,
-          spot.price,
-          spot.description,
-          spot.status,
-          spot.contact,
-          spot.hourly_rate,
-          spot.current_user_id,
-          spot.opening_hours
+          spot.owner_username, spot.location, spot.coordinates, spot.price,
+          spot.description, spot.status, spot.hourly_rate, spot.contact,
+          spot.opening_hours, spot.lock_serial_number
         ]
       );
+    } catch (error) {
+      if (!error.message.includes('UNIQUE constraint failed')) {
+        console.error('创建测试停车位失败:', error);
+      }
     }
-    console.log(`成功创建${testSpots.length}个测试停车场数据`);
-  } catch (error) {
-    console.error("创建测试停车场数据失败:", error);
   }
 }
 

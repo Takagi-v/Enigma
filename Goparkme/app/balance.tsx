@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -9,7 +10,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { userAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,8 +46,8 @@ export default function BalanceScreen() {
 
     try {
       const [balanceData, giftBalanceData] = await Promise.all([
-        userAPI.getUserBalance(user.id),
-        userAPI.getUserGiftBalance(user.id)
+        userAPI.getUserBalance(),
+        userAPI.getUserGiftBalance()
       ]);
       
       setBalance(balanceData.balance || 0);
@@ -66,7 +67,7 @@ export default function BalanceScreen() {
   };
 
   const handleTopUp = () => {
-    Alert.alert('充值功能', '充值功能正在开发中...');
+    router.push('/top-up' as any);
   };
 
   const handleWithdraw = () => {

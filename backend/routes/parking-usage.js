@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../models/db');
+const { db, get, run } = require('../models/db');
 const { authenticateToken } = require('../middleware/auth');
+const parkingLockService = require('../services/parkingLockService');
 
 // 获取当前使用状态
 router.get("/current", authenticateToken, (req, res) => {
@@ -79,225 +80,178 @@ router.get("/my", authenticateToken, (req, res) => {
 });
 
 // 开始使用停车位
-router.post("/:spotId/start", authenticateToken, (req, res) => {
+router.post("/:spotId/start", authenticateToken, async (req, res) => {
   const { spotId } = req.params;
   const userId = req.user.id;
   const { vehicle_plate } = req.body;
 
   console.log('开始使用停车位:', { spotId, userId, vehicle_plate });
 
-  // 首先检查停车位是否可用
-  db().get(
-    "SELECT * FROM parking_spots WHERE id = ? AND status = 'available'",
-    [spotId],
-    (err, spot) => {
-      if (err) {
-        console.error('检查停车位状态失败:', err);
-        return res.status(500).json({ 
-          message: "检查停车位状态失败",
-          code: 'DB_ERROR'
-        });
-      }
+  try {
+    // 检查停车位是否可用
+    const spot = await get("SELECT * FROM parking_spots WHERE id = ? AND status = 'available'", [spotId]);
 
-      if (!spot) {
-        console.log('停车位不可用:', spotId);
-        return res.status(400).json({ 
-          message: "停车位不可用",
-          code: 'SPOT_UNAVAILABLE'
-        });
-      }
-
-      // 检查用户是否已经有正在使用的停车位
-      db().get(
-        "SELECT * FROM parking_usage WHERE user_id = ? AND status = 'active'",
-        [userId],
-        (err, activeUsage) => {
-          if (err) {
-            console.error('检查用户当前使用状态失败:', err);
-            return res.status(500).json({ 
-              message: "检查用户当前使用状态失败",
-              code: 'DB_ERROR'
-            });
-          }
-
-          if (activeUsage) {
-            console.log('用户已有正在使用的停车位:', activeUsage);
-            return res.status(400).json({ 
-              message: "您已有正在使用的停车位",
-              code: 'ALREADY_IN_USE'
-            });
-          }
-
-          // 开启事务
-          db().run("BEGIN TRANSACTION");
-
-          // 创建使用记录，明确指定使用UTC时间
-          db().run(
-            `INSERT INTO parking_usage (
-              parking_spot_id, 
-              user_id, 
-              start_time,
-              vehicle_plate,
-              status
-            ) VALUES (?, ?, datetime('now', 'utc'), ?, 'active')`,
-            [spotId, userId, vehicle_plate],
-            function(err) {
-              if (err) {
-                console.error('创建使用记录失败:', err);
-                db().run("ROLLBACK");
-                return res.status(500).json({ 
-                  message: "创建使用记录失败",
-                  code: 'DB_ERROR'
-                });
-              }
-
-              const usageId = this.lastID;
-
-              // 更新停车位状态
-              db().run(
-                "UPDATE parking_spots SET status = 'occupied', current_user_id = ? WHERE id = ?",
-                [userId, spotId],
-                (err) => {
-                  if (err) {
-                    console.error('更新停车位状态失败:', err);
-                    db().run("ROLLBACK");
-                    return res.status(500).json({ 
-                      message: "更新停车位状态失败",
-                      code: 'DB_ERROR'
-                    });
-                  }
-
-                  db().run("COMMIT");
-                  console.log('成功开始使用停车位:', { usageId, spotId });
-                  res.json({ 
-                    message: "开始使用停车位",
-                    usage_id: usageId,
-                    code: 'SUCCESS'
-                  });
-                }
-              );
-            }
-          );
-        }
-      );
+    if (!spot) {
+      console.log('停车位不可用:', spotId);
+      return res.status(400).json({ 
+        message: "停车位不可用或已被占用",
+        code: 'SPOT_UNAVAILABLE'
+      });
     }
-  );
+
+    // 检查用户是否已经有正在使用的停车位
+    const activeUsage = await get("SELECT * FROM parking_usage WHERE user_id = ? AND status = 'active'", [userId]);
+
+    if (activeUsage) {
+      console.log('用户已有正在使用的停车位:', activeUsage);
+      return res.status(400).json({ 
+        message: "您已有正在使用的停车位，请先结束当前的使用",
+        code: 'ALREADY_IN_USE'
+      });
+    }
+
+    // 开启事务
+    await run("BEGIN TRANSACTION");
+
+    // 创建使用记录
+    const result = await run(
+      `INSERT INTO parking_usage (
+        parking_spot_id, 
+        user_id, 
+        start_time,
+        vehicle_plate,
+        status,
+        lock_closure_status
+      ) VALUES (?, ?, datetime('now', 'utc'), ?, 'active', ?)`,
+      [spotId, userId, vehicle_plate, spot.lock_serial_number ? 'pending_open' : 'not_applicable']
+    );
+    const usageId = result.lastID;
+
+    // 更新停车位状态
+    await run(
+      "UPDATE parking_spots SET status = 'occupied', current_user_id = ? WHERE id = ?",
+      [userId, spotId]
+    );
+
+    // 如果有关联的地锁，则发送开锁指令
+    if (spot.lock_serial_number) {
+      console.log(`正在为停车位 ${spotId} 的地锁 ${spot.lock_serial_number} 发送开锁指令`);
+      try {
+        const lockResult = await parkingLockService.openLock(spot.lock_serial_number);
+        if (!lockResult.success) {
+          // 如果开锁失败，回滚所有操作
+          throw new Error(lockResult.message || '开锁指令执行失败');
+        }
+        console.log(`地锁 ${spot.lock_serial_number} 开锁成功`);
+      } catch (lockError) {
+        console.error('开锁失败，回滚事务:', lockError);
+        await run("ROLLBACK");
+        return res.status(500).json({
+          message: `无法打开地锁: ${lockError.message}`,
+          code: 'LOCK_OPEN_FAILED'
+        });
+      }
+    }
+    
+    // 提交事务
+    await run("COMMIT");
+
+    console.log('成功开始使用停车位:', { usageId, spotId });
+    res.json({ 
+      message: "开始使用停车位",
+      usage_id: usageId,
+      code: 'SUCCESS'
+    });
+
+  } catch (error) {
+    console.error('开始使用停车位时发生错误:', error);
+    // 确保在任何错误发生时都回滚事务
+    await run("ROLLBACK");
+    res.status(500).json({ 
+      message: error.message || "处理请求时发生内部错误",
+      code: 'INTERNAL_ERROR'
+    });
+  }
 });
 
 // 结束使用停车位
-router.post("/:spotId/end", authenticateToken, (req, res) => {
+router.post("/:spotId/end", authenticateToken, async (req, res) => {
   const { spotId } = req.params;
   const userId = req.user.id;
 
   console.log('结束使用停车位:', { spotId, userId });
 
-  // 获取使用记录
-  db().get(
-    `SELECT pu.*, ps.hourly_rate 
-     FROM parking_usage pu
-     JOIN parking_spots ps ON pu.parking_spot_id = ps.id
-     WHERE pu.parking_spot_id = ? 
-     AND pu.user_id = ? 
-     AND pu.status = 'active'`,
-    [spotId, userId],
-    (err, usage) => {
-      if (err) {
-        console.error('获取使用记录失败:', err);
-        return res.status(500).json({ 
-          message: "获取使用记录失败",
-          code: 'DB_ERROR'
-        });
-      }
+  try {
+    // 获取使用记录及车位信息
+    const usage = await get(
+      `SELECT pu.*, ps.hourly_rate, ps.lock_serial_number 
+       FROM parking_usage pu
+       JOIN parking_spots ps ON pu.parking_spot_id = ps.id
+       WHERE pu.parking_spot_id = ? 
+       AND pu.user_id = ? 
+       AND pu.status = 'active'`,
+      [spotId, userId]
+    );
 
-      if (!usage) {
-        console.log('未找到有效的使用记录:', { spotId, userId });
-        return res.status(404).json({ 
-          message: "未找到有效的使用记录",
-          code: 'USAGE_NOT_FOUND'
-        });
-      }
-
-      // 开启事务
-      db().run("BEGIN TRANSACTION");
-
-      // 使用SQLite的日期时间函数计算时间差和费用，明确使用UTC时间
-      db().get(
-        `SELECT 
-          ROUND((julianday('now', 'utc') - julianday(start_time)) * 24) AS hours,
-          ROUND((julianday('now', 'utc') - julianday(start_time)) * 24 * ?) AS amount
-        FROM parking_usage WHERE id = ?`, 
-        [usage.hourly_rate, usage.id], 
-        (err, calculation) => {
-          if (err) {
-            console.error('计算费用失败:', err);
-            db().run("ROLLBACK");
-            return res.status(500).json({ 
-              message: "计算费用失败",
-              code: 'DB_ERROR'
-            });
-          }
-
-          // 取整费用
-          const totalAmount = Math.ceil(calculation.amount);
-
-          console.log('计算费用:', { 
-            hourlyRate: usage.hourly_rate,
-            hours: calculation.hours,
-            totalAmount 
-          });
-
-          // 更新使用记录，明确使用UTC时间
-          db().run(
-            `UPDATE parking_usage 
-             SET end_time = datetime('now', 'utc'),
-                 total_amount = ?,
-                 status = 'completed',
-                 payment_status = 'pending'
-             WHERE id = ?`,
-            [totalAmount, usage.id],
-            (err) => {
-              if (err) {
-                console.error('更新使用记录失败:', err);
-                db().run("ROLLBACK");
-                return res.status(500).json({ 
-                  message: "更新使用记录失败",
-                  code: 'DB_ERROR'
-                });
-              }
-
-              // 更新停车位状态
-              db().run(
-                "UPDATE parking_spots SET status = 'available', current_user_id = NULL WHERE id = ?",
-                [spotId],
-                (err) => {
-                  if (err) {
-                    console.error('更新停车位状态失败:', err);
-                    db().run("ROLLBACK");
-                    return res.status(500).json({ 
-                      message: "更新停车位状态失败",
-                      code: 'DB_ERROR'
-                    });
-                  }
-
-                  db().run("COMMIT");
-                  console.log('成功结束使用停车位:', { 
-                    usageId: usage.id, 
-                    spotId, 
-                    totalAmount 
-                  });
-                  res.json({
-                    message: "结束使用停车位",
-                    total_amount: totalAmount,
-                    code: 'SUCCESS'
-                  });
-                }
-              );
-            }
-          );
-        }
-      );
+    if (!usage) {
+      console.log('未找到有效的使用记录:', { spotId, userId });
+      return res.status(404).json({ 
+        message: "未找到需要结束的有效停车记录",
+        code: 'USAGE_NOT_FOUND'
+      });
     }
-  );
+
+    // 开启事务
+    await run("BEGIN TRANSACTION");
+
+    // 计算费用
+    const calculation = await get(
+      `SELECT (julianday('now', 'utc') - julianday(start_time)) * 24 * ? AS amount FROM parking_usage WHERE id = ?`,
+      [usage.hourly_rate, usage.id]
+    );
+    const totalAmount = Math.ceil(calculation.amount);
+    console.log('计算费用:', { hourlyRate: usage.hourly_rate, totalAmount });
+
+    // 更新使用记录
+    await run(
+      `UPDATE parking_usage 
+       SET end_time = datetime('now', 'utc'), 
+           total_amount = ?, 
+           status = 'completed',
+           payment_status = 'unpaid',
+           lock_closure_status = ?
+       WHERE id = ?`,
+      [totalAmount, usage.lock_serial_number ? 'pending_close' : 'not_applicable', usage.id]
+    );
+
+    // 如果没有关联地锁，直接释放车位
+    if (!usage.lock_serial_number) {
+      await run(
+        "UPDATE parking_spots SET status = 'available', current_user_id = NULL WHERE id = ?",
+        [spotId]
+      );
+      console.log(`停车位 ${spotId} (无地锁) 已被释放。`);
+    } else {
+      console.log(`停车位 ${spotId} (有地锁) 等待车辆离开后自动关锁并释放。`);
+    }
+    
+    // 提交事务
+    await run("COMMIT");
+
+    res.json({
+      message: "成功结束使用，请尽快将车辆驶离，地锁将在车辆离开后自动升起。",
+      total_amount: totalAmount,
+      code: 'SUCCESS'
+    });
+
+  } catch (error) {
+    console.error('结束使用停车位时发生错误:', error);
+    await run("ROLLBACK");
+    res.status(500).json({ 
+      message: error.message || "处理请求时发生内部错误",
+      code: 'INTERNAL_ERROR'
+    });
+  }
 });
 
 // 支付停车费用

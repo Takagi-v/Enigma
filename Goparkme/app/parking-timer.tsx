@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView, Alert } from 'react-native';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, SafeAreaView, Alert, ScrollView } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { parkingAPI } from '../services/api';
+import { useNavigation } from '@react-navigation/native';
 
 interface ParkingUsage {
   id: number;
@@ -18,6 +19,7 @@ interface ParkingUsage {
 export default function ParkingTimerScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const navigation = useNavigation();
   
   const [usage, setUsage] = useState<ParkingUsage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,6 +27,11 @@ export default function ParkingTimerScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [estimatedCost, setEstimatedCost] = useState(0);
+
+  // 隐藏默认Header，避免与自定义Header重复
+  useLayoutEffect(() => {
+    navigation.setOptions?.({ headerShown: false });
+  }, [navigation]);
 
   // 获取当前使用状态
   const fetchCurrentUsage = async () => {
@@ -69,17 +76,21 @@ export default function ParkingTimerScreen() {
   // 计算已用时间和费用
   useEffect(() => {
     if (usage && usage.start_time) {
-      const startTime = new Date(usage.start_time + 'Z'); // 添加Z表示UTC时间
-      const now = new Date();
+      const startTime = new Date(usage.start_time + 'Z'); // 从数据库获取的时间是UTC
+      const now = currentTime; // 使用每秒更新的当前时间
+      
       const diffMs = now.getTime() - startTime.getTime();
-      const diffMinutes = Math.floor(diffMs / (1000 * 60));
-      const diffHours = diffMs / (1000 * 60 * 60);
       
-      setElapsedTime(diffMinutes);
+      // 确保时间差不为负
+      if (diffMs < 0) return;
+
+      const elapsedMinutes = Math.floor(diffMs / (1000 * 60));
+      setElapsedTime(elapsedMinutes);
       
-      // 计算预估费用（向上取整到小时）
-      const hours = Math.ceil(diffHours);
-      const cost = hours * usage.hourly_rate;
+      // 计算预估费用 (不足一小时按一小时计)
+      // 如果 elapsedMinutes 是 0, elapsedHours 会是 0. 如果是 1-60, 会是 1.
+      const elapsedHours = elapsedMinutes === 0 ? 0 : Math.ceil(elapsedMinutes / 60);
+      const cost = elapsedHours * usage.hourly_rate;
       setEstimatedCost(cost);
     }
   }, [currentTime, usage]);
@@ -169,7 +180,11 @@ export default function ParkingTimerScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* 计时器显示 */}
         <View style={styles.timerCard}>
           <View style={styles.timerHeader}>
@@ -214,9 +229,9 @@ export default function ParkingTimerScreen() {
           </View>
           
           <View style={styles.costDisplay}>
-            <Text style={styles.costAmount}>¥{estimatedCost}</Text>
+            <Text style={styles.costAmount}>¥{estimatedCost.toFixed(2)}</Text>
             <Text style={styles.costNote}>
-              按{Math.ceil(elapsedTime / 60)}小时计费
+              按{elapsedTime === 0 ? 0 : Math.ceil(elapsedTime / 60)}小时计费
             </Text>
           </View>
           
@@ -236,19 +251,21 @@ export default function ParkingTimerScreen() {
             请在停车结束后及时点击"结束使用"按钮
           </Text>
         </View>
+      </ScrollView>
 
-        {/* 结束使用按钮 */}
-        <TouchableOpacity
-          style={[styles.endButton, ending && styles.endButtonDisabled]}
+      {/* 结束停车按钮 (悬浮) */}
+      <View style={styles.fabContainer}>
+        <TouchableOpacity 
+          style={[styles.endParkingButton, ending && styles.buttonDisabled]}
           onPress={handleEndParking}
           disabled={ending}
         >
           {ending ? (
-            <ActivityIndicator size="small" color="white" />
+            <ActivityIndicator color="white" />
           ) : (
             <>
-              <Ionicons name="stop" size={20} color="white" />
-              <Text style={styles.endButtonText}>结束使用</Text>
+              <Ionicons name="stop-circle-outline" size={24} color="white" />
+              <Text style={styles.endParkingButtonText}>结束使用 (¥{estimatedCost.toFixed(2)})</Text>
             </>
           )}
         </TouchableOpacity>
@@ -260,31 +277,7 @@ export default function ParkingTimerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f7',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  headerBackButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  refreshButton: {
-    padding: 8,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
+    backgroundColor: '#f8f9fa',
   },
   loadingContainer: {
     flex: 1,
@@ -293,22 +286,21 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
+    fontSize: 16,
     color: '#666',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   errorTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
     marginTop: 16,
-    marginBottom: 20,
   },
   backButton: {
+    marginTop: 20,
     backgroundColor: '#007AFF',
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -316,110 +308,120 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  headerBackButton: {},
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  refreshButton: {},
+  content: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 100, // Add padding to the bottom to avoid FAB overlap
   },
   timerCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
     alignItems: 'center',
+    marginBottom: 16,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
   },
   timerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   timerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
     marginLeft: 8,
   },
   timerDisplay: {
-    fontSize: 48,
+    fontSize: 64,
     fontWeight: 'bold',
     color: '#007AFF',
-    fontFamily: 'monospace',
-    marginBottom: 8,
   },
   timerSubtext: {
     fontSize: 14,
     color: '#666',
+    marginTop: 5,
   },
   infoCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingBottom: 10,
   },
   infoTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
     marginLeft: 8,
   },
   infoItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     paddingVertical: 8,
   },
   infoLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
   },
   infoValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
-    color: '#333',
   },
   costCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   costHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   costTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
     marginLeft: 8,
+    color: '#ff9500',
   },
   costDisplay: {
-    alignItems: 'center',
-    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 5,
   },
   costAmount: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#ff9500',
-    marginBottom: 4,
   },
   costNote: {
     fontSize: 14,
@@ -428,50 +430,59 @@ const styles = StyleSheet.create({
   costDescription: {
     fontSize: 12,
     color: '#999',
-    textAlign: 'center',
   },
   statusCard: {
-    backgroundColor: '#f0f8ff',
+    backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#007AFF20',
+    padding: 20,
+    alignItems: 'center',
   },
   statusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#00ff00',
+    backgroundColor: '#34C759',
     marginRight: 8,
   },
   statusText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontWeight: '600',
   },
   statusDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
-    lineHeight: 20,
+    textAlign: 'center',
   },
-  endButton: {
+  fabContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    backgroundColor: 'transparent',
+  },
+  endParkingButton: {
     backgroundColor: '#ff3b30',
+    paddingVertical: 15,
     borderRadius: 12,
-    paddingVertical: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  endButtonDisabled: {
-    backgroundColor: '#ccc',
+  buttonDisabled: {
+    opacity: 0.7,
   },
-  endButtonText: {
+  endParkingButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',

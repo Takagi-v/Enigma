@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Alert } from 'react-native';
 import { parkingAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import React from 'react';
 
 interface ParkingUsage {
   id: number;
@@ -80,6 +81,15 @@ export const useParkingStatus = () => {
       checkCurrentUsage(true);
     }
   }, [user]);
+
+  // 每次屏幕聚焦时刷新状态
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        checkCurrentUsage(true);
+      }
+    }, [user])
+  );
 
   return {
     currentUsage,

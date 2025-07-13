@@ -208,27 +208,77 @@ router.get("/:id", (req, res) => {
   });
 });
 
-// 更新停车位状态
+// 更新停车位信息
 router.put("/:id", authenticateToken, (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const {
+    location,
+    price,
+    description,
+    status,
+    hourly_rate,
+    contact,
+    opening_hours,
+    lock_serial_number // 新增地锁序列号
+  } = req.body;
 
-  db().run(
-    "UPDATE parking_spots SET status = ? WHERE id = ?",
-    [status, id],
-    function(err) {
-      if (err) {
-        console.error("Error updating parking spot:", err);
-        return res.status(500).json({ message: "更新停车位状态失败" });
-      }
+  // 动态构建SQL更新语句
+  const fields = [];
+  const params = [];
 
-      if (this.changes === 0) {
-        return res.status(404).json({ message: "停车位信息不存在" });
-      }
+  if (location !== undefined) {
+    fields.push("location = ?");
+    params.push(location);
+  }
+  if (price !== undefined) {
+    fields.push("price = ?");
+    params.push(price);
+  }
+  if (description !== undefined) {
+    fields.push("description = ?");
+    params.push(description);
+  }
+  if (status !== undefined) {
+    fields.push("status = ?");
+    params.push(status);
+  }
+  if (hourly_rate !== undefined) {
+    fields.push("hourly_rate = ?");
+    params.push(hourly_rate);
+  }
+  if (contact !== undefined) {
+    fields.push("contact = ?");
+    params.push(contact);
+  }
+  if (opening_hours !== undefined) {
+    fields.push("opening_hours = ?");
+    params.push(opening_hours);
+  }
+  // 允许将地锁序列号设置为空字符串或null来解绑
+  if (lock_serial_number !== undefined) {
+    fields.push("lock_serial_number = ?");
+    params.push(lock_serial_number || null);
+  }
 
-      res.json({ message: "停车位状态更新成功" });
+  if (fields.length === 0) {
+    return res.status(400).json({ message: "没有提供任何需要更新的字段" });
+  }
+
+  const sql = `UPDATE parking_spots SET ${fields.join(", ")} WHERE id = ?`;
+  params.push(id);
+
+  db().run(sql, params, function(err) {
+    if (err) {
+      console.error("更新停车场信息失败:", err);
+      return res.status(500).json({ message: "更新停车场信息失败" });
     }
-  );
+
+    if (this.changes === 0) {
+      return res.status(404).json({ message: "未找到该停车位，或信息无变化" });
+    }
+
+    res.json({ message: "停车场信息更新成功" });
+  });
 });
 
 // 删除停车位

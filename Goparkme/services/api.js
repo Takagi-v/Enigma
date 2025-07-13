@@ -195,9 +195,53 @@ export const userAPI = {
       requireAuth: true,
     });
   },
+
+  // 发送手机验证码
+  sendVerificationCode: async (phone) => {
+    return await apiRequest('/auth/send-verification-code', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  },
+
+  // 验证手机验证码
+  verifyCode: async (phone, code) => {
+    return await apiRequest('/auth/verify-code', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code }),
+    });
+  },
 };
+
+// 支付相关API
+export const paymentAPI = {
+  // 获取支付方式状态
+  getPaymentMethodStatus: async () => {
+    return await apiRequest('/payment/status', {
+      requireAuth: true,
+    });
+  },
+  // 保存支付方式
+  savePaymentMethod: async (paymentMethodId) => {
+    return await apiRequest('/payment/save-method', {
+      method: 'POST',
+      body: JSON.stringify({ paymentMethodId, paymentType: 'card' }),
+      requireAuth: true,
+    });
+  },
+  // 创建充值意图
+  createTopUpIntent: async (amount) => {
+    return await apiRequest('/payment/top-up', {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+        requireAuth: true,
+    });
+  },
+};
+
 
 export default {
   parkingAPI,
   userAPI,
+  paymentAPI,
 }; 

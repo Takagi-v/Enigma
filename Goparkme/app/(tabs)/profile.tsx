@@ -1,19 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Button } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { userAPI } from '../../services/api';
 import AuthModal from '../../components/AuthModal';
 import { useParkingStatus } from '../../hooks/useParkingStatus';
+import UnauthenticatedProfile from '../../components/profile/UnauthenticatedProfile';
+import UserCard from '../../components/profile/UserCard';
+import ParkingStatusCard from '../../components/profile/ParkingStatusCard';
+import StatsCard from '../../components/profile/StatsCard';
+import RecentReservations from '../../components/profile/RecentReservations';
+import CompleteProfileCard from '../../components/profile/CompleteProfileCard';
 
 export default function ProfileScreen() {
   const { user, onLogout } = useAuth();
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [balance, setBalance] = useState(0);
   const [recentReservations, setRecentReservations] = useState([]);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [showCompleteProfileCard, setShowCompleteProfileCard] = useState(false);
   const { currentUsage, hasActiveUsage, goToTimer, showUsageAlert } = useParkingStatus();
 
   const fetchUserStats = async () => {
@@ -26,8 +34,15 @@ export default function ProfileScreen() {
         userAPI.getUserReservations()
       ]);
       
-      setBalance(balanceResponse.data.balance || 0);
-      setRecentReservations(reservationsResponse.data.slice(0, 3) || []);
+      setBalance(balanceResponse.balance || 0);
+      setRecentReservations(reservationsResponse.slice(0, 3) || []);
+      
+      // 检查用户信息是否完整
+      if (!user.fullName || !user.vehiclePlate) {
+        setShowCompleteProfileCard(true);
+      } else {
+        setShowCompleteProfileCard(false);
+      }
     } catch (error) {
       console.error('获取用户统计信息失败:', error);
     } finally {
@@ -52,72 +67,24 @@ export default function ProfileScreen() {
   // 如果用户未登录，显示引导页面
   if (!user) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.unauthenticatedContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.logoSection}>
-            <View style={styles.logo}>
-              <Ionicons name="car" size={60} color="#007AFF" />
-            </View>
-            <Text style={styles.appName}>停车易</Text>
-            <Text style={styles.welcomeText}>
-              欢迎使用停车易！登录后享受更多功能
-            </Text>
-          </View>
-
-          <View style={styles.featuresSection}>
-            <Text style={styles.featuresTitle}>功能特色</Text>
-            <View style={styles.featureItem}>
-              <Ionicons name="location" size={20} color="#007AFF" />
-              <Text style={styles.featureText}>智能找车位</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="time" size={20} color="#007AFF" />
-              <Text style={styles.featureText}>在线预约</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="card" size={20} color="#007AFF" />
-              <Text style={styles.featureText}>便捷支付</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="shield-checkmark" size={20} color="#007AFF" />
-              <Text style={styles.featureText}>安全保障</Text>
-            </View>
-          </View>
-
-          <View style={styles.authButtons}>
-            <TouchableOpacity 
-              style={styles.loginButton}
-              onPress={() => setShowAuthModal(true)}
-            >
-              <Text style={styles.loginButtonText}>登录</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.registerButton}
-              onPress={() => {
-                setShowAuthModal(true);
-                // 这里可以传递初始模式为注册，但由于我们的AuthModal组件中有切换功能，先保持简单
-              }}
-            >
-              <Text style={styles.registerButtonText}>注册</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.guestModeText}>
-            或者继续以游客身份浏览停车位
-          </Text>
-
-          <AuthModal
-            visible={showAuthModal}
-            onClose={() => setShowAuthModal(false)}
-            onSuccess={() => setShowAuthModal(false)}
-          />
-        </ScrollView>
-      </SafeAreaView>
+      <>
+        <UnauthenticatedProfile
+          onLogin={() => {
+            setAuthMode('login');
+            setShowAuthModal(true);
+          }}
+          onRegister={() => {
+            setAuthMode('register');
+            setShowAuthModal(true);
+          }}
+        />
+        <AuthModal
+          visible={showAuthModal}
+          initialMode={authMode}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => setShowAuthModal(false)}
+        />
+      </>
     );
   }
 
@@ -155,97 +122,33 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
+        {/* 提示用户完善资料 */}
+        {showCompleteProfileCard && (
+          <CompleteProfileCard 
+            onPress={() => router.push('/edit-profile' as any)}
+          />
+        )}
+
         {/* 用户信息卡片 */}
-        <View style={styles.userCard}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={40} color="#007AFF" />
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.username}>{user.fullName || user.username || '用户'}</Text>
-            <Text style={styles.userEmail}>{user.email}</Text>
-            {user.phone && (
-              <Text style={styles.userPhone}>{user.phone}</Text>
-            )}
-          </View>
-        </View>
+        <UserCard user={user} />
 
         {/* 停车状态卡片 */}
         {hasActiveUsage && currentUsage && (
-          <View style={styles.parkingStatusCard}>
-            <View style={styles.parkingStatusHeader}>
-              <View style={styles.parkingStatusIndicator}>
-                <View style={styles.parkingStatusDot} />
-                <Text style={styles.parkingStatusTitle}>正在使用停车位</Text>
-              </View>
-              <TouchableOpacity onPress={goToTimer}>
-                <Ionicons name="chevron-forward" size={20} color="#007AFF" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.parkingStatusInfo}>
-              <View style={styles.parkingStatusItem}>
-                <Ionicons name="location" size={16} color="#666" />
-                <Text style={styles.parkingStatusText}>{currentUsage.location}</Text>
-              </View>
-              <View style={styles.parkingStatusItem}>
-                <Ionicons name="car" size={16} color="#666" />
-                <Text style={styles.parkingStatusText}>{currentUsage.vehicle_plate}</Text>
-              </View>
-            </View>
-            
-            <TouchableOpacity style={styles.parkingStatusButton} onPress={goToTimer}>
-              <Text style={styles.parkingStatusButtonText}>查看详情</Text>
-            </TouchableOpacity>
-          </View>
+          <ParkingStatusCard currentUsage={currentUsage} goToTimer={goToTimer} />
         )}
 
         {/* 统计信息卡片 */}
-        <View style={styles.statsCard}>
-          <View style={styles.statsHeader}>
-            <Text style={styles.statsTitle}>我的数据</Text>
-            {statsLoading && <ActivityIndicator size="small" color="#007AFF" />}
-          </View>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>¥{balance.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>账户余额</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{recentReservations.length}</Text>
-              <Text style={styles.statLabel}>最近预约</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>0</Text>
-              <Text style={styles.statLabel}>积分</Text>
-            </View>
-          </View>
-        </View>
+        <StatsCard 
+          balance={balance}
+          reservationsCount={recentReservations.length}
+          isLoading={statsLoading}
+        />
 
         {/* 最近预约 */}
-        {recentReservations.length > 0 && (
-          <View style={styles.recentSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>最近预约</Text>
-              <TouchableOpacity onPress={() => router.push('/reservations' as any)}>
-                <Text style={styles.seeAllText}>查看全部</Text>
-              </TouchableOpacity>
-            </View>
-            {recentReservations.map((reservation: any, index) => (
-              <View key={index} style={styles.reservationItem}>
-                <View style={styles.reservationIcon}>
-                  <Ionicons name="car" size={20} color="#007AFF" />
-                </View>
-                <View style={styles.reservationInfo}>
-                  <Text style={styles.reservationLocation}>{reservation.location}</Text>
-                  <Text style={styles.reservationTime}>
-                    {reservation.reservation_date} {reservation.start_time.substring(0, 5)} - {reservation.end_time.substring(0, 5)}
-                  </Text>
-                </View>
-                <Text style={styles.reservationAmount}>¥{reservation.total_amount}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        <RecentReservations 
+          reservations={recentReservations}
+          onSeeAll={() => router.push('/reservations' as any)}
+        />
 
         {/* 菜单项 */}
         <View style={styles.menuSection}>
@@ -288,7 +191,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: 20,
+    padding: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -592,16 +495,14 @@ const styles = StyleSheet.create({
     color: '#007AFF',
   },
   menuSection: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginBottom: 16,
+    backgroundColor: '#fff',
     borderRadius: 12,
-    overflow: 'hidden',
+    paddingHorizontal: 10,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
   },
   menuItem: {
     flexDirection: 'row',

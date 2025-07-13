@@ -47,10 +47,25 @@ router.get('/status', authenticateToken, async (req, res) => {
           return res.status(500).json({ message: '获取支付方式状态失败' });
         }
 
-        res.json({
-          hasPaymentMethod: !!row?.payment_method_id,
-          stripeCustomerId: row?.stripe_customer_id || null
-        });
+        if (row && row.payment_method_id) {
+          try {
+            const paymentMethod = await stripe.paymentMethods.retrieve(
+              row.payment_method_id
+            );
+            res.json({
+              hasPaymentMethod: true,
+              card: {
+                brand: paymentMethod.card.brand,
+                last4: paymentMethod.card.last4,
+              },
+            });
+          } catch (stripeErr) {
+            console.error('从Stripe获取支付方式失败:', stripeErr);
+            res.json({ hasPaymentMethod: true, card: null, error: '无法获取卡片详情' });
+          }
+        } else {
+          res.json({ hasPaymentMethod: false });
+        }
       }
     );
   } catch (error) {

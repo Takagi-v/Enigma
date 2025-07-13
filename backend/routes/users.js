@@ -212,7 +212,7 @@ function updateUserInfo(username, full_name, phone, bio, address, res) {
 }
 
 // 获取用户赠送余额
-router.get('/:userId/gift-balance', async (req, res) => {
+router.get('/:userId(\\d+)/gift-balance', async (req, res) => {
   try {
     const giftBalance = await new Promise((resolve, reject) => {
       db().get(
@@ -234,7 +234,7 @@ router.get('/:userId/gift-balance', async (req, res) => {
 });
 
 // 获取用户实际余额
-router.get('/:userId/balance', authenticateToken, async (req, res) => {
+router.get('/:userId(\\d+)/balance', authenticateToken, async (req, res) => {
   try {
     // 验证用户是否有权限访问
     if (req.user.id !== parseInt(req.params.userId) && !req.user.isAdmin) {
@@ -259,7 +259,7 @@ router.get('/:userId/balance', authenticateToken, async (req, res) => {
 });
 
 // 获取用户的预约列表
-router.get('/:userId/reservations', authenticateToken, async (req, res) => {
+router.get('/:userId(\\d+)/reservations', authenticateToken, async (req, res) => {
   try {
     // 验证用户是否有权限访问
     if (req.user.id !== parseInt(req.params.userId) && !req.user.isAdmin) {
@@ -272,7 +272,9 @@ router.get('/:userId/reservations', authenticateToken, async (req, res) => {
            r.*,
            p.location,
            p.price,
-           p.hourly_rate
+           p.hourly_rate,
+           p.latitude,
+           p.longitude
          FROM reservations r
          JOIN parking_spots p ON r.parking_spot_id = p.id
          WHERE r.user_id = ?
@@ -301,7 +303,9 @@ router.get('/my/reservations', authenticateToken, async (req, res) => {
            r.*,
            p.location,
            p.price,
-           p.hourly_rate
+           p.hourly_rate,
+           p.latitude,
+           p.longitude
          FROM reservations r
          JOIN parking_spots p ON r.parking_spot_id = p.id
          WHERE r.user_id = ?

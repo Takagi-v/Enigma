@@ -15,20 +15,8 @@ import { userAPI, parkingAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useProtectedRoute } from '../hooks/useProtectedRoute';
 import AuthModal from '../components/AuthModal';
+import ReservationCard, { Reservation } from '../components/ReservationCard';
 
-interface Reservation {
-  id: number;
-  parking_spot_id: number;
-  reservation_date: string;
-  start_time: string;
-  end_time: string;
-  total_amount: number;
-  status: 'active' | 'confirmed' | 'cancelled';
-  notes?: string;
-  location: string;
-  hourly_rate: number;
-  created_at: string;
-}
 
 export default function ReservationsScreen() {
   const router = useRouter();
@@ -57,7 +45,7 @@ export default function ReservationsScreen() {
     if (!user) return;
 
     try {
-      const data = await userAPI.getUserReservations(user.id);
+      const data = await userAPI.getUserReservations();
       setReservations(data || []);
     } catch (error) {
       console.error('获取预约列表失败:', error);
@@ -180,69 +168,14 @@ export default function ReservationsScreen() {
           }
         >
           {reservations.map((reservation) => (
-            <View key={reservation.id} style={styles.reservationCard}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.locationText}>{reservation.location}</Text>
-                <Text
-                  style={[
-                    styles.statusBadge,
-                    { color: getStatusColor(reservation.status) },
-                  ]}
-                >
-                  {getStatusText(reservation.status)}
-                </Text>
-              </View>
-
-              <View style={styles.cardContent}>
-                <View style={styles.infoRow}>
-                  <Ionicons name="calendar-outline" size={16} color="#666" />
-                  <Text style={styles.infoText}>
-                    {formatDate(reservation.reservation_date)}
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Ionicons name="time-outline" size={16} color="#666" />
-                  <Text style={styles.infoText}>
-                    {formatTime(reservation.start_time)} - {formatTime(reservation.end_time)}
-                  </Text>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Ionicons name="cash-outline" size={16} color="#666" />
-                  <Text style={styles.infoText}>¥{reservation.total_amount}</Text>
-                </View>
-
-                {reservation.notes && (
-                  <View style={styles.infoRow}>
-                    <Ionicons name="document-text-outline" size={16} color="#666" />
-                    <Text style={styles.infoText}>{reservation.notes}</Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  style={styles.detailButton}
-                  onPress={() => router.push(`/parking/${reservation.parking_spot_id}`)}
-                >
-                  <Text style={styles.detailButtonText}>查看详情</Text>
-                </TouchableOpacity>
-
-                {reservation.status !== 'cancelled' &&
-                  isUpcoming(reservation.reservation_date, reservation.start_time) && (
-                    <TouchableOpacity
-                      style={styles.cancelButton}
-                      onPress={() => handleCancelReservation(reservation)}
-                    >
-                      <Text style={styles.cancelButtonText}>取消预约</Text>
-                    </TouchableOpacity>
-                  )}
-              </View>
-            </View>
+            <ReservationCard 
+              key={reservation.id}
+              reservation={reservation}
+              onCancel={handleCancelReservation}
+            />
           ))}
-                 </ScrollView>
-       )}
+        </ScrollView>
+      )}
 
        {/* 登录弹窗 */}
        <AuthModal
@@ -282,119 +215,43 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
   },
   title: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    padding: 20,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
     marginTop: 16,
-    marginBottom: 8,
   },
   emptySubtext: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
     textAlign: 'center',
-    marginBottom: 32,
   },
   exploreButton: {
+    marginTop: 24,
     backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
   },
   exploreButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  reservationCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  locationText: {
-    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-  },
-  statusBadge: {
-    fontSize: 14,
-    fontWeight: '600',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-  },
-  cardContent: {
-    marginBottom: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  infoText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#666',
-  },
-  cardActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  detailButton: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  detailButtonText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#dc3545',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    color: 'white',
-    fontWeight: '600',
   },
 });

@@ -111,8 +111,10 @@ router.post('/send-verification-code', async (req, res) => {
         verifyRequested: true,
         expiresAt: Date.now() + 10 * 60 * 1000 // 10分钟后过期
       };
+      
+      return res.status(200).json({ message: "验证码已发送" });
     } else {
-      // 开发环境下，生成6位随机验证码并打印
+      // 开发环境下，生成6位随机验证码并返回给前端用于测试
       const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       console.log(`开发环境 - 手机号: ${formattedPhone}, 验证码: ${verificationCode}`);
       
@@ -121,9 +123,12 @@ router.post('/send-verification-code', async (req, res) => {
         code: verificationCode,
         expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
       };
+      
+      return res.status(200).json({ 
+        message: "验证码已生成 (仅供测试)",
+        verificationCode: verificationCode 
+      });
     }
-    
-    return res.status(200).json({ message: "验证码已发送" });
   } catch (error) {
     console.error('发送验证码错误:', error);
     return res.status(500).json({ message: "发送验证码失败" });

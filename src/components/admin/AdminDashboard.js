@@ -149,7 +149,8 @@ const AdminDashboard = () => {
   const handleEditSpot = (spot) => {
     setEditingSpot({
       ...spot,
-      price: Number(spot.price)
+      price: Number(spot.price),
+      lock_serial_number: spot.lock_serial_number || ''
     });
   };
 
@@ -165,9 +166,13 @@ const AdminDashboard = () => {
         },
         body: JSON.stringify({
           location: editingSpot.location,
-          price: editingSpot.price,
+          price: parseFloat(editingSpot.price) || 0,
           status: editingSpot.status,
-          description: editingSpot.description
+          description: editingSpot.description,
+          hourly_rate: parseFloat(editingSpot.hourly_rate) || 0,
+          contact: editingSpot.contact,
+          opening_hours: editingSpot.opening_hours,
+          lock_serial_number: editingSpot.lock_serial_number
         }),
       });
 
@@ -268,48 +273,23 @@ const AdminDashboard = () => {
           <div className="parking-spots-table">
             {editingSpot && (
               <div className="edit-form-overlay">
-                <form className="edit-form" onSubmit={handleUpdateSpot}>
-                  <h3>编辑停车位</h3>
-                  <div className="form-group">
-                    <label>位置:</label>
-                    <input
-                      type="text"
-                      value={editingSpot.location}
-                      onChange={(e) => setEditingSpot({...editingSpot, location: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>价格:</label>
-                    <input
-                      type="number"
-                      value={editingSpot.price}
-                      onChange={(e) => setEditingSpot({...editingSpot, price: Number(e.target.value)})}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>状态:</label>
-                    <select
-                      value={editingSpot.status || 'available'}
-                      onChange={(e) => setEditingSpot({...editingSpot, status: e.target.value})}
-                    >
+                <form onSubmit={handleUpdateSpot} className="edit-spot-form">
+                  <label>位置: <input type="text" value={editingSpot.location} onChange={e => setEditingSpot({...editingSpot, location: e.target.value})} /></label>
+                  <label>价格: <input type="number" value={editingSpot.price} onChange={e => setEditingSpot({...editingSpot, price: e.target.value})} /></label>
+                  <label>每小时费率: <input type="number" value={editingSpot.hourly_rate} onChange={e => setEditingSpot({...editingSpot, hourly_rate: e.target.value})} /></label>
+                  <label>联系方式: <input type="text" value={editingSpot.contact} onChange={e => setEditingSpot({...editingSpot, contact: e.target.value})} /></label>
+                  <label>开放时间: <input type="text" value={editingSpot.opening_hours} onChange={e => setEditingSpot({...editingSpot, opening_hours: e.target.value})} /></label>
+                  <label>地锁序列号: <input type="text" value={editingSpot.lock_serial_number} onChange={e => setEditingSpot({...editingSpot, lock_serial_number: e.target.value})} /></label>
+                  <label>状态: 
+                    <select value={editingSpot.status} onChange={e => setEditingSpot({...editingSpot, status: e.target.value})}>
                       <option value="available">可用</option>
                       <option value="occupied">已占用</option>
                       <option value="maintenance">维护中</option>
                     </select>
-                  </div>
-                  <div className="form-group">
-                    <label>描述:</label>
-                    <textarea
-                      value={editingSpot.description || ''}
-                      onChange={(e) => setEditingSpot({...editingSpot, description: e.target.value})}
-                    />
-                  </div>
-                  <div className="form-buttons">
-                    <button type="submit">保存</button>
-                    <button type="button" onClick={() => setEditingSpot(null)}>取消</button>
-                  </div>
+                  </label>
+                  <label>描述: <textarea value={editingSpot.description} onChange={e => setEditingSpot({...editingSpot, description: e.target.value})} /></label>
+                  <button type="submit">更新</button>
+                  <button type="button" onClick={() => setEditingSpot(null)}>取消</button>
                 </form>
               </div>
             )}

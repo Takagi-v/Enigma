@@ -266,7 +266,7 @@ export default function ReservationModal({
           <DateTimePicker
             value={startTime}
             mode="time"
-            display="default"
+            display="spinner"
             onChange={(event: any, time?: Date) => {
               setShowStartTimePicker(false);
               if (time) {
@@ -285,7 +285,7 @@ export default function ReservationModal({
           <DateTimePicker
             value={endTime}
             mode="time"
-            display="default"
+            display="spinner"
             minimumDate={startTime}
             onChange={(event: any, time?: Date) => {
               setShowEndTimePicker(false);
