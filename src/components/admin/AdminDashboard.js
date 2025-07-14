@@ -289,7 +289,7 @@ const AdminDashboard = () => {
                   </label>
                   <label>描述: <textarea value={editingSpot.description} onChange={e => setEditingSpot({...editingSpot, description: e.target.value})} /></label>
                   <button type="submit">更新</button>
-                  <button type="button" onClick={() => setEditingSpot(null)}>取消</button>
+                    <button type="button" onClick={() => setEditingSpot(null)}>取消</button>
                 </form>
               </div>
             )}

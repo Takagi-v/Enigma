@@ -268,12 +268,12 @@ router.put("/:id", authenticateToken, (req, res) => {
   params.push(id);
 
   db().run(sql, params, function(err) {
-    if (err) {
+      if (err) {
       console.error("更新停车场信息失败:", err);
       return res.status(500).json({ message: "更新停车场信息失败" });
-    }
+      }
 
-    if (this.changes === 0) {
+      if (this.changes === 0) {
       return res.status(404).json({ message: "未找到该停车位，或信息无变化" });
     }
 

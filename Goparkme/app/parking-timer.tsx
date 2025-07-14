@@ -99,24 +99,26 @@ export default function ParkingTimerScreen() {
     if (!usage) return;
 
     Alert.alert(
-      '确认结束',
-      `确定要结束使用吗？\n预估费用：¥${estimatedCost}`,
+      '确认结束停车',
+      '请确保您的车辆已完全驶离车位。是否继续？',
       [
         { text: '取消', style: 'cancel' },
         { 
-          text: '确定', 
+          text: '确定结束', 
           style: 'destructive',
           onPress: async () => {
             try {
               setEnding(true);
-              await parkingAPI.endParking(usage.parking_spot_id.toString());
+              const response = await parkingAPI.endParking(usage.parking_spot_id.toString());
               
-              Alert.alert('成功', '停车结束，费用已计算', [
-                { text: '确定', onPress: () => router.replace('/(tabs)' as any) }
+              Alert.alert('停车结束', `感谢您的使用！\n最终费用：¥${response.total_amount.toFixed(2)}`, [
+                { text: '好的', onPress: () => router.replace('/(tabs)' as any) }
               ]);
+
             } catch (error: any) {
               console.error('结束使用失败:', error);
-              Alert.alert('错误', error.message || '结束使用失败，请重试');
+              // 直接显示后端返回的错误信息
+              Alert.alert('操作失败', error.message || '结束使用失败，请重试');
             } finally {
               setEnding(false);
             }
@@ -443,10 +445,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#34C759',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#34c759', // Green
     marginRight: 8,
   },
   statusText: {
@@ -487,5 +489,33 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+  },
+  endButton: {
+    backgroundColor: '#ff3b30', // Red
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  closeLockButton: {
+    backgroundColor: '#007AFF', // Blue
+  },
+  endButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 }); 

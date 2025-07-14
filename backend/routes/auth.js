@@ -123,7 +123,7 @@ router.post('/send-verification-code', async (req, res) => {
         code: verificationCode,
         expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
       };
-      
+    
       return res.status(200).json({ 
         message: "验证码已生成 (仅供测试)",
         verificationCode: verificationCode 

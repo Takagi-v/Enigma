@@ -270,10 +270,10 @@ async function createTestParkingSpots() {
   try {
     const user = await new Promise((resolve, reject) => {
       db.get("SELECT * FROM users WHERE username = ?", [defaultUser.username], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
+      if (err) reject(err);
+      else resolve(row);
     });
+  });
 
     if (!user) {
       const hashedPassword = await bcrypt.hash(defaultUser.password, 10);
@@ -303,7 +303,7 @@ async function createTestParkingSpots() {
       coordinates: '34.0522,-118.2437',
       price: 12.0,
       description: '安静的社区，靠近公园。',
-      status: 'available',
+          status: 'available',
       hourly_rate: 12.0,
       contact: '987-654-3210',
       opening_hours: '24/7',
@@ -311,7 +311,7 @@ async function createTestParkingSpots() {
     }
   ];
 
-  for (const spot of testSpots) {
+    for (const spot of testSpots) {
     try {
       await runQuery(
         `INSERT INTO parking_spots (owner_username, location, coordinates, price, description, status, hourly_rate, contact, opening_hours, lock_serial_number) 
@@ -322,7 +322,7 @@ async function createTestParkingSpots() {
           spot.opening_hours, spot.lock_serial_number
         ]
       );
-    } catch (error) {
+  } catch (error) {
       if (!error.message.includes('UNIQUE constraint failed')) {
         console.error('创建测试停车位失败:', error);
       }

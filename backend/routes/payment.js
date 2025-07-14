@@ -52,7 +52,7 @@ router.get('/status', authenticateToken, async (req, res) => {
             const paymentMethod = await stripe.paymentMethods.retrieve(
               row.payment_method_id
             );
-            res.json({
+        res.json({
               hasPaymentMethod: true,
               card: {
                 brand: paymentMethod.card.brand,
