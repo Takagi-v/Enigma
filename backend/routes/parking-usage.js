@@ -38,7 +38,7 @@ router.get("/current", authenticateToken, async (req, res) => {
     return res.status(500).json({ 
       message: "获取当前使用状态失败",
       code: 'DB_ERROR'
-    });
+  });
   }
 });
 
@@ -72,7 +72,7 @@ router.get("/my", authenticateToken, async (req, res) => {
     return res.status(500).json({ 
       message: "获取停车记录失败",
       code: 'DB_ERROR'
-    });
+  });
   }
 });
 

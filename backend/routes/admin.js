@@ -219,16 +219,16 @@ router.put("/users/:id", authenticateAdmin, async (req, res) => {
 // 修改停车位信息
 router.put("/parking-spots/:id", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
-  const { location, price, status, description, latitude, longitude } = req.body;
+  const { location, price, status, description, coordinates } = req.body;
 
   try {
     const result = await new Promise((resolve, reject) => {
       db().run(
         `UPDATE parking_spots 
          SET location = ?, price = ?, status = ?, description = ?,
-         latitude = ?, longitude = ?, updated_at = DATETIME('now', 'utc')
+         coordinates = ?, updated_at = DATETIME('now', 'utc')
          WHERE id = ?`,
-        [location, price, status, description, latitude, longitude, id],
+        [location, price, status, description, coordinates, id],
         function(err) {
           if (err) reject(err);
           else resolve(this.changes);
@@ -257,20 +257,19 @@ router.post("/parking-spots", authenticateAdmin, async (req, res) => {
     status, 
     opening_hours, 
     lock_serial_number,
-    latitude,
-    longitude
+    coordinates
   } = req.body;
 
-  if (!owner_username || !location || !price) {
-    return res.status(400).json({ message: "所有者、位置和价格是必填项。" });
+  if (!owner_username || !location || !price || !coordinates) {
+    return res.status(400).json({ message: "所有者、位置、价格和坐标是必填项。" });
   }
 
   try {
     const result = await new Promise((resolve, reject) => {
       db().run(
-        `INSERT INTO parking_spots (owner_username, location, price, description, status, opening_hours, lock_serial_number, latitude, longitude)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [owner_username, location, price, description, status, opening_hours, lock_serial_number, latitude, longitude],
+        `INSERT INTO parking_spots (owner_username, location, price, description, status, opening_hours, lock_serial_number, coordinates)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [owner_username, location, price, description, status, opening_hours, lock_serial_number, coordinates],
         function(err) {
           if (err) reject(err);
           else resolve({ id: this.lastID });

@@ -34,7 +34,6 @@ export default function MapScreen() {
       const response = await parkingAPI.getAllParkingSpots();
       
       if (response && response.spots) {
-        // 过滤有效的坐标数据
         const validSpots = response.spots.filter((spot: ParkingSpot) => {
           if (!spot.coordinates) return false;
           const coords = spot.coordinates.split(',');
@@ -78,7 +77,6 @@ export default function MapScreen() {
       };
     }
 
-    // 计算所有停车位的边界
     const latitudes = parkingSpots.map(spot => parseFloat(spot.coordinates.split(',')[0]));
     const longitudes = parkingSpots.map(spot => parseFloat(spot.coordinates.split(',')[1]));
     
@@ -112,16 +110,16 @@ export default function MapScreen() {
 
   // 处理从抽屉中选择停车位的事件
   const handleSpotSelectFromDrawer = (spot: ParkingSpot) => {
-    bottomSheetRef.current?.close(); // 关闭抽屉
+    bottomSheetRef.current?.close(); 
     const [latitude, longitude] = spot.coordinates.split(',').map(Number);
     if (mapRef.current) {
       const region: Region = {
         latitude,
         longitude,
-        latitudeDelta: 0.01, // 聚焦时使用更小的Delta值，放大地图
+        latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       };
-      mapRef.current.animateToRegion(region, 1000); // 1秒内平滑移动
+      mapRef.current.animateToRegion(region, 1000); 
     }
   };
 

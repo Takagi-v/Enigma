@@ -95,19 +95,19 @@ router.post('/send-verification-code', async (req, res) => {
     const formattedPhone = `+1${standardizedPhone}`;
     
     // 强制使用开发环境逻辑：生成6位随机验证码并返回给前端用于测试
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     console.log(`测试模式 - 手机号: ${formattedPhone}, 验证码: ${verificationCode}`);
+      
+      // 存储验证码，设置5分钟过期
+      verificationCodes[standardizedPhone] = {
+        code: verificationCode,
+        expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
+      };
     
-    // 存储验证码，设置5分钟过期
-    verificationCodes[standardizedPhone] = {
-      code: verificationCode,
-      expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
-    };
-  
-    return res.status(200).json({ 
-      message: "验证码已生成 (仅供测试)",
-      verificationCode: verificationCode 
-    });
+      return res.status(200).json({ 
+        message: "验证码已生成 (仅供测试)",
+        verificationCode: verificationCode 
+      });
   } catch (error) {
     console.error('发送验证码错误:', error);
     return res.status(500).json({ message: "发送验证码失败" });
@@ -128,24 +128,24 @@ router.post('/verify-code', async (req, res) => {
     const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
     
     // 强制使用开发环境的验证逻辑
-    const storedVerification = verificationCodes[standardizedPhone];
-    
-    if (!storedVerification) {
-      return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
-    }
-    
-    if (Date.now() > storedVerification.expiresAt) {
-      // 删除过期的验证码
+      const storedVerification = verificationCodes[standardizedPhone];
+      
+      if (!storedVerification) {
+        return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
+      }
+      
+      if (Date.now() > storedVerification.expiresAt) {
+        // 删除过期的验证码
+        delete verificationCodes[standardizedPhone];
+        return res.status(400).json({ message: "验证码已过期，请重新获取" });
+      }
+      
+      if (storedVerification.code !== code) {
+        return res.status(400).json({ message: "验证码不正确" });
+      }
+      
+      // 验证成功，删除验证码
       delete verificationCodes[standardizedPhone];
-      return res.status(400).json({ message: "验证码已过期，请重新获取" });
-    }
-    
-    if (storedVerification.code !== code) {
-      return res.status(400).json({ message: "验证码不正确" });
-    }
-    
-    // 验证成功，删除验证码
-    delete verificationCodes[standardizedPhone];
     
     return res.status(200).json({ message: "验证成功" });
   } catch (error) {

@@ -175,7 +175,8 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
     };
 
     if (mode === 'detail' && initialSpot) {
-      setUserLocation({ lat: initialSpot.lat, lng: initialSpot.lng });
+      const [lat, lng] = initialSpot.coordinates.split(',').map(Number);
+      setUserLocation({ lat, lng });
       setLoading(false);
     } else {
       getLocation();
@@ -275,16 +276,19 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
       setIsLoadingSpots(true);
       try {
         const response = await fetch(`${config.API_URL}/parking-spots`);
-        const data = await response.json();
-        
-        // 设置基本的停车位数据，不包含预约状态
-        setParkingSpots(data.spots || []);
-        
-        if (currentPoint) {
-          await updateSortedSpots(currentPoint.lat, currentPoint.lng, data.spots || []);
+        if (response.ok) {
+          let data = await response.json();
+          const spots = data.spots || [];
+          setParkingSpots(spots);
+          if (userLocation) {
+            updateSortedSpots(userLocation.lat, userLocation.lng, spots);
+          }
+        } else {
+          setError('获取停车位失败');
         }
-      } catch (error) {
-        console.error('获取停车位失败:', error);
+      } catch (err) {
+        console.error('获取停车位错误:', err);
+        setError('网络错误，无法获取停车位');
       } finally {
         setIsLoadingSpots(false);
       }
@@ -363,20 +367,15 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
   // 更新排序后的停车位
   const updateSortedSpots = async (lat, lng, spots = parkingSpots) => {
     setIsCalculating(true);
-    try {
-      const spotsWithDistance = spots
-        .filter(spot => spot?.coordinates)
-        .map(spot => {
-          const [spotLat, spotLng] = spot.coordinates.split(',').map(Number);
-          const distanceFromPoint = calculateDistance(lat, lng, spotLat, spotLng);
-          const distanceFromUser = userLocation ? 
-            calculateDistance(userLocation.lat, userLocation.lng, spotLat, spotLng) : 
-            distanceFromPoint;
-          return {
-            ...spot,
-            distance: isUserInitiated ? distanceFromUser : distanceFromPoint
-          };
-        });
+    const spotsWithDistance = spots
+      .filter(spot => spot?.coordinates)
+      .map(spot => {
+        const [spotLat, spotLng] = spot.coordinates.split(',').map(Number);
+        return {
+          ...spot,
+          distance: calculateDistance(lat, lng, spotLat, spotLng)
+        };
+    });
 
       const sorted = [...spotsWithDistance].sort((a, b) => {
         switch(sortType) {
@@ -391,13 +390,7 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
       });
 
       setSortedSpots(sorted);
-      return true;
-    } catch (error) {
-      console.error('计算距离时出错:', error);
-      return false;
-    } finally {
       setIsCalculating(false);
-    }
   };
 
   // 处理地图点击
@@ -599,16 +592,16 @@ function Map({ onLocationSelect, mode = "view", initialSpot = null, hideSearch =
 
       {/* 停车位标记 - 仅在非详情模式下显示 */}
       {mode !== 'detail' && parkingSpots.map((spot) => {
-        if (!spot.coordinates) return null;
-        const [lat, lng] = spot.coordinates.split(',').map(Number);
-        return (
-          <Marker
-            key={spot.id}
-            position={{ lat, lng }}
-            icon={parkingIcon}
-            onClick={() => setSelectedMarker(spot)}
-          />
-        );
+          if (!spot.coordinates) return null;
+          const [lat, lng] = spot.coordinates.split(',').map(Number);
+          return (
+            <Marker
+              key={spot.id}
+              position={{ lat, lng }}
+              icon={parkingIcon}
+              onClick={() => setSelectedMarker(spot)}
+            />
+          );
       })}
 
       {/* 详情模式下的停车位标记 */}

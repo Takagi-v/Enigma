@@ -58,8 +58,7 @@ async function createTables(createTestData = false) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       owner_username TEXT NOT NULL,
       location TEXT NOT NULL,
-      latitude REAL,
-      longitude REAL,
+      coordinates TEXT,
       price REAL NOT NULL,
       description TEXT,
       status TEXT DEFAULT 'available',
@@ -218,6 +217,8 @@ async function createTables(createTestData = false) {
   
   // 只有在需要创建测试数据时才执行
   if (createTestData) {
+    // 创建测试用户
+    await createTestUsers();
     // 创建测试停车场数据
     await createTestParkingSpots();
     // 创建测试评论数据
@@ -266,70 +267,82 @@ async function createDefaultAdmin() {
   }
 }
 
+// 创建测试用户
+async function createTestUsers() {
+    const testUsers = [
+        { username: 'user1', password: 'password1', email: 'user1@example.com', fullName: '张三', phone: '13800138001', balance: 100 },
+        { username: 'user2', password: 'password2', email: 'user2@example.com', fullName: '李四', phone: '13800138002', balance: 250 },
+        { username: 'user3', password: 'password3', email: 'user3@example.com', fullName: '王五', phone: '13800138003', balance: 50 },
+        { username: 'testuser1', password: 'password123', email: 'testuser1@example.com', fullName: '测试用户一', phone: '13800138000', balance: 150 },
+        { username: 'owner1', password: 'password_owner', email: 'owner1@example.com', fullName: '车位主', phone: '13800138004', balance: 500 },
+    ];
+
+    console.log("--- 开始创建测试用户 ---");
+    for (const userData of testUsers) {
+        try {
+            const user = await get("SELECT * FROM users WHERE username = ?", [userData.username]);
+            if (!user) {
+                const hashedPassword = await bcrypt.hash(userData.password, 10);
+                await runQuery(`INSERT INTO users (username, password, email, full_name, phone, balance) VALUES (?, ?, ?, ?, ?, ?)`, 
+                    [userData.username, hashedPassword, userData.email, userData.fullName, userData.phone, userData.balance]);
+                
+                // 在控制台输出明文密码
+                console.log(`用户: ${userData.username}, 密码: ${userData.password}`);
+            }
+        } catch (error) {
+            if (!error.message.includes('UNIQUE constraint failed')) {
+                console.error(`创建测试用户 ${userData.username} 失败:`, error);
+            }
+        }
+    }
+    console.log("--- 测试用户创建完成 ---");
+}
+
 // 创建测试停车场数据
 async function createTestParkingSpots() {
-  const defaultUser = { username: 'testuser1', password: 'password123', email: 'testuser1@example.com', fullName: '测试用户一', phone: '13800138000' };
-  try {
-    const user = await new Promise((resolve, reject) => {
-      db.get("SELECT * FROM users WHERE username = ?", [defaultUser.username], (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
+  const testSpots = [];
+  const baseLat = 31.2304;
+  const baseLng = 121.4737;
 
-    if (!user) {
-      const hashedPassword = await bcrypt.hash(defaultUser.password, 10);
-      await runQuery(`INSERT INTO users (username, password, email, full_name, phone, balance) VALUES (?, ?, ?, ?, ?, ?)`, 
-        [defaultUser.username, hashedPassword, defaultUser.email, defaultUser.fullName, defaultUser.phone, 100]);
-    }
-  } catch (error) {
-    console.error('创建测试用户失败:', error);
+  for (let i = 0; i < 20; i++) {
+    const deltaLat = (Math.random() - 0.5) * 0.1;
+    const deltaLng = (Math.random() - 0.5) * 0.1;
+    testSpots.push({
+      owner_username: 'owner1', // 所有车位都归属于 owner1
+      location: `上海市黄浦区-测试车位-${i + 1}`,
+      coordinates: `${(baseLat + deltaLat).toFixed(6)},${(baseLng + deltaLng).toFixed(6)}`,
+      price: parseFloat((8 + Math.random() * 12).toFixed(2)),
+      description: `这是一个位于上海市中心的示例停车位 #${i + 1}，方便测试使用。`,
+      status: 'available',
+      hourly_rate: parseFloat((10 + Math.random() * 5).toFixed(2)),
+      contact: '13800138004',
+      opening_hours: '00:00-23:59',
+      lock_serial_number: i % 4 === 0 ? `SH-LOCK-${1000 + i}` : null // 每4个车位有一个地锁
+    });
   }
 
-  const testSpots = [
-    {
-      owner_username: 'testuser1',
-      location: '123 Main St, New York, NY',
-      coordinates: '40.7128,-74.0060',
-      price: 15.5,
-      description: '这是一个宽敞的停车位，位于市中心，交通便利。',
-      status: 'available',
-      hourly_rate: 15.5,
-      contact: '123-456-7890',
-      opening_hours: '08:00-22:00',
-      lock_serial_number: 'd4c3b2a190877654' // 添加一个测试用的地锁序列号
-    },
-    {
-      owner_username: 'testuser1',
-      location: '456 Oak Ave, Los Angeles, CA',
-      coordinates: '34.0522,-118.2437',
-      price: 12.0,
-      description: '安静的社区，靠近公园。',
-          status: 'available',
-      hourly_rate: 12.0,
-      contact: '987-654-3210',
-      opening_hours: '24/7',
-      lock_serial_number: null
-    }
-  ];
-
-    for (const spot of testSpots) {
+  for (const spot of testSpots) {
     try {
-      await runQuery(
-        `INSERT INTO parking_spots (owner_username, location, coordinates, price, description, status, hourly_rate, contact, opening_hours, lock_serial_number) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          spot.owner_username, spot.location, spot.coordinates, spot.price,
-          spot.description, spot.status, spot.hourly_rate, spot.contact,
-          spot.opening_hours, spot.lock_serial_number
-        ]
-      );
-  } catch (error) {
+      // 检查是否已存在
+      const existingSpot = await get("SELECT id FROM parking_spots WHERE location = ?", [spot.location]);
+      if (!existingSpot) {
+          await runQuery(
+            `INSERT INTO parking_spots (owner_username, location, coordinates, price, description, status, hourly_rate, contact, opening_hours, lock_serial_number) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              spot.owner_username, spot.location, spot.coordinates, spot.price,
+              spot.description, spot.status, spot.hourly_rate, spot.contact,
+              spot.opening_hours, spot.lock_serial_number
+            ]
+          );
+      }
+    } catch (error) {
       if (!error.message.includes('UNIQUE constraint failed')) {
         console.error('创建测试停车位失败:', error);
       }
     }
   }
+   console.log("测试停车位数据生成完毕。");
 }
 
 // 创建测试评论数据
@@ -451,6 +464,30 @@ function getDB() {
     connectDB();
   }
   return db;
+}
+
+async function get(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    getDB().get(sql, params, (err, row) => {
+        if (err) {
+            reject(err);
+        } else {
+            resolve(row);
+        }
+    });
+  });
+}
+
+async function all(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        getDB().all(sql, params, (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows);
+            }
+        });
+    });
 }
 
 module.exports = {

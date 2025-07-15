@@ -1,13 +1,12 @@
 export interface ParkingSpot {
     id: number;
+    owner_username: string;
     location: string;
     coordinates: string;
-    price: number; // For consistency, though may not be used directly
+    price: number;
     hourly_rate: number;
-    status: 'available' | 'occupied' | 'reserved';
-    owner_username: string;
     description: string;
-    contact: string;
+    status: 'available' | 'occupied' | 'unavailable';
     average_rating: string; // The API returns it as a string
     opening_hours: string;
     created_at: string;

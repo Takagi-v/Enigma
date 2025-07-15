@@ -47,6 +47,9 @@ export default function AuthModal({
   // 注册流程分为三个步骤: 1: 输入手机号, 2: 输入验证码, 3: 输入个人信息
   const [registerStep, setRegisterStep] = useState(1);
   
+  // 用于在界面上显示测试验证码
+  const [displayedCode, setDisplayedCode] = useState<string | null>(null);
+
   // 登录表单的状态
   const [loginForm, setLoginForm] = useState({ account: '', password: '' });
 
@@ -66,6 +69,7 @@ export default function AuthModal({
     if (visible) {
       setMode(initialMode);
       setRegisterStep(1); // 每次打开时重置注册步骤
+      setDisplayedCode(null); // 重置显示的验证码
       resetForms();
     }
   }, [visible, initialMode]);
@@ -125,17 +129,14 @@ export default function AuthModal({
     setLoading(true);
     try {
       const response = await userAPI.sendVerificationCode(registerForm.phone);
-      // 在开发环境中，直接显示验证码
+      // 在测试环境中，直接显示验证码
       if (response.verificationCode) {
-        Alert.alert(
-          '验证码已发送 (仅供测试)',
-          `您的验证码是: ${response.verificationCode}`,
-          [{ text: '好的', onPress: () => setRegisterStep(2) }]
-        );
+        setDisplayedCode(response.verificationCode);
+        Alert.alert('成功', '测试验证码已生成');
       } else {
         Alert.alert('成功', '验证码已发送');
-        setRegisterStep(2);
       }
+      setRegisterStep(2);
     } catch (error: any) {
       Alert.alert('错误', error.message || '发送验证码失败');
     } finally {
@@ -238,6 +239,13 @@ export default function AuthModal({
         <>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>验证码</Text>
+            {displayedCode && (
+              <View style={styles.codeDisplayContainer}>
+                <Text style={styles.codeDisplayText}>
+                  测试验证码: {displayedCode}
+                </Text>
+              </View>
+            )}
             <TextInput
               style={styles.input}
               value={registerForm.code}
@@ -353,7 +361,10 @@ const styles = StyleSheet.create({
   appName: { fontSize: 24, fontWeight: 'bold', color: '#007AFF', marginTop: 10 },
   slogan: { fontSize: 16, color: '#666', marginTop: 5 },
   formSection: {},
-  inputGroup: { marginBottom: 15 },
+  inputGroup: {
+    width: '100%',
+    marginBottom: 20,
+  },
   label: { fontSize: 14, color: '#666', marginBottom: 8, fontWeight: '500' },
   input: {
     backgroundColor: '#fff',
@@ -384,4 +395,17 @@ const styles = StyleSheet.create({
   switchModeButton: { fontSize: 14, color: '#007AFF', marginLeft: 5, fontWeight: '600' },
   linkButton: { marginTop: 15, alignItems: 'center' },
   linkText: { fontSize: 14, color: '#007AFF' },
+  codeDisplayContainer: {
+    marginVertical: 10,
+    padding: 10,
+    backgroundColor: '#eef2f5',
+    borderRadius: 8,
+    alignItems: 'center',
+    width: '100%',
+  },
+  codeDisplayText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: 'bold',
+  },
 }); 

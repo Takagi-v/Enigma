@@ -10,7 +10,7 @@
 .parking-spot-form-container h2 {
     text-align: center;
     margin-bottom: 1.5rem;
-    color: #333;
+  color: #333;
 }
 
 .parking-spot-form {
@@ -22,19 +22,8 @@
     margin-bottom: 1rem;
 }
 
-.form-group-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.form-group-row .form-group {
-    flex: 1;
-    margin-bottom: 0;
-}
-
 .form-group label {
-    display: block;
+  display: block;
     margin-bottom: 0.5rem;
     font-weight: bold;
     color: #555;
@@ -43,7 +32,7 @@
 .form-group input,
 .form-group textarea,
 .form-group select {
-    width: 100%;
+  width: 100%;
     padding: 0.75rem;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -53,7 +42,7 @@
 
 .form-group textarea {
     min-height: 100px;
-    resize: vertical;
+  resize: vertical;
 }
 
 .form-actions {
@@ -75,7 +64,7 @@
 
 .btn-submit {
     background-color: #007bff;
-    color: white;
+  color: white;
 }
 
 .btn-submit:hover {
@@ -98,8 +87,8 @@
     padding: 0.75rem;
     border-radius: 4px;
     margin-bottom: 1rem;
-}
-
+  }
+  
 .success-message {
     color: #155724;
     background-color: #d4edda;

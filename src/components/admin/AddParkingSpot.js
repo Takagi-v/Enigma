@@ -1,4 +1,4 @@
-
+ 
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
@@ -15,8 +15,7 @@ const AddParkingSpot = () => {
         status: 'available',
         opening_hours: '00:00-23:59',
         lock_serial_number: '',
-        latitude: '',
-        longitude: ''
+        coordinates: ''
     });
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -50,8 +49,7 @@ const AddParkingSpot = () => {
                 status: 'available',
                 opening_hours: '00:00-23:59',
                 lock_serial_number: '',
-                latitude: '',
-                longitude: ''
+                coordinates: ''
             });
             // 可选：短暂延迟后重定向
             setTimeout(() => {
@@ -79,29 +77,16 @@ const AddParkingSpot = () => {
                         required
                     />
                 </div>
-                <div className="form-group-row">
-                    <div className="form-group">
-                        <label htmlFor="latitude">纬度</label>
-                        <input
-                            type="number"
-                            step="any"
-                            id="latitude"
-                            name="latitude"
-                            value={formData.latitude}
-                            onChange={handleChange}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label htmlFor="longitude">经度</label>
-                        <input
-                            type="number"
-                            step="any"
-                            id="longitude"
-                            name="longitude"
-                            value={formData.longitude}
-                            onChange={handleChange}
-                        />
-                    </div>
+                <div className="form-group">
+                    <label htmlFor="coordinates">坐标 (格式: lat,lng)</label>
+                    <input
+                        type="text"
+                        id="coordinates"
+                        name="coordinates"
+                        value={formData.coordinates}
+                        onChange={handleChange}
+                        required
+                    />
                 </div>
                 <div className="form-group">
                     <label htmlFor="price">价格 (每小时)</label>

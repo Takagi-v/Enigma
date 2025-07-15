@@ -29,10 +29,9 @@ router.get("/", (req, res) => {
       
       // 验证坐标格式
       const validSpots = rows.filter(spot => {
+        if (!spot.coordinates) return false;
         const coords = spot.coordinates.split(',');
-        return coords.length === 2 && 
-               !isNaN(coords[0]) && 
-               !isNaN(coords[1]);
+        return coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1]);
       });
 
       res.json({
@@ -72,10 +71,9 @@ router.get("/", (req, res) => {
         
         // 验证坐标格式
         const validSpots = rows.filter(spot => {
+          if (!spot.coordinates) return false;
           const coords = spot.coordinates.split(',');
-          return coords.length === 2 && 
-                 !isNaN(coords[0]) && 
-                 !isNaN(coords[1]);
+          return coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1]);
         });
 
         res.json({
@@ -113,10 +111,9 @@ router.get("/nearby", (req, res) => {
     
     // 验证坐标格式
     const validSpots = rows.filter(spot => {
+      if (!spot.coordinates) return false;
       const coords = spot.coordinates.split(',');
-      return coords.length === 2 && 
-             !isNaN(coords[0]) && 
-             !isNaN(coords[1]);
+      return coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1]);
     });
 
     res.json(validSpots);
@@ -161,9 +158,7 @@ router.get("/search", (req, res) => {
       const validSpots = spots.filter(spot => {
         if (!spot.coordinates) return false;
         const coords = spot.coordinates.split(',');
-        return coords.length === 2 && 
-               !isNaN(coords[0]) && 
-               !isNaN(coords[1]);
+        return coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1]);
       });
 
       res.json(validSpots);
@@ -194,7 +189,6 @@ router.get("/:id", (req, res) => {
       return res.status(404).json({ message: "未找到该停车位" });
     }
 
-    // 验证坐标格式
     if (spot.coordinates) {
       const coords = spot.coordinates.split(',');
       if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
