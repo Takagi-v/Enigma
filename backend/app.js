@@ -3,7 +3,6 @@ const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
-const cron = require('node-cron');
 const serverConfig = require('./config/server');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 

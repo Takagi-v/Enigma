@@ -219,16 +219,16 @@ router.put("/users/:id", authenticateAdmin, async (req, res) => {
 // 修改停车位信息
 router.put("/parking-spots/:id", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
-  const { location, price, status, description } = req.body;
+  const { location, price, status, description, latitude, longitude } = req.body;
 
   try {
     const result = await new Promise((resolve, reject) => {
       db().run(
         `UPDATE parking_spots 
          SET location = ?, price = ?, status = ?, description = ?,
-         updated_at = DATETIME('now', 'utc')
+         latitude = ?, longitude = ?, updated_at = DATETIME('now', 'utc')
          WHERE id = ?`,
-        [location, price, status, description, id],
+        [location, price, status, description, latitude, longitude, id],
         function(err) {
           if (err) reject(err);
           else resolve(this.changes);
@@ -244,6 +244,43 @@ router.put("/parking-spots/:id", authenticateAdmin, async (req, res) => {
   } catch (error) {
     console.error('更新停车位信息失败:', error);
     res.status(500).json({ message: "更新停车位信息失败，请稍后重试" });
+  }
+});
+
+// 新增停车位
+router.post("/parking-spots", authenticateAdmin, async (req, res) => {
+  const { 
+    owner_username, 
+    location, 
+    price, 
+    description, 
+    status, 
+    opening_hours, 
+    lock_serial_number,
+    latitude,
+    longitude
+  } = req.body;
+
+  if (!owner_username || !location || !price) {
+    return res.status(400).json({ message: "所有者、位置和价格是必填项。" });
+  }
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      db().run(
+        `INSERT INTO parking_spots (owner_username, location, price, description, status, opening_hours, lock_serial_number, latitude, longitude)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [owner_username, location, price, description, status, opening_hours, lock_serial_number, latitude, longitude],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+    res.status(201).json({ message: "停车位添加成功", spotId: result.id });
+  } catch (error) {
+    console.error('添加停车位失败:', error);
+    res.status(500).json({ message: "添加停车位失败，请稍后重试" });
   }
 });
 

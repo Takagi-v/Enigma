@@ -17,6 +17,9 @@ import { searchParking } from "./services/parkingService";
 import ParkingSearch from "./components/ParkingSearch";
 import AdminLogin from './components/admin/AdminLogin';
 import AdminDashboard from './components/admin/AdminDashboard';
+import AdminLayout from './components/admin/AdminLayout';
+import ParkingLockControl from './components/admin/ParkingLockControl';
+import AddParkingSpot from './components/admin/AddParkingSpot';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ParkingRecord from './components/ParkingRecord';
@@ -104,7 +107,11 @@ function App() {
                     </ProtectedRoute>
                   } />
                   <Route path="/admin/login" element={<AdminLogin />} />
-                  <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                  <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="add-parking-spot" element={<AddParkingSpot />} />
+                    <Route path="parking-lock-control" element={<ParkingLockControl />} />
+                  </Route>
                   <Route path="/contact-us" element={<ContactUs />} />
                   <Route path="/payment-setup" element={<PaymentSetup />} />
                   <Route path="/top-up" element={

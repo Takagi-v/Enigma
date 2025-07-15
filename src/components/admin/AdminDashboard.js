@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/AdminDashboard.css';
 import config from '../../config';
 import ParkingLockControl from './ParkingLockControl';
+import api from '../../services/api';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const AdminDashboard = () => {
+  const { user, logout } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [parkingSpots, setParkingSpots] = useState([]);
@@ -208,9 +211,15 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard">
-      <header className="admin-header">
-        <h1>管理员控制台</h1>
-        <button onClick={handleLogout}>退出登录</button>
+      <header className="dashboard-header">
+        <h1>管理员仪表盘</h1>
+        <div className="header-actions">
+          <button onClick={() => navigate('/admin/add-parking-spot')} className="add-spot-button">
+            新增停车位
+          </button>
+          <p>欢迎, {user ? user.username : '管理员'}</p>
+          <button onClick={handleLogout} className="logout-button">登出</button>
+        </div>
       </header>
       
       <div className="admin-tabs">

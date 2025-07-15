@@ -1,89 +1,110 @@
-.parking-form-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  padding: 20px;
-  height: calc(100vh - 60px);
+.parking-spot-form-container {
+    padding: 2rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    max-width: 600px;
+    margin: 2rem auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.map-section {
-  height: 100%;
-  border-radius: 12px;
-  overflow: hidden;
+.parking-spot-form-container h2 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: #333;
 }
 
-.form-section {
-  background: white;
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow-y: auto;
-}
-
-.form-section h2 {
-  margin-bottom: 24px;
-  color: #333;
+.parking-spot-form {
+    display: flex;
+    flex-direction: column;
 }
 
 .form-group {
-  margin-bottom: 20px;
+    margin-bottom: 1rem;
+}
+
+.form-group-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-group-row .form-group {
+    flex: 1;
+    margin-bottom: 0;
 }
 
 .form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #666;
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+    color: #555;
 }
 
 .form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box; 
 }
 
 .form-group textarea {
-  height: 100px;
-  resize: vertical;
+    min-height: 100px;
+    resize: vertical;
 }
 
-.selected-location {
-  margin: 20px 0;
-  padding: 15px;
-  background: #f5f5f5;
-  border-radius: 6px;
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
 }
 
-.selected-location p {
-  margin: 5px 0;
-  color: #666;
+.btn-submit,
+.btn-cancel {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
 }
 
-button[type="submit"] {
-  width: 100%;
-  padding: 12px;
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: all 0.3s ease;
+.btn-submit {
+    background-color: #007bff;
+    color: white;
 }
 
-button[type="submit"]:hover {
-  opacity: 0.9;
-  transform: translateY(-2px);
+.btn-submit:hover {
+    background-color: #0056b3;
 }
 
-@media (max-width: 768px) {
-  .parking-form-container {
-    grid-template-columns: 1fr;
-  }
-  
-  .map-section {
-    height: 300px;
-  }
+.btn-cancel {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-cancel:hover {
+    background-color: #5a6268;
+}
+
+.error-message {
+    color: #dc3545;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.success-message {
+    color: #155724;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
 } 

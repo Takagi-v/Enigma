@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { db, get, run } = require('../models/db');
+const { get, all, run } = require('../models/db');
 const { authenticateToken } = require('../middleware/auth');
 const parkingLockService = require('../services/parkingLockService');
 
 // 获取当前使用状态
-router.get("/current", authenticateToken, (req, res) => {
+router.get("/current", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   console.log('获取用户当前使用状态，用户ID:', userId);
 
@@ -21,19 +21,11 @@ router.get("/current", authenticateToken, (req, res) => {
     LIMIT 1
   `;
 
-  db().get(query, [userId], (err, record) => {
-    if (err) {
-      console.error('获取当前使用状态失败:', err);
-      return res.status(500).json({ 
-        message: "获取当前使用状态失败",
-        code: 'DB_ERROR'
-      });
-    }
-
+  try {
+    const record = await get(query, [userId]);
     if (!record) {
       return res.json({ usage: null });
     }
-
     console.log('找到当前使用记录:', record);
     res.json({ 
       usage: {
@@ -41,11 +33,17 @@ router.get("/current", authenticateToken, (req, res) => {
         total_amount: record.total_amount ? parseFloat(record.total_amount) : null
       }
     });
-  });
+  } catch (err) {
+    console.error('获取当前使用状态失败:', err);
+    return res.status(500).json({ 
+      message: "获取当前使用状态失败",
+      code: 'DB_ERROR'
+    });
+  }
 });
 
 // 获取用户的停车记录
-router.get("/my", authenticateToken, (req, res) => {
+router.get("/my", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   console.log('获取用户停车记录，用户ID:', userId);
 
@@ -60,15 +58,8 @@ router.get("/my", authenticateToken, (req, res) => {
     ORDER BY pu.start_time DESC
   `;
 
-  db().all(query, [userId], (err, records) => {
-    if (err) {
-      console.error('获取停车记录失败:', err);
-      return res.status(500).json({ 
-        message: "获取停车记录失败",
-        code: 'DB_ERROR'
-      });
-    }
-
+  try {
+    const records = await all(query, [userId]);
     console.log('找到的停车记录:', records);
     res.json({ 
       records: records.map(record => ({
@@ -76,7 +67,13 @@ router.get("/my", authenticateToken, (req, res) => {
         total_amount: record.total_amount ? parseFloat(record.total_amount) : null
       }))
     });
-  });
+  } catch (err) {
+    console.error('获取停车记录失败:', err);
+    return res.status(500).json({ 
+      message: "获取停车记录失败",
+      code: 'DB_ERROR'
+    });
+  }
 });
 
 // 开始使用停车位
@@ -185,15 +182,15 @@ router.post("/:spotId/end", authenticateToken, async (req, res) => {
     // 1. 获取使用记录和车位信息
     const usage = await get(
       `SELECT pu.*, ps.hourly_rate, ps.lock_serial_number 
-       FROM parking_usage pu
-       JOIN parking_spots ps ON pu.parking_spot_id = ps.id
+     FROM parking_usage pu
+     JOIN parking_spots ps ON pu.parking_spot_id = ps.id
        WHERE pu.parking_spot_id = ? AND pu.user_id = ? AND pu.status = 'active'`,
       [spotId, userId]
     );
 
-    if (!usage) {
+      if (!usage) {
       return res.status(404).json({ message: "未找到有效的停车记录", code: 'USAGE_NOT_FOUND' });
-    }
+      }
 
     await run("BEGIN TRANSACTION");
 
@@ -238,29 +235,29 @@ router.post("/:spotId/end", authenticateToken, async (req, res) => {
 
     // 4. 更新停车记录
     await run(
-      `UPDATE parking_usage 
-       SET end_time = datetime('now', 'utc'),
-           total_amount = ?,
-           status = 'completed',
+            `UPDATE parking_usage 
+             SET end_time = datetime('now', 'utc'),
+                 total_amount = ?,
+                 status = 'completed',
            payment_status = 'unpaid',
            lock_closure_status = ?
-       WHERE id = ?`,
+             WHERE id = ?`,
       [totalAmount, usage.lock_serial_number ? 'completed' : 'not_applicable', usage.id]
     );
 
     // 5. 释放车位
-    await run(
-      "UPDATE parking_spots SET status = 'available', current_user_id = NULL WHERE id = ?",
-      [spotId]
-    );
+      await run(
+                "UPDATE parking_spots SET status = 'available', current_user_id = NULL WHERE id = ?",
+        [spotId]
+      );
 
     await run("COMMIT");
 
-    res.json({
+                  res.json({
       message: "停车已成功结束",
-      total_amount: totalAmount,
-      code: 'SUCCESS'
-    });
+                    total_amount: totalAmount,
+                    code: 'SUCCESS'
+                  });
 
   } catch (error) {
     console.error('结束使用停车位时发生错误:', error);
@@ -269,7 +266,7 @@ router.post("/:spotId/end", authenticateToken, async (req, res) => {
       message: error.message || "处理请求时发生内部错误",
       code: 'INTERNAL_ERROR'
     });
-  }
+    }
 });
 
 // 支付停车费用
