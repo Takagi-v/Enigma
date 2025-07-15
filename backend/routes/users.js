@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../models/db');
+const { db, get, all } = require('../models/db');
 const { authenticateToken, checkUserAccess } = require('../middleware/auth');
 
 // JWT密钥
@@ -23,49 +23,47 @@ router.get('/profile', authenticateToken, (req, res) => {
 });
 
 // 获取用户信息
-router.get("/:username", authenticateToken, checkUserAccess, (req, res) => {
+router.get("/:username", authenticateToken, checkUserAccess, async (req, res) => {
   const { username } = req.params;
-
-  db().get(
-    `SELECT id, username, email, full_name, phone, bio, address, created_at, balance, vehicle_plate
-     FROM users 
-     WHERE username = ?`,
-    [username],
-    (err, user) => {
-      if (err) {
-        console.error("获取用户信息失败:", err);
-        return res.status(500).json({ 
-          message: "获取用户信息失败",
-          code: 'DB_ERROR'
-        });
-      }
+  try {
+    const user = await get(
+      `SELECT id, username, email, full_name, phone, bio, address, created_at, balance, vehicle_plate
+       FROM users 
+       WHERE username = ?`,
+      [username]
+    );
       
-      if (!user) {
-        return res.status(404).json({ 
-          message: "用户不存在",
-          code: 'USER_NOT_FOUND'
-        });
-      }
-
-      // 返回用户信息，但不包含密码
-      res.json({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        full_name: user.full_name,
-        phone: user.phone,
-        bio: user.bio || '该用户很神秘',
-        address: user.address,
-        created_at: user.created_at,
-        balance: user.balance || 0,
-        vehicle_plate: user.vehicle_plate
+    if (!user) {
+      return res.status(404).json({ 
+        message: "用户不存在",
+        code: 'USER_NOT_FOUND'
       });
     }
-  );
+
+    // 返回用户信息，但不包含密码
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      full_name: user.full_name,
+      phone: user.phone,
+      bio: user.bio || '该用户很神秘',
+      address: user.address,
+      created_at: user.created_at,
+      balance: user.balance || 0,
+      vehicle_plate: user.vehicle_plate
+    });
+  } catch (err) {
+    console.error("获取用户信息失败:", err);
+    return res.status(500).json({ 
+      message: "获取用户信息失败",
+      code: 'DB_ERROR'
+    });
+  }
 });
 
 // 更新用户信息
-router.put("/:username", authenticateToken, checkUserAccess, (req, res) => {
+router.put("/:username", authenticateToken, checkUserAccess, async (req, res) => {
   const { username } = req.params;
   const { full_name, phone, bio, address } = req.body;
 
@@ -92,37 +90,32 @@ router.put("/:username", authenticateToken, checkUserAccess, (req, res) => {
     const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
     
     // 检查电话号码是否已被其他用户使用
-    db().get(
-      "SELECT username FROM users WHERE phone = ? AND username != ?",
-      [standardizedPhone, username],
-      (err, existingUser) => {
-        if (err) {
-          console.error("检查电话号码失败:", err);
-          return res.status(500).json({
-            message: "更新用户信息失败",
-            code: 'DB_ERROR'
-          });
-        }
-
-        if (existingUser) {
-          return res.status(409).json({
-            message: "该电话号码已被其他用户使用",
-            code: 'PHONE_ALREADY_EXISTS'
-          });
-        }
-
-        // 电话号码验证通过，继续更新用户信息
-        updateUserInfo(username, full_name, phone, bio, address, res);
+    try {
+      const existingUser = await get(
+        "SELECT username FROM users WHERE phone = ? AND username != ?",
+        [standardizedPhone, username]
+      );
+      if (existingUser) {
+        return res.status(409).json({
+          message: "该电话号码已被其他用户使用",
+          code: 'PHONE_ALREADY_EXISTS'
+        });
       }
-    );
-  } else {
-    // 如果没有提供电话号码，直接更新用户信息
-    updateUserInfo(username, full_name, phone, bio, address, res);
+    } catch (err) {
+      console.error("检查电话号码失败:", err);
+      return res.status(500).json({
+        message: "更新用户信息失败",
+        code: 'DB_ERROR'
+      });
+    }
   }
+
+  // 电话号码验证通过，继续更新用户信息
+  await updateUserInfo(username, full_name, phone, bio, address, res);
 });
 
 // 辅助函数：更新用户信息
-function updateUserInfo(username, full_name, phone, bio, address, res) {
+async function updateUserInfo(username, full_name, phone, bio, address, res) {
   // 构建更新语句
   let updateFields = [];
   let params = [];
@@ -155,78 +148,62 @@ function updateUserInfo(username, full_name, phone, bio, address, res) {
   params.push(username);
 
   // 执行更新
-  db().run(
-    `UPDATE users SET ${updateFields.join(", ")} WHERE username = ?`,
-    params,
-    function(err) {
-      if (err) {
-        console.error("更新用户信息失败:", err);
-        return res.status(500).json({ 
-          message: "更新用户信息失败",
-          code: 'DB_ERROR'
-        });
-      }
+  try {
+    await db().run(
+      `UPDATE users SET ${updateFields.join(", ")} WHERE username = ?`,
+      params
+    );
 
-      if (this.changes === 0) {
-        return res.status(404).json({ 
-          message: "用户不存在",
-          code: 'USER_NOT_FOUND'
-        });
-      }
+    // 获取更新后的用户信息
+    const user = await get(
+      `SELECT id, username, email, full_name, phone, bio, address, created_at, balance, vehicle_plate
+       FROM users 
+       WHERE username = ?`,
+      [username]
+    );
 
-      // 获取更新后的用户信息
-      db().get(
-        `SELECT id, username, email, full_name, phone, bio, address, created_at, balance, vehicle_plate
-         FROM users 
-         WHERE username = ?`,
-        [username],
-        (err, user) => {
-          if (err) {
-            console.error("获取更新后的用户信息失败:", err);
-            return res.status(200).json({ 
-              message: "用户信息更新成功，但获取更新后的信息失败",
-              code: 'UPDATE_SUCCESS_GET_FAILED'
-            });
-          }
-
-          res.json({ 
-            message: "用户信息更新成功",
-            code: 'SUCCESS',
-            user: {
-              id: user.id,
-              username: user.username,
-              email: user.email,
-              full_name: user.full_name,
-              phone: user.phone,
-              bio: user.bio || '该用户很神秘',
-              address: user.address,
-              created_at: user.created_at,
-              balance: user.balance || 0,
-              vehicle_plate: user.vehicle_plate
-            }
-          });
-        }
-      );
+    if (!user) {
+      return res.status(404).json({ 
+        message: "用户不存在",
+        code: 'USER_NOT_FOUND'
+      });
     }
-  );
+
+    res.json({ 
+      message: "用户信息更新成功",
+      code: 'SUCCESS',
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        full_name: user.full_name,
+        phone: user.phone,
+        bio: user.bio || '该用户很神秘',
+        address: user.address,
+        created_at: user.created_at,
+        balance: user.balance || 0,
+        vehicle_plate: user.vehicle_plate
+      }
+    });
+  } catch (err) {
+    console.error("更新用户信息失败:", err);
+    return res.status(500).json({ 
+      message: "更新用户信息失败",
+      code: 'DB_ERROR'
+    });
+  }
 }
 
 // 获取用户赠送余额
 router.get('/:userId(\\d+)/gift-balance', async (req, res) => {
   try {
-    const giftBalance = await new Promise((resolve, reject) => {
-      db().get(
-        `SELECT COALESCE(SUM(amount), 0) as gift_balance 
-         FROM coupons 
-         WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
-        [req.params.userId],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row ? row.gift_balance : 0);
-        }
-      );
-    });
-    res.json({ gift_balance: giftBalance });
+    const giftBalance = await get(
+      `SELECT COALESCE(SUM(amount), 0) as gift_balance 
+       FROM coupons 
+       WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
+      [req.params.userId]
+    );
+    res.json({ gift_balance: giftBalance ? giftBalance.gift_balance : 0 });
   } catch (error) {
     console.error('获取赠送余额失败:', error);
     res.status(500).json({ error: '获取赠送余额失败' });
@@ -241,17 +218,11 @@ router.get('/:userId(\\d+)/balance', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: '无权访问该用户的余额信息' });
     }
 
-    const balance = await new Promise((resolve, reject) => {
-      db().get(
-        'SELECT balance FROM users WHERE id = ?',
-        [req.params.userId],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row ? row.balance || 0 : 0);
-        }
-      );
-    });
-    res.json({ balance });
+    const balance = await get(
+      'SELECT balance FROM users WHERE id = ?',
+      [req.params.userId]
+    );
+    res.json({ balance: balance ? balance.balance || 0 : 0 });
   } catch (error) {
     console.error('获取用户余额失败:', error);
     res.status(500).json({ error: '获取用户余额失败' });
@@ -263,30 +234,23 @@ router.get('/:userId(\\d+)/reservations', authenticateToken, async (req, res) =>
   try {
     // 验证用户是否有权限访问
     if (req.user.id !== parseInt(req.params.userId) && !req.user.isAdmin) {
-      return res.status(403).json({ error: '无权访问该用户的预约记录' });
+      return res.status(403).json({ error: '无权访问该用户的预约信息' });
     }
 
-    const reservations = await new Promise((resolve, reject) => {
-      db().all(
-        `SELECT 
+    const reservations = await all(
+      `SELECT 
            r.*,
            p.location,
            p.price,
            p.hourly_rate,
-           p.latitude,
-           p.longitude
+           p.coordinates
          FROM reservations r
          JOIN parking_spots p ON r.parking_spot_id = p.id
          WHERE r.user_id = ?
          ORDER BY r.reservation_date DESC, r.start_time DESC`,
-        [req.params.userId],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        }
-      );
-    });
-
+      [req.params.userId]
+    );
+    
     res.json(reservations);
   } catch (error) {
     console.error('获取用户预约列表失败:', error);
@@ -297,26 +261,19 @@ router.get('/:userId(\\d+)/reservations', authenticateToken, async (req, res) =>
 // 获取当前用户的预约列表
 router.get('/my/reservations', authenticateToken, async (req, res) => {
   try {
-    const reservations = await new Promise((resolve, reject) => {
-      db().all(
-        `SELECT 
+    const reservations = await all(
+      `SELECT 
            r.*,
            p.location,
            p.price,
            p.hourly_rate,
-           p.latitude,
-           p.longitude
+           p.coordinates
          FROM reservations r
          JOIN parking_spots p ON r.parking_spot_id = p.id
          WHERE r.user_id = ?
          ORDER BY r.reservation_date DESC, r.start_time DESC`,
-        [req.user.id],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        }
-      );
-    });
+      [req.user.id]
+    );
 
     res.json(reservations);
   } catch (error) {
@@ -328,17 +285,11 @@ router.get('/my/reservations', authenticateToken, async (req, res) => {
 // 获取当前用户余额
 router.get('/my/balance', authenticateToken, async (req, res) => {
   try {
-    const balance = await new Promise((resolve, reject) => {
-      db().get(
-        'SELECT balance FROM users WHERE id = ?',
-        [req.user.id],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row ? row.balance || 0 : 0);
-        }
-      );
-    });
-    res.json({ balance });
+    const balance = await get(
+      'SELECT balance FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    res.json({ balance: balance ? balance.balance || 0 : 0 });
   } catch (error) {
     console.error('获取用户余额失败:', error);
     res.status(500).json({ error: '获取用户余额失败' });
@@ -348,19 +299,13 @@ router.get('/my/balance', authenticateToken, async (req, res) => {
 // 获取当前用户赠送余额
 router.get('/my/gift-balance', authenticateToken, async (req, res) => {
   try {
-    const giftBalance = await new Promise((resolve, reject) => {
-      db().get(
-        `SELECT COALESCE(SUM(amount), 0) as gift_balance 
-         FROM coupons 
-         WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
-        [req.user.id],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row ? row.gift_balance : 0);
-        }
-      );
-    });
-    res.json({ gift_balance: giftBalance });
+    const giftBalance = await get(
+      `SELECT COALESCE(SUM(amount), 0) as gift_balance 
+       FROM coupons 
+       WHERE user_id = ? AND type = 'gift_balance' AND status = 'valid'`,
+      [req.user.id]
+    );
+    res.json({ gift_balance: giftBalance ? giftBalance.gift_balance : 0 });
   } catch (error) {
     console.error('获取赠送余额失败:', error);
     res.status(500).json({ error: '获取赠送余额失败' });
@@ -390,16 +335,10 @@ router.put('/my/password', authenticateToken, async (req, res) => {
     const bcrypt = require('bcrypt');
     
     // 获取当前用户信息
-    const user = await new Promise((resolve, reject) => {
-      db().get(
-        'SELECT id, password FROM users WHERE id = ?',
-        [req.user.id],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
-        }
-      );
-    });
+    const user = await get(
+      'SELECT id, password FROM users WHERE id = ?',
+      [req.user.id]
+    );
     
     if (!user) {
       return res.status(404).json({ 
@@ -421,16 +360,10 @@ router.put('/my/password', authenticateToken, async (req, res) => {
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
     
     // 更新密码
-    await new Promise((resolve, reject) => {
-      db().run(
-        'UPDATE users SET password = ? WHERE id = ?',
-        [hashedNewPassword, req.user.id],
-        function(err) {
-          if (err) reject(err);
-          else resolve(this);
-        }
-      );
-    });
+    await db().run(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashedNewPassword, req.user.id]
+    );
     
     res.json({ 
       message: '密码修改成功',

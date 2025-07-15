@@ -493,5 +493,8 @@ async function all(sql, params = []) {
 module.exports = {
   db: getDB,
   connectDB,
-  closeDB
+  closeDB,
+  get,
+  all,
+  runQuery
 }; 
