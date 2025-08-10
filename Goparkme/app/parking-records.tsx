@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { userAPI } from '../services/api';
+import { userAPI, parkingAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useProtectedRoute } from '../hooks/useProtectedRoute';
 import AuthModal from '../components/AuthModal';
@@ -23,6 +23,7 @@ interface ParkingRecord {
   end_time: string | null;
   total_amount: number | null;
   status: 'active' | 'completed' | 'cancelled';
+  payment_status: 'paid' | 'unpaid' | 'pending';
   vehicle_plate?: string;
   location: string;
   hourly_rate: number;
@@ -35,6 +36,7 @@ export default function ParkingRecordsScreen() {
   const [records, setRecords] = useState<ParkingRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [payingRecordId, setPayingRecordId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -65,6 +67,26 @@ export default function ParkingRecordsScreen() {
     }
   };
 
+  const handlePayment = async (recordId: number) => {
+    setPayingRecordId(recordId);
+    try {
+      const result = await parkingAPI.payForUsage(recordId);
+      if (result.code === 'SUCCESS') {
+        Alert.alert('成功', '支付成功！');
+        fetchParkingRecords(); // 重新加载数据以更新状态
+      } else {
+        // 后端返回的业务逻辑错误（如余额不足）
+        Alert.alert('支付失败', result.message || '发生未知错误');
+      }
+    } catch (error: any) {
+      console.error('支付失败:', error);
+      // 网络错误或其他请求层面的错误
+      Alert.alert('错误', error.message || '支付过程中发生错误，请稍后再试');
+    } finally {
+      setPayingRecordId(null);
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchParkingRecords();
@@ -88,17 +110,25 @@ export default function ParkingRecordsScreen() {
     const start = new Date(startTime);
     const end = new Date(endTime);
     const diffMs = end.getTime() - start.getTime();
-    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+
+    if (diffMs < 0) return '时间错误';
+
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.round((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    let duration = '';
+    if (diffDays > 0) duration += `${diffDays}天 `;
+    if (diffHours > 0) duration += `${diffHours}小时 `;
+    if (diffMinutes > 0 || (diffDays === 0 && diffHours === 0)) duration += `${diffMinutes}分钟`;
     
-    if (diffHours < 1) {
-      const diffMinutes = Math.ceil(diffMs / (1000 * 60));
-      return `${diffMinutes}分钟`;
-    }
-    
-    return `${diffHours}小时`;
+    return duration.trim();
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, paymentStatus: string) => {
+    if (status === 'completed' && paymentStatus === 'unpaid') {
+      return '#ff9500'; // Orange for unpaid
+    }
     switch (status) {
       case 'active':
         return '#007AFF';
@@ -111,7 +141,10 @@ export default function ParkingRecordsScreen() {
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string, paymentStatus: string) => {
+    if (status === 'completed' && paymentStatus === 'unpaid') {
+      return '待支付';
+    }
     switch (status) {
       case 'active':
         return '使用中';
@@ -162,8 +195,8 @@ export default function ParkingRecordsScreen() {
             <View key={record.id} style={styles.recordCard}>
               <View style={styles.cardHeader}>
                 <Text style={styles.locationText}>{record.location}</Text>
-                <Text style={[styles.statusBadge, { color: getStatusColor(record.status) }]}>
-                  {getStatusText(record.status)}
+                <Text style={[styles.statusBadge, { color: getStatusColor(record.status, record.payment_status) }]}>
+                  {getStatusText(record.status, record.payment_status)}
                 </Text>
               </View>
 
@@ -201,7 +234,7 @@ export default function ParkingRecordsScreen() {
                 <View style={styles.infoRow}>
                   <Ionicons name="cash-outline" size={16} color="#666" />
                   <Text style={styles.infoText}>
-                    费用: {record.total_amount ? `¥${record.total_amount}` : '计算中'}
+                    费用: {record.total_amount != null ? `$${record.total_amount.toFixed(2)}` : '计算中'}
                   </Text>
                 </View>
               </View>
@@ -209,10 +242,24 @@ export default function ParkingRecordsScreen() {
               <View style={styles.cardActions}>
                 <TouchableOpacity
                   style={styles.detailButton}
-                  onPress={() => router.push(`/parking/${record.parking_spot_id}` as any)}
+                  onPress={() => router.push(`/parking-details/${record.id}` as any)}
                 >
-                  <Text style={styles.detailButtonText}>查看停车位</Text>
+                  <Text style={styles.detailButtonText}>查看详情</Text>
                 </TouchableOpacity>
+
+                {record.status === 'completed' && record.payment_status === 'unpaid' && (
+                  <TouchableOpacity
+                    style={[styles.payButton, payingRecordId === record.id && styles.disabledButton]}
+                    onPress={() => handlePayment(record.id)}
+                    disabled={payingRecordId === record.id}
+                  >
+                    {payingRecordId === record.id ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.payButtonText}>立即支付</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))}
@@ -355,4 +402,20 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '600',
   },
+  payButton: {
+    backgroundColor: '#ff9500',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  payButtonText: {
+    fontSize: 14,
+    color: 'white',
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.7,
+  }
 }); 

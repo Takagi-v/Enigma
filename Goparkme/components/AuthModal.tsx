@@ -180,19 +180,30 @@ export default function AuthModal({
     }
     setLoading(true);
     try {
-      await onRegister({
+      const response = await onRegister({
         username,
         password,
-        fullName,
-        vehiclePlate,
+        full_name: fullName,
+        vehicle_plate: vehiclePlate,
         phone,
         verified: isVerified,
       });
-      Alert.alert('成功', '注册成功！现在您可以登录了。', [
-        { text: '好的', onPress: handleClose },
-      ]);
+
+      // 检查注册是否成功
+      if (response && response.user) {
+        Alert.alert('成功', '注册成功！现在您可以登录了。', [
+          { text: '好的', onPress: () => {
+            switchMode(); // 切换到登录模式
+            setLoginForm({ account: username, password: '' }); // 自动填充用户名
+          }},
+        ]);
+      } else {
+        // 如果onRegister内部逻辑未能成功但未抛出错误，则在这里处理
+        throw new Error('注册失败，请重试。');
+      }
     } catch (error: any) {
-      Alert.alert('注册失败', error.message || '注册过程中出现错误');
+      // 后端返回的特定错误信息会在这里被捕获和显示
+      Alert.alert('注册失败', error.message || '未知错误，请稍后再试');
     } finally {
       setLoading(false);
     }

@@ -1,13 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 
 type Props = {
   balance: number;
+  couponBalance: number;
   reservationsCount: number;
   isLoading: boolean;
 };
 
-export default function StatsCard({ balance, reservationsCount, isLoading }: Props) {
+export default function StatsCard({ balance, couponBalance, reservationsCount, isLoading }: Props) {
+  const router = useRouter();
+
   return (
     <View style={styles.statsCard}>
       <View style={styles.statsHeader}>
@@ -16,17 +20,17 @@ export default function StatsCard({ balance, reservationsCount, isLoading }: Pro
       </View>
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>¥{balance.toFixed(2)}</Text>
+          <Text style={styles.statValue}>${balance.toFixed(2)}</Text>
           <Text style={styles.statLabel}>账户余额</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{reservationsCount}</Text>
           <Text style={styles.statLabel}>最近预约</Text>
         </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>0</Text>
-          <Text style={styles.statLabel}>积分</Text>
-        </View>
+        <TouchableOpacity style={styles.statItem} onPress={() => router.push('/coupons' as any)}>
+          <Text style={styles.statValue}>${couponBalance.toFixed(2)}</Text>
+          <Text style={styles.statLabel}>优惠券</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

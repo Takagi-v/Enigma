@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, SafeAreaView, Alert } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { userAPI } from '../services/api';
@@ -14,12 +14,12 @@ interface UserInfo {
   avatar?: string;
   bio: string;
   address: string;
-  vehiclePlate?: string;
-  vehicleModel?: string;
+  vehiclePlate: string;
+  vehicleModel: string;
 }
 
 export default function EditProfileScreen() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const router = useRouter();
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +76,11 @@ export default function EditProfileScreen() {
       return;
     }
 
+    if (!formData.vehiclePlate.trim()) {
+      Alert.alert('提示', '请输入车牌号');
+      return;
+    }
+
     // 验证手机号格式
     const phoneRegex = /^(\+?1)?[- ()]*([2-9][0-9]{2})[- )]*([2-9][0-9]{2})[- ]*([0-9]{4})$/;
     if (!phoneRegex.test(formData.phone)) {
@@ -85,7 +90,7 @@ export default function EditProfileScreen() {
 
     try {
       setSaving(true);
-      await userAPI.updateUserProfile(userInfo.username, {
+      const response = await userAPI.updateUserProfile(userInfo.username, {
         full_name: formData.fullName,
         phone: formData.phone,
         bio: formData.bio,
@@ -93,6 +98,11 @@ export default function EditProfileScreen() {
         vehicle_plate: formData.vehiclePlate,
         vehicle_model: formData.vehicleModel,
       });
+
+      // 更新 AuthContext 中的用户信息
+      if (response && response.user) {
+        updateUser(response.user);
+      }
       
       Alert.alert('成功', '个人信息更新成功', [
         { text: '确定', onPress: () => router.back() }
@@ -118,30 +128,25 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Stack.Screen
+        options={{
+          title: '编辑资料',
+          headerRight: () => (
+            <TouchableOpacity onPress={handleSave} disabled={saving}>
+              {saving ? (
+                <ActivityIndicator size="small" color="#007AFF" />
+              ) : (
+                <Text style={styles.saveButtonText}>保存</Text>
+              )}
+            </TouchableOpacity>
+          ),
+        }}
+      />
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* 头部 */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>编辑资料</Text>
-          <TouchableOpacity 
-            style={styles.saveButton} 
-            onPress={handleSave}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#007AFF" />
-            ) : (
-              <Text style={styles.saveButtonText}>保存</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
         {/* 头像部分 */}
         <View style={styles.avatarSection}>
           <View style={styles.avatar}>
@@ -191,6 +196,39 @@ export default function EditProfileScreen() {
               placeholderTextColor="#999"
               keyboardType="phone-pad"
             />
+          </View>
+          
+          <View style={styles.formSectionTitle}>
+            <Ionicons name="car-sport-outline" size={20} color="#333" />
+            <Text style={styles.sectionTitleText}>车辆信息</Text>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>车牌号 *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.vehiclePlate}
+              onChangeText={(text) => setFormData({...formData, vehiclePlate: text})}
+              placeholder="请输入车牌号"
+              placeholderTextColor="#999"
+              autoCapitalize="characters"
+            />
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>车型</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.vehicleModel}
+              onChangeText={(text) => setFormData({...formData, vehicleModel: text})}
+              placeholder="例如：Tesla Model 3"
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <View style={styles.formSectionTitle}>
+            <Ionicons name="person-outline" size={20} color="#333" />
+            <Text style={styles.sectionTitleText}>个人信息</Text>
           </View>
 
           <View style={styles.formGroup}>
@@ -266,26 +304,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#666',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  saveButton: {
-    padding: 8,
-  },
   saveButtonText: {
     color: '#007AFF',
     fontSize: 16,
@@ -319,14 +337,31 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: 'white',
-    marginHorizontal: 16,
     borderRadius: 12,
     padding: 20,
+    margin: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
     elevation: 2,
+  },
+  formSectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingBottom: 10,
+  },
+  sectionTitleText: {
+    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
   formGroup: {
     marginBottom: 20,

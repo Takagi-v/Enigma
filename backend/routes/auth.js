@@ -94,20 +94,20 @@ router.post('/send-verification-code', async (req, res) => {
     const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
     const formattedPhone = `+1${standardizedPhone}`;
     
-    // 强制使用开发环境逻辑：生成6位随机验证码并返回给前端用于测试
-      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(`测试模式 - 手机号: ${formattedPhone}, 验证码: ${verificationCode}`);
-      
-      // 存储验证码，设置5分钟过期
-      verificationCodes[standardizedPhone] = {
-        code: verificationCode,
-        expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
-      };
+    // 生成6位随机验证码并直接返回给前端用于测试
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`统一验证码发送 - 手机号: ${formattedPhone}, 验证码: ${verificationCode}`);
     
-      return res.status(200).json({ 
-        message: "验证码已生成 (仅供测试)",
-        verificationCode: verificationCode 
-      });
+    // 存储验证码，设置5分钟过期
+    verificationCodes[standardizedPhone] = {
+      code: verificationCode,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5分钟后过期
+    };
+  
+    return res.status(200).json({ 
+      message: "验证码已生成 (统一测试模式)",
+      verificationCode: verificationCode 
+    });
   } catch (error) {
     console.error('发送验证码错误:', error);
     return res.status(500).json({ message: "发送验证码失败" });
@@ -127,25 +127,25 @@ router.post('/verify-code', async (req, res) => {
     const digits = phone.replace(/\D/g, '');
     const standardizedPhone = digits.startsWith('1') && digits.length > 10 ? digits.substring(1) : digits;
     
-    // 强制使用开发环境的验证逻辑
-      const storedVerification = verificationCodes[standardizedPhone];
+    // 统一验证逻辑，不再区分环境
+    const storedVerification = verificationCodes[standardizedPhone];
       
-      if (!storedVerification) {
-        return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
-      }
-      
-      if (Date.now() > storedVerification.expiresAt) {
-        // 删除过期的验证码
-        delete verificationCodes[standardizedPhone];
-        return res.status(400).json({ message: "验证码已过期，请重新获取" });
-      }
-      
-      if (storedVerification.code !== code) {
-        return res.status(400).json({ message: "验证码不正确" });
-      }
-      
-      // 验证成功，删除验证码
+    if (!storedVerification) {
+      return res.status(400).json({ message: "验证码不存在或已过期，请重新获取" });
+    }
+    
+    if (Date.now() > storedVerification.expiresAt) {
+      // 删除过期的验证码
       delete verificationCodes[standardizedPhone];
+      return res.status(400).json({ message: "验证码已过期，请重新获取" });
+    }
+    
+    if (storedVerification.code !== code) {
+      return res.status(400).json({ message: "验证码不正确" });
+    }
+    
+    // 验证成功，删除验证码
+    delete verificationCodes[standardizedPhone];
     
     return res.status(200).json({ message: "验证成功" });
   } catch (error) {
@@ -168,6 +168,18 @@ router.post("/register", async (req, res) => {
   }
 
   try {
+    // 检查用户名是否已存在
+    const existingUser = await new Promise((resolve, reject) => {
+      db().get("SELECT id FROM users WHERE username = ?", [username], (err, row) => {
+        if (err) reject(err);
+        resolve(row);
+      });
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ message: "用户名已存在，请换一个" });
+    }
+
     // 验证手机号格式
     const phoneRegex = /^(\+?1)?[- ()]*([2-9][0-9]{2})[- )]*([2-9][0-9]{2})[- ]*([0-9]{4})$/;
     if (!phoneRegex.test(phone)) {
@@ -187,7 +199,7 @@ router.post("/register", async (req, res) => {
     });
 
     if (existingPhone) {
-      return res.status(400).json({ message: "该手机号已被注册" });
+      return res.status(409).json({ message: "该手机号已被注册" });
     }
 
     // 检查车牌号是否已存在
@@ -199,58 +211,40 @@ router.post("/register", async (req, res) => {
     });
 
     if (existingPlate) {
-      return res.status(400).json({ message: "该车牌号已被绑定" });
+      return res.status(409).json({ message: "该车牌号已被注册" });
     }
 
+    // 哈希密码
     const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // 如果avatar是base64格式，需要先保存为文件
-    let avatarUrl = avatar;
-    if (avatar && avatar.startsWith('data:image')) {
-      const matches = avatar.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
-      if (matches && matches.length === 3) {
-        const imageBuffer = Buffer.from(matches[2], 'base64');
-        const fileExtension = matches[1].replace('+', '');
-        const fileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}.${fileExtension}`;
-        const filePath = path.join(serverConfig.uploadDir, fileName);
-        
-        await fs.mkdir(serverConfig.uploadDir, { recursive: true });
-        await fs.writeFile(filePath, imageBuffer);
-        
-        const baseUrl = process.env.NODE_ENV === 'production'
-          ? `https://139.196.36.100:${serverConfig.port}`
-          : `http://localhost:${serverConfig.port}`;
-        avatarUrl = `${baseUrl}/uploads/${fileName}`;
-      }
-    }
-    
-    await db().run(
-      `INSERT INTO users (username, password, full_name, phone, avatar, bio, address, vehicle_plate) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [username, hashedPassword, full_name, standardizedPhone, avatarUrl, bio || '用户未填写简介', address || '', vehicle_plate],
-      async function(err) {
-        if (err) {
-          if (err.message.includes("UNIQUE constraint failed")) {
-            if (err.message.includes("users.username")) {
-              return res.status(400).json({ message: "用户名已存在" });
-            } else if (err.message.includes("users.phone")) {
-              return res.status(400).json({ message: "该手机号已被注册" });
-            } else if (err.message.includes("users.vehicle_plate")) {
-              return res.status(400).json({ message: "该车牌号已被绑定" });
-            }
-            return res.status(400).json({ message: "注册信息有误，请检查" });
-          }
-          return res.status(500).json({ message: "创建用户失败" });
-        }
 
-        // 不再赠送初始余额，改为首次充值时赠送
-        
-        res.status(201).json({ message: "注册成功" });
+    // 插入新用户
+    const result = await new Promise((resolve, reject) => {
+      db().run(
+        `INSERT INTO users (username, password, full_name, phone, avatar, bio, address, vehicle_plate)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [username, hashedPassword, full_name, standardizedPhone, avatar, bio, address, vehicle_plate],
+        function (err) {
+          if (err) reject(err);
+          resolve(this);
+        }
+      );
+    });
+
+    // 获取新创建的用户
+    db().get("SELECT id, username, email, full_name, phone, avatar, bio, address, vehicle_plate FROM users WHERE id = ?", [result.lastID], (err, user) => {
+      if (err) {
+        console.error("获取新用户信息失败:", err.message);
+        return res.status(500).json({ message: '创建用户成功但获取信息失败' });
       }
-    );
+
+      res.status(201).json({ 
+        message: "用户注册成功",
+        user: user 
+      });
+    });
   } catch (error) {
-    console.error('注册错误:', error);
-    res.status(500).json({ message: "创建用户失败" });
+    console.error("注册错误:", error.message);
+    res.status(500).json({ message: "服务器内部错误" });
   }
 });
 
@@ -297,7 +291,7 @@ router.post("/login", (req, res) => {
             username: user.username
           },
           JWT_SECRET,
-          { expiresIn: '24h' }
+          { expiresIn: '30d' }
         );
 
         // 设置 Cookie，确保只设置一次，并打印 Cookie 设置
@@ -379,7 +373,7 @@ router.post("/mobile-login", (req, res) => {
             username: user.username
           },
           JWT_SECRET,
-          { expiresIn: '24h' }
+          { expiresIn: '30d' }
         );
 
         // 返回用户信息和token（不包含密码）
@@ -572,7 +566,7 @@ router.post('/google-login', async (req, res) => {
               username: user.username
             },
             JWT_SECRET,
-            { expiresIn: '24h' }
+            { expiresIn: '30d' }
           );
           
           // 设置cookie
@@ -681,7 +675,7 @@ router.post('/google-bind-vehicle', async (req, res) => {
             username: username
           },
           JWT_SECRET,
-          { expiresIn: '24h' }
+          { expiresIn: '30d' }
         );
         
         // 设置cookie

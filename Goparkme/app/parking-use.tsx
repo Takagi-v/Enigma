@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, SafeAreaView, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { parkingAPI } from '../services/api';
@@ -148,15 +148,7 @@ export default function ParkingUseScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 头部 */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBackButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>立即使用</Text>
-        <View style={styles.placeholder} />
-      </View>
-
+      <Stack.Screen options={{ title: '立即使用' }} />
       <View style={styles.content}>
         {/* 停车位信息 */}
         <View style={styles.spotCard}>
@@ -249,26 +241,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f7',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  headerBackButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  placeholder: {
-    width: 40,
   },
   content: {
     flex: 1,

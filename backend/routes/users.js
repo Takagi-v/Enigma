@@ -8,18 +8,33 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // 获取用户个人资料接口（用于移动端）
 router.get('/profile', authenticateToken, (req, res) => {
-  // 直接返回从token中获取的用户信息
-  // req.user 已经在 authenticateToken 中间件中设置
-  res.json({
-    id: req.user.id,
-    username: req.user.username,
-    email: req.user.email,
-    fullName: req.user.fullName,
-    phone: req.user.phone,
-    avatar: req.user.avatar,
-    bio: req.user.bio || '该用户很神秘',
-    address: req.user.address
-  });
+  // 从数据库读取，确保字段完整且为最新（包括车辆信息）
+  db().get(
+    `SELECT id, username, email, full_name, phone, avatar, bio, address, vehicle_plate, vehicle_model
+     FROM users WHERE id = ?`,
+    [req.user.id],
+    (err, row) => {
+      if (err) {
+        console.error('获取用户个人资料失败:', err);
+        return res.status(500).json({ message: '获取用户资料失败', code: 'DB_ERROR' });
+      }
+      if (!row) {
+        return res.status(404).json({ message: '用户不存在', code: 'USER_NOT_FOUND' });
+      }
+      res.json({
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        fullName: row.full_name || undefined,
+        phone: row.phone || undefined,
+        avatar: row.avatar || undefined,
+        bio: row.bio || '该用户很神秘',
+        address: row.address || undefined,
+        vehiclePlate: row.vehicle_plate || undefined,
+        vehicleModel: row.vehicle_model || undefined,
+      });
+    }
+  );
 });
 
 // 获取用户信息

@@ -19,6 +19,7 @@ export default function ProfileScreen() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [balance, setBalance] = useState(0);
+  const [couponBalance, setCouponBalance] = useState(0);
   const [recentReservations, setRecentReservations] = useState([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [showCompleteProfileCard, setShowCompleteProfileCard] = useState(false);
@@ -29,13 +30,19 @@ export default function ProfileScreen() {
     
     setStatsLoading(true);
     try {
-      const [balanceResponse, reservationsResponse] = await Promise.all([
+      const [balanceResponse, reservationsResponse, couponsResponse] = await Promise.all([
         userAPI.getUserBalance(),
-        userAPI.getUserReservations()
+        userAPI.getUserReservations(),
+        userAPI.getUserCoupons(),
       ]);
       
       setBalance(balanceResponse.balance || 0);
       setRecentReservations(reservationsResponse.slice(0, 3) || []);
+
+      // 计算有效优惠券总额
+      const validCoupons = couponsResponse.filter((c: any) => c.status === 'valid');
+      const totalCouponValue = validCoupons.reduce((sum: number, coupon: any) => sum + coupon.amount, 0);
+      setCouponBalance(totalCouponValue);
       
       // 检查用户信息是否完整（需要姓名+车牌，车牌从后端通过 req.user.vehiclePlate 注入）
       if (!user.fullName || !user.vehiclePlate) {
@@ -140,6 +147,7 @@ export default function ProfileScreen() {
         {/* 统计信息卡片 */}
         <StatsCard 
           balance={balance}
+          couponBalance={couponBalance}
           reservationsCount={recentReservations.length}
           isLoading={statsLoading}
         />
@@ -495,42 +503,46 @@ const styles = StyleSheet.create({
     color: '#007AFF',
   },
   menuSection: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+    paddingHorizontal: 12,
+  },
+  menuItem: {
+    width: '48%',
     backgroundColor: '#fff',
     borderRadius: 12,
-    paddingHorizontal: 10,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
   menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#f0f8ff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginBottom: 8,
   },
   menuContent: {
-    flex: 1,
+    alignItems: 'center',
   },
   menuTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
     color: '#333',
-    marginBottom: 2,
+    marginTop: 4,
   },
   menuSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   logoutSection: {

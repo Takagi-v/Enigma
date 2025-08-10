@@ -15,21 +15,47 @@ function TopUpScreenContent() {
   const [amount, setAmount] = useState('');
   const [cardDetails, setCardDetails] = useState<CardDetails | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<{ brand: string; last4: string } | null>(null);
+  const [paymentMethodId, setPaymentMethodId] = useState<string | null>(null);
   const [isFetchingStatus, setIsFetchingStatus] = useState(true);
+  const [isFirstTopUp, setIsFirstTopUp] = useState(false);
+  const [hasReceivedGift, setHasReceivedGift] = useState(false);
+
 
   const fetchStatus = useCallback(async () => {
     try {
       setIsFetchingStatus(true);
-      const status = await paymentAPI.getPaymentMethodStatus();
-      if (status.hasPaymentMethod && status.card) {
-        setPaymentMethod(status.card);
+      
+      // 并行获取支付方式和奖励状态
+      const [paymentMethodRes, giftStatusRes] = await Promise.all([
+        paymentAPI.getPaymentMethod(),
+        paymentAPI.getGiftStatus(),
+      ]);
+
+      if (paymentMethodRes.paymentMethod) {
+        setPaymentMethod({
+          brand: paymentMethodRes.paymentMethod.card.brand,
+          last4: paymentMethodRes.paymentMethod.card.last4,
+        });
+        setPaymentMethodId(paymentMethodRes.paymentMethod.id);
       } else {
         setPaymentMethod(null);
+        setPaymentMethodId(null);
       }
+      
+      // 根据后端返回的数据更新状态
+      // `hasReceivedGift` 表示用户是否已通过任何方式（包括旧的逻辑）获得过赠金
+      // `transactions` 是一个数组，如果为空，说明用户从未充值过
+      setHasReceivedGift(giftStatusRes.hasReceivedGift);
+      // 只有在用户从未有过充值记录，并且也从未领取过赠金的情况下，才认为是首次充值
+      setIsFirstTopUp(giftStatusRes.transactions.length === 0 && !giftStatusRes.hasReceivedGift);
+
     } catch (error) {
-      console.error('获取支付方式状态失败:', error);
-      Alert.alert('错误', '无法获取您的支付信息，请稍后再试。');
+      console.error('获取支付或奖励状态失败:', error);
+      Alert.alert('错误', '无法获取您的账户信息，请稍后再试。');
       setPaymentMethod(null);
+      setPaymentMethodId(null);
+      setIsFirstTopUp(false);
+      setHasReceivedGift(true); // 出错时保守处理，避免误发奖励
     } finally {
       setIsFetchingStatus(false);
     }
@@ -75,48 +101,77 @@ function TopUpScreenContent() {
   };
 
   const handleTopUp = async () => {
+    console.log('--- 开始充值流程 ---');
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) {
       Alert.alert('提示', '请输入有效的充值金额');
       return;
     }
-    if (!paymentMethod) {
-      Alert.alert('提示', '请先绑定银行卡');
+    
+    // 根据是否首次充值，检查最低金额
+    const minAmount = isFirstTopUp ? 10 : 20;
+    if (amt < minAmount) {
+      Alert.alert('提示', `充值金额不能低于 $${minAmount.toFixed(2)}`);
       return;
     }
-    if (!stripe) return;
+
+    // 关键检查：确保 paymentMethodId 已加载
+    if (!paymentMethodId) {
+      Alert.alert('提示', '支付信息尚未加载完成，请稍后再试或重新进入页面。');
+      console.log('错误：尝试充值时 paymentMethodId 为空。');
+      return;
+    }
+    
+    // 关键检查：确保 stripe 实例已加载
+    if (!stripe) {
+      Alert.alert('错误', '支付服务初始化失败，请重新进入页面。');
+      console.log('错误：Stripe 实例未准备好。');
+      return;
+    }
     
     setLoading(true);
     try {
+      console.log(`1. 准备创建支付意图，金额: ${amt}, 支付方式ID: ${paymentMethodId}, 是否首次充值: ${isFirstTopUp}`);
       // The backend uses the default payment method associated with the customer,
       // so we don't need to pass the payment method ID here.
-      const intentRes = await paymentAPI.createTopUpIntent(amt);
+      const intentRes = await paymentAPI.createTopUpIntent(amt, paymentMethodId, isFirstTopUp);
 
       if (!intentRes.clientSecret) {
-        throw new Error(intentRes.error || '创建支付失败');
+        throw new Error(intentRes.error || '创建支付意图失败，无法获取 client_secret');
       }
+      
+      console.log('2. 成功获取 client_secret，准备调用 confirmPayment');
 
-      const { error } = await stripe.confirmPayment(intentRes.clientSecret, {
-        paymentMethodType: 'Card',
-      });
+      // 关键：当PaymentIntent在后端已附加支付方式时，前端确认时理论上无需再提供
+      // 我们只提供 client_secret，让Stripe处理后续流程（如3DS验证）
+      // 传递一个最小化的参数以满足类型检查
+      const { error } = await stripe.confirmPayment(intentRes.clientSecret);
       
       if (error) {
+        console.error('3. confirmPayment 返回错误:', JSON.stringify(error, null, 2));
         if (error.code === 'Canceled') {
           Alert.alert('提示', '支付已取消');
         } else {
-          throw new Error(error.message);
+          // 提供更详细的错误信息
+          Alert.alert('支付失败', `错误码: ${error.code}\n信息: ${error.message}`);
+          throw new Error(`[${error.code}] ${error.message}`);
         }
       } else {
+        console.log('3. confirmPayment 成功！');
         Alert.alert('成功', '充值成功', [
           { text: '确定', onPress: () => router.back() }
         ]);
         setAmount('');
       }
     } catch (err: any) {
-      console.error('充值失败:', err);
-      Alert.alert('错误', err.message || '充值失败');
+      console.error('4. 充值流程捕获到未知错误:', err);
+      // 避免重复弹窗
+      if (!String(err.message).includes('支付失败')) {
+        Alert.alert('错误', err.message || '充值过程中发生未知错误');
+      }
     } finally {
       setLoading(false);
+      console.log('--- 充值流程结束 ---');
     }
   };
 
@@ -174,7 +229,7 @@ function TopUpScreenContent() {
               style={styles.amountInput}
               value={amount}
               onChangeText={setAmount}
-              placeholder="最低 $5.00"
+              placeholder={isFirstTopUp ? '首次充值最低 $10.00，即可获赠 $5 奖励!' : '最低 $20.00'}
               keyboardType="numeric"
             />
           </View>
@@ -182,8 +237,8 @@ function TopUpScreenContent() {
 
         {paymentMethod && (
           <TouchableOpacity
-            style={[styles.actionButton, loading && styles.disabledButton]}
-            disabled={loading || !amount}
+            style={[styles.actionButton, (loading || !paymentMethodId) && styles.disabledButton]}
+            disabled={loading || !paymentMethodId}
             onPress={handleTopUp}
           >
             {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.actionButtonText}>立即充值</Text>}

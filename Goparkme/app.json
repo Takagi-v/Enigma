@@ -9,7 +9,14 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.enigma.goparkme",
+      "buildNumber": "3",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "This app uses the camera to scan card details or QR codes for parking-related features. 本应用使用相机用于扫描银行卡信息或二维码以完成停车相关功能。",
+        "NSLocationWhenInUseUsageDescription": "Your location helps us show nearby parking spots and provide navigation to destinations. 您的位置用于展示附近停车位并提供导航。"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -38,6 +45,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fe79928f-ca29-4e3f-a595-0360b7c24258"
+      }
     }
   }
 }

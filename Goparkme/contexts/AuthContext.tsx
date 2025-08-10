@@ -15,14 +15,16 @@ export interface User {
   bio?: string;
   address?: string;
   vehiclePlate?: string;
+  vehicleModel?: string;
 }
 
 // 定义AuthContext类型
 interface AuthContextType {
   authState: { token: string | null; authenticated: boolean };
   onLogin: (credentials: any) => Promise<void>; // 暂时保持any，或定义具体类型
-  onRegister: (userData: any) => Promise<void>; // 新增onRegister
+  onRegister: (userData: any) => Promise<any>; // 允许返回数据
   onLogout: () => Promise<void>;
+  updateUser: (newUser: Partial<User>) => void;
   user: User | null;
   isLoading: boolean;
   loading: boolean; // 添加兼容性
@@ -31,8 +33,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   authState: { token: null, authenticated: false },
   onLogin: async () => {},
-  onRegister: async () => {}, // 新增
+  onRegister: async () => {}, // 新增onRegister
   onLogout: async () => {},
+  updateUser: () => {},
   user: null,
   isLoading: true,
   loading: true,
@@ -80,12 +83,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       // 调用API进行注册，这里不自动登录
       const response = await userAPI.register(userData);
-      if (!response || !response.success) {
-        throw new Error(response.message || '注册失败');
+      // 检查返回的数据中是否包含 user 对象来判断成功
+      if (!response || !response.user) {
+        throw new Error(response.message || '注册失败，请检查您填写的信息。');
       }
-      // 注册成功，但由用户手动登录
+      // 注册成功，直接返回成功的响应，让调用方处理后续逻辑
+      return response;
     } catch (error) {
-      console.error('Register error:', error);
+      console.error('Register error in context:', error);
+      // 将原始错误向上抛出，以便UI层可以捕获并显示具体错误信息
       throw error;
     }
   };
@@ -117,10 +123,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const updateUser = (newUser: Partial<User>) => {
+    setUser(prevUser => {
+      if (!prevUser) return null;
+      // 合并旧的用户数据和新的数据
+      return { ...prevUser, ...newUser };
+    });
+  };
+
   const value = {
     onLogin: login,
     onRegister: register, // 新增
     onLogout: logout,
+    updateUser,
     authState,
     user,
     isLoading: !initialLoadComplete, // 只有首次加载时为true

@@ -8,44 +8,51 @@ type Props = {
 
 export default function CompleteProfileCard({ onPress }: Props) {
   return (
-    <View style={styles.card}>
-      <Ionicons name="information-circle-outline" size={32} color="#007AFF" style={styles.icon} />
+    <TouchableOpacity style={styles.card} onPress={onPress}>
+      <Ionicons name="rocket-outline" size={32} color="#fff" style={styles.icon} />
       <View style={styles.textContainer}>
-        <Text style={styles.title}>完善您的个人资料</Text>
-        <Text style={styles.subtitle}>添加车辆信息等，以便获得更好的停车体验。</Text>
+        <Text style={styles.title}>开启您的智能停车之旅！</Text>
+        <Text style={styles.subtitle}>完善您的座驾信息，体验更流畅的预定和停车服务。</Text>
       </View>
-      <TouchableOpacity onPress={onPress}>
-        <Ionicons name="chevron-forward" size={24} color="#007AFF" />
-      </TouchableOpacity>
-    </View>
+      <Ionicons name="chevron-forward" size={24} color="#fff" />
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#e9f3ff',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: '#007AFF',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    shadowColor: '#007AFF',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   icon: {
     marginRight: 15,
   },
   textContainer: {
     flex: 1,
+    marginRight: 10,
   },
   title: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 13,
-    color: '#555',
-    marginTop: 2,
+    color: '#e0e0e0',
+    lineHeight: 18,
   },
 }); 

@@ -48,7 +48,9 @@ async function createTables(createTestData = false) {
       bio TEXT DEFAULT '该用户很神秘',
       address TEXT,
       vehicle_plate TEXT UNIQUE,
+      vehicle_model TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME,
       balance REAL DEFAULT 0,
       google_id TEXT UNIQUE
     )`,
@@ -67,7 +69,7 @@ async function createTables(createTestData = false) {
       contact TEXT,
       average_rating REAL DEFAULT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME,
       opening_hours TEXT DEFAULT '00:00-23:59',
       lock_serial_number TEXT,
       FOREIGN KEY (owner_username) REFERENCES users(username),
@@ -84,7 +86,6 @@ async function createTables(createTestData = false) {
       total_amount REAL,
       payment_status TEXT DEFAULT 'pending',
       status TEXT DEFAULT 'active',
-      lock_closure_status TEXT DEFAULT 'not_applicable',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       vehicle_plate TEXT,
@@ -211,6 +212,88 @@ async function createTables(createTestData = false) {
       console.error('创建表失败:', error);
     }
   }
+
+  // 检查并添加缺失的列 (数据库迁移)
+  try {
+    const dbInstance = getDB();
+
+    // 1. 检查 users 表
+    const usersColumns = await new Promise((resolve, reject) => {
+      dbInstance.all("PRAGMA table_info(users)", (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows ? rows.map(r => r.name) : []);
+      });
+    });
+
+    if (!usersColumns.includes('vehicle_model')) {
+      console.log('Migrating users: adding column vehicle_model');
+      await new Promise((resolve, reject) => {
+        dbInstance.run("ALTER TABLE users ADD COLUMN vehicle_model TEXT", (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+
+    if (!usersColumns.includes('updated_at')) {
+      console.log('Migrating users: adding column updated_at');
+      await new Promise((resolve, reject) => {
+        dbInstance.run("ALTER TABLE users ADD COLUMN updated_at DATETIME", (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+
+    // 2. 检查 parking_spots 表
+    const parkingSpotsColumns = await new Promise((resolve, reject) => {
+      dbInstance.all("PRAGMA table_info(parking_spots)", (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows ? rows.map(r => r.name) : []);
+      });
+    });
+
+    if (!parkingSpotsColumns.includes('updated_at')) {
+      console.log('Migrating parking_spots: adding column updated_at');
+      await new Promise((resolve, reject) => {
+        dbInstance.run("ALTER TABLE parking_spots ADD COLUMN updated_at DATETIME", (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+    
+    if (!parkingSpotsColumns.includes('lock_serial_number')) {
+      console.log('Migrating parking_spots: adding column lock_serial_number');
+      await new Promise((resolve, reject) => {
+        dbInstance.run("ALTER TABLE parking_spots ADD COLUMN lock_serial_number TEXT", (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+
+    // 3. 检查 parking_usage 表
+    const parkingUsageColumns = await new Promise((resolve, reject) => {
+      dbInstance.all("PRAGMA table_info(parking_usage)", (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows ? rows.map(r => r.name) : []);
+      });
+    });
+
+    if (!parkingUsageColumns.includes('lock_closure_status')) {
+      console.log('Migrating parking_usage: adding column lock_closure_status');
+      await new Promise((resolve, reject) => {
+        dbInstance.run("ALTER TABLE parking_usage ADD COLUMN lock_closure_status TEXT DEFAULT 'not_applicable'", (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    }
+  } catch (error) {
+    console.error('数据库迁移失败:', error);
+  }
+
 
   // 创建默认管理员账号
   await createDefaultAdmin();
