@@ -349,6 +349,9 @@ router.post('/top-up', authenticateToken, async (req, res) => {
   const { amount, paymentMethodId, isFirstTopUp } = req.body;
   const userId = req.user.id;
 
+  // 如果前端未传 paymentMethodId，则尝试使用数据库中保存的默认支付方式
+  let effectivePaymentMethodId = paymentMethodId;
+
   if (!amount || amount <= 0) {
     return res.status(400).json({ 
       success: false,
@@ -391,16 +394,27 @@ router.post('/top-up', authenticateToken, async (req, res) => {
       });
     }
 
-    // 1. 获取用户的支付方式信息
+    // 1. 获取用户的支付方式信息（支持回退）
     const userPayment = await new Promise((resolve, reject) => {
+      if (effectivePaymentMethodId) {
       db().get(
         'SELECT stripe_customer_id FROM user_payment_methods WHERE user_id = ? AND payment_method_id = ?',
-        [userId, paymentMethodId],
+          [userId, effectivePaymentMethodId],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      } else {
+        db().get(
+          'SELECT stripe_customer_id, payment_method_id FROM user_payment_methods WHERE user_id = ?',
+          [userId],
         (err, row) => {
           if (err) reject(err);
           else resolve(row);
         }
       );
+      }
     });
 
     if (!userPayment?.stripe_customer_id) {
@@ -410,12 +424,17 @@ router.post('/top-up', authenticateToken, async (req, res) => {
       });
     }
 
+    // 如果前端没传，则用数据库中的 payment_method_id
+    if (!effectivePaymentMethodId) {
+      effectivePaymentMethodId = userPayment.payment_method_id;
+    }
+
     // 2. 创建支付意向
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // 转换为美分
       currency: 'usd',
       customer: userPayment.stripe_customer_id,
-      payment_method: paymentMethodId,
+      payment_method: effectivePaymentMethodId,
       description: 'GoParkMe停车服务充值',
       statement_descriptor: 'GOPARKME',
       statement_descriptor_suffix: 'PARK',
@@ -569,18 +588,18 @@ router.get('/status/:paymentIntentId', authenticateToken, async (req, res) => {
   }
 });
 
-// 获取用户充值记录
+// 获取用户交易记录（所有余额变动）
 router.get('/transactions', authenticateToken, async (req, res) => {
   const userId = req.user.id;
-  console.log(`获取用户 ${userId} 的充值记录`);
+  console.log(`获取用户 ${userId} 的交易记录`);
 
   try {
-    // 获取用户的充值交易记录
+    // 获取用户的所有交易记录（充值/消费/收入）
     const transactions = await new Promise((resolve, reject) => {
       console.log('执行数据库查询...');
       db().all(
         `SELECT * FROM transactions 
-         WHERE user_id = ? AND type = 'top_up'
+         WHERE user_id = ?
          ORDER BY created_at DESC`,
         [userId],
         (err, rows) => {
@@ -613,8 +632,8 @@ router.get('/transactions', authenticateToken, async (req, res) => {
 
     res.json(transactions);
   } catch (error) {
-    console.error('获取充值记录失败:', error);
-    res.status(500).json({ message: '获取充值记录失败' });
+    console.error('获取交易记录失败:', error);
+    res.status(500).json({ message: '获取交易记录失败' });
   }
 });
 

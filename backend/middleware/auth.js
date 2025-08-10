@@ -33,7 +33,7 @@ const authenticateToken = async (req, res, next) => {
     
     // 从数据库获取用户信息
     db().get(
-      `SELECT id, username, email, full_name, phone, avatar, bio, address 
+      `SELECT id, username, email, full_name, phone, avatar, bio, address, vehicle_plate, vehicle_model 
        FROM users WHERE id = ?`,
       [decoded.id],
       (err, user) => {
@@ -61,7 +61,9 @@ const authenticateToken = async (req, res, next) => {
           phone: user.phone,
           avatar: user.avatar,
           bio: user.bio,
-          address: user.address
+          address: user.address,
+          vehiclePlate: user.vehicle_plate,
+          vehicleModel: user.vehicle_model
         };
 
         // 将解码后的token信息也添加到请求对象

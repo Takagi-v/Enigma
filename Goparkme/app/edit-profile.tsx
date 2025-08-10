@@ -14,6 +14,8 @@ interface UserInfo {
   avatar?: string;
   bio: string;
   address: string;
+  vehiclePlate?: string;
+  vehicleModel?: string;
 }
 
 export default function EditProfileScreen() {
@@ -29,6 +31,8 @@ export default function EditProfileScreen() {
     phone: '',
     bio: '',
     address: '',
+    vehiclePlate: '',
+    vehicleModel: '',
   });
 
   const fetchUserInfo = async () => {
@@ -41,6 +45,8 @@ export default function EditProfileScreen() {
         phone: response.phone || '',
         bio: response.bio || '',
         address: response.address || '',
+        vehiclePlate: response.vehiclePlate || '',
+        vehicleModel: response.vehicleModel || '',
       });
     } catch (error) {
       console.error('获取用户信息失败:', error);
@@ -84,6 +90,8 @@ export default function EditProfileScreen() {
         phone: formData.phone,
         bio: formData.bio,
         address: formData.address,
+        vehicle_plate: formData.vehiclePlate,
+        vehicle_model: formData.vehicleModel,
       });
       
       Alert.alert('成功', '个人信息更新成功', [
@@ -207,6 +215,29 @@ export default function EditProfileScreen() {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+            />
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>车牌号 *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.vehiclePlate}
+              onChangeText={(text) => setFormData({ ...formData, vehiclePlate: text })}
+              placeholder="请输入车牌号"
+              placeholderTextColor="#999"
+              autoCapitalize="characters"
+            />
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>车辆型号</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.vehicleModel}
+              onChangeText={(text) => setFormData({ ...formData, vehicleModel: text })}
+              placeholder="例如 Toyota Camry"
+              placeholderTextColor="#999"
             />
           </View>
         </View>

@@ -37,7 +37,7 @@ export default function ProfileScreen() {
       setBalance(balanceResponse.balance || 0);
       setRecentReservations(reservationsResponse.slice(0, 3) || []);
       
-      // 检查用户信息是否完整
+      // 检查用户信息是否完整（需要姓名+车牌，车牌从后端通过 req.user.vehiclePlate 注入）
       if (!user.fullName || !user.vehiclePlate) {
         setShowCompleteProfileCard(true);
       } else {

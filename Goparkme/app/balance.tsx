@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { userAPI } from '../services/api';
+import { userAPI, paymentAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useProtectedRoute } from '../hooks/useProtectedRoute';
 import AuthModal from '../components/AuthModal';
@@ -25,6 +25,7 @@ export default function BalanceScreen() {
   const [giftBalance, setGiftBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -45,13 +46,15 @@ export default function BalanceScreen() {
     if (!user) return;
 
     try {
-      const [balanceData, giftBalanceData] = await Promise.all([
+      const [balanceData, giftBalanceData, txList] = await Promise.all([
         userAPI.getUserBalance(),
-        userAPI.getUserGiftBalance()
+        userAPI.getUserGiftBalance(),
+        paymentAPI.getTransactions(),
       ]);
       
       setBalance(balanceData.balance || 0);
       setGiftBalance(giftBalanceData.gift_balance || 0);
+      setTransactions(Array.isArray(txList) ? txList : []);
     } catch (error) {
       console.error('获取余额信息失败:', error);
       Alert.alert('错误', '获取余额信息失败');
@@ -133,10 +136,27 @@ export default function BalanceScreen() {
         {/* 交易记录 */}
         <View style={styles.transactionSection}>
           <Text style={styles.sectionTitle}>交易记录</Text>
-          <View style={styles.emptyState}>
-            <Ionicons name="receipt-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>暂无交易记录</Text>
-          </View>
+          {transactions.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="receipt-outline" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>暂无交易记录</Text>
+            </View>
+          ) : (
+            <View style={{ gap: 12 }}>
+              {transactions.map((tx) => (
+                <View key={tx.id} style={styles.txItem}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name={tx.status === 'succeeded' ? 'checkmark-circle' : 'alert-circle'} size={20} color={tx.status === 'succeeded' ? '#28a745' : '#ff3b30'} />
+                    <Text style={styles.txTitle}>
+                      {tx.type === 'top_up' ? '充值' : tx.type}
+                    </Text>
+                  </View>
+                  <Text style={styles.txAmount}>¥{Number(tx.amount || 0).toFixed(2)}</Text>
+                  <Text style={styles.txTime}>{tx.created_at ? new Date(tx.created_at + 'Z').toLocaleString() : ''}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -258,6 +278,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 16,
+  },
+  txItem: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  txTitle: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  txAmount: {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  txTime: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#888',
   },
   emptyState: {
     backgroundColor: 'white',

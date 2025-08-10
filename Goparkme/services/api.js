@@ -120,6 +120,21 @@ export const parkingAPI = {
       requireAuth: true,
     });
   },
+
+  // 获取单条停车记录详情
+  getParkingUsageById: async (usageId) => {
+    return await apiRequest(`/parking-spots/usage/${usageId}`, {
+      requireAuth: true,
+    });
+  },
+
+  // 为停车记录付款
+  payForUsage: async (usageId) => {
+    return await apiRequest(`/parking-spots/usage/${usageId}/pay`, {
+      method: 'POST',
+      requireAuth: true,
+    });
+  },
 };
 
 // 用户相关API
@@ -177,6 +192,13 @@ export const userAPI = {
     });
   },
 
+  // 获取用户优惠券
+  getUserCoupons: async () => {
+    return await apiRequest('/coupons/user/me', { // 后端需要一个能处理 /me 的路由
+      requireAuth: true,
+    });
+  },
+
   // 获取用户停车记录
   getUserParkingUsage: async () => {
     return await apiRequest('/parking-spots/usage/my', {
@@ -221,6 +243,18 @@ export const paymentAPI = {
       requireAuth: true,
     });
   },
+  // 获取完整的默认支付方式（包含 id 用于后续支付）
+  getPaymentMethod: async () => {
+    return await apiRequest('/payment/method', {
+      requireAuth: true,
+    });
+  },
+  // 获取用户首次充值奖励状态
+  getGiftStatus: async () => {
+    return await apiRequest('/payment/gift-status', {
+      requireAuth: true,
+    });
+  },
   // 保存支付方式
   savePaymentMethod: async (paymentMethodId) => {
     return await apiRequest('/payment/save-method', {
@@ -230,11 +264,17 @@ export const paymentAPI = {
     });
   },
   // 创建充值意图
-  createTopUpIntent: async (amount) => {
+  createTopUpIntent: async (amount, paymentMethodId, isFirstTopUp = false) => {
     return await apiRequest('/payment/top-up', {
         method: 'POST',
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, paymentMethodId, isFirstTopUp }),
         requireAuth: true,
+    });
+  },
+  // 获取交易记录（充值）
+  getTransactions: async () => {
+    return await apiRequest('/payment/transactions', {
+      requireAuth: true,
     });
   },
 };
