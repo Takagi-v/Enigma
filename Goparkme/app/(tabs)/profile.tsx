@@ -136,8 +136,11 @@ export default function ProfileScreen() {
           />
         )}
 
-        {/* 用户信息卡片 */}
-        <UserCard user={user} />
+        {/* 用户信息卡片，可点击跳转到用户详情 */}
+        <UserCard
+          user={user}
+          onPress={() => router.push('/user-info' as any)}
+        />
 
         {/* 停车状态卡片 */}
         {hasActiveUsage && currentUsage && (

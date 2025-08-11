@@ -229,7 +229,7 @@ function TopUpScreenContent() {
               style={styles.amountInput}
               value={amount}
               onChangeText={setAmount}
-              placeholder={isFirstTopUp ? '首次充值最低 $10.00，即可获赠 $5 奖励!' : '最低 $20.00'}
+              placeholder={isFirstTopUp ? '首次充值最低 $10.00，即可获赠 $10 奖励!' : '最低 $20.00'}
               keyboardType="numeric"
             />
           </View>

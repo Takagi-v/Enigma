@@ -1,15 +1,22 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { User } from '../../contexts/AuthContext';
 
 type Props = {
   user: User;
+  onPress?: () => void;
 };
 
-export default function UserCard({ user }: Props) {
+export default function UserCard({ user, onPress }: Props) {
   return (
-    <View style={styles.userCard}>
+    <TouchableOpacity
+      style={styles.userCard}
+      onPress={onPress}
+      activeOpacity={0.8}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+    >
       <View style={styles.avatar}>
         <Ionicons name="person" size={40} color="#007AFF" />
       </View>
@@ -20,7 +27,10 @@ export default function UserCard({ user }: Props) {
           <Text style={styles.userPhone}>{user.phone}</Text>
         )}
       </View>
-    </View>
+      {onPress ? (
+        <Ionicons name="chevron-forward" size={20} color="#ccc" />
+      ) : null}
+    </TouchableOpacity>
   );
 }
 

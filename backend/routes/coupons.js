@@ -58,7 +58,7 @@ router.post('/create-default', async (req, res) => {
       db().run(
         `INSERT INTO coupons (user_id, amount, status, expiry_date, description) 
          VALUES (?, ?, ?, ?, ?)`,
-        [userId, 5.0, 'valid', expiryDate.toISOString(), '新用户注册优惠券'],
+        [userId, 10.0, 'valid', expiryDate.toISOString(), '新用户注册优惠券'],
         (err) => {
           if (err) reject(err);
           else resolve();

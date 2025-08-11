@@ -25,7 +25,16 @@ export default function BalanceScreen() {
   const [giftBalance, setGiftBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  type Transaction = {
+    id: number;
+    type: 'top_up' | 'parking_payment' | 'parking_income' | string;
+    amount: number; // 正为入账，负为支出
+    status: 'succeeded' | 'failed' | 'pending' | string;
+    payment_intent_id?: string | null;
+    error_message?: string | null;
+    created_at?: string;
+  };
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -143,18 +152,63 @@ export default function BalanceScreen() {
             </View>
           ) : (
             <View style={{ gap: 12 }}>
-              {transactions.map((tx) => (
-                <View key={tx.id} style={styles.txItem}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Ionicons name={tx.status === 'succeeded' ? 'checkmark-circle' : 'alert-circle'} size={20} color={tx.status === 'succeeded' ? '#28a745' : '#ff3b30'} />
-                    <Text style={styles.txTitle}>
-                      {tx.type === 'top_up' ? '充值' : tx.type}
+              {transactions.map((tx) => {
+                const isIncome = (tx.amount || 0) > 0;
+                const amountColor = isIncome ? '#28a745' : '#ff3b30';
+                const amountPrefix = isIncome ? '+' : '';
+                const statusIcon = tx.status === 'succeeded' ? 'checkmark-circle' : (tx.status === 'pending' ? 'time' : 'alert-circle');
+                const statusColor = tx.status === 'succeeded' ? '#28a745' : (tx.status === 'pending' ? '#ff9500' : '#ff3b30');
+
+                let title = '交易';
+                let subtitle: string[] = [];
+                switch (tx.type) {
+                  case 'top_up':
+                    title = '余额充值';
+                    if (tx.payment_intent_id) subtitle.push(`Intent: ${tx.payment_intent_id}`);
+                    break;
+                  case 'parking_payment':
+                    title = '停车扣费';
+                    break;
+                  case 'parking_income':
+                    title = '停车收入';
+                    break;
+                  default:
+                    title = '其他';
+                }
+                subtitle.push(`状态: ${tx.status === 'succeeded' ? '成功' : (tx.status === 'pending' ? '处理中' : '失败')}`);
+                if (tx.error_message && tx.status !== 'succeeded') {
+                  subtitle.push(`原因: ${tx.error_message}`);
+                }
+
+                return (
+                  <View key={tx.id} style={styles.txItem}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                      <Ionicons name={statusIcon as any} size={20} color={statusColor} />
+                      <Text style={styles.txTitle}>{title}</Text>
+                      <View style={styles.txBadge}>
+                        <Text style={styles.txBadgeText}>{isIncome ? '入账' : '支出'}</Text>
+                      </View>
+                    </View>
+
+                    <Text style={[styles.txAmount, { color: amountColor }]}>
+                      {amountPrefix}¥{Number(tx.amount || 0).toFixed(2)}
                     </Text>
+
+                    <View style={styles.txMetaRow}>
+                      <Ionicons name="calendar-outline" size={14} color="#999" />
+                      <Text style={styles.txTime}>{tx.created_at ? new Date(tx.created_at + 'Z').toLocaleString() : ''}</Text>
+                    </View>
+
+                    {subtitle.length > 0 && (
+                      <View style={{ marginTop: 6 }}>
+                        {subtitle.map((line, idx) => (
+                          <Text key={idx} style={styles.txSubtitle}>{line}</Text>
+                        ))}
+                      </View>
+                    )}
                   </View>
-                  <Text style={styles.txAmount}>¥{Number(tx.amount || 0).toFixed(2)}</Text>
-                  <Text style={styles.txTime}>{tx.created_at ? new Date(tx.created_at + 'Z').toLocaleString() : ''}</Text>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
         </View>
@@ -295,16 +349,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
   },
+  txBadge: {
+    marginLeft: 8,
+    backgroundColor: '#f0f4ff',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  txBadgeText: {
+    fontSize: 10,
+    color: '#3355ff',
+  },
   txAmount: {
     marginTop: 8,
     fontSize: 16,
     fontWeight: '600',
     color: '#007AFF',
   },
+  txMetaRow: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   txTime: {
-    marginTop: 4,
+    marginTop: 2,
     fontSize: 12,
     color: '#888',
+  },
+  txSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    lineHeight: 16,
   },
   emptyState: {
     backgroundColor: 'white',
