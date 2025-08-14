@@ -147,7 +147,6 @@ export default function MapScreen() {
     <View style={styles.container}>
       <MapView
         ref={mapRef}
-        provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={getInitialRegion()}
         showsUserLocation={true}

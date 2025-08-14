@@ -2,7 +2,7 @@
   "expo": {
     "name": "Goparkme",
     "slug": "Goparkme",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "goparkme",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.enigma.goparkme",
-      "buildNumber": "3",
+      "buildNumber": "7",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "This app uses the camera to scan card details or QR codes for parking-related features. 本应用使用相机用于扫描银行卡信息或二维码以完成停车相关功能。",
