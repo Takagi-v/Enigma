@@ -12,7 +12,10 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_STRIPE_PK": "pk_test_51Qx7PsPtwrqAw8HZ8riukCKMVU8Wwu1Y8QmRGDxjYAu4OCN8YwXomZ5MgoUBDzHAeiJyD55gXQLyZgxViZXdSKtU00vZMnfSJP"
+      }
     }
   },
   "submit": {
