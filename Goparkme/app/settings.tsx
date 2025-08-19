@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 interface SettingItemBase {
   icon: string;
@@ -34,7 +35,12 @@ type SettingItem = SettingItemWithPress | SettingItemWithSwitch;
 export default function SettingsScreen() {
   const router = useRouter();
   const { user, onLogout } = useAuth();
-  const [notifications, setNotifications] = useState(true);
+  const { 
+    notificationSettings, 
+    updateNotificationSettings, 
+    hasPermissions, 
+    requestPermissions 
+  } = useNotification();
   const [locationServices, setLocationServices] = useState(true);
   const [autoLogin, setAutoLogin] = useState(true);
 
@@ -69,6 +75,41 @@ export default function SettingsScreen() {
     );
   };
 
+  // 处理通知设置变更
+  const handleNotificationToggle = async (value: boolean) => {
+    if (value && !hasPermissions) {
+      const granted = await requestPermissions();
+      if (!granted) {
+        Alert.alert(
+          '权限被拒绝',
+          '请在系统设置中开启通知权限以接收重要消息。',
+          [
+            { text: '取消', style: 'cancel' },
+            { text: '去设置', onPress: () => {
+              // 可以引导用户到设置页面
+              Alert.alert('提示', '请在"设置 > GoParkMe > 通知"中开启通知权限');
+            }},
+          ]
+        );
+        return;
+      }
+    }
+    
+    await updateNotificationSettings({ enabled: value });
+  };
+
+  const handleParkingNotificationToggle = async (value: boolean) => {
+    await updateNotificationSettings({ parkingNotifications: value });
+  };
+
+  const handlePaymentNotificationToggle = async (value: boolean) => {
+    await updateNotificationSettings({ paymentNotifications: value });
+  };
+
+  const handleSystemNotificationToggle = async (value: boolean) => {
+    await updateNotificationSettings({ systemNotifications: value });
+  };
+
   const settingsSections = [
     {
       title: '账户设置',
@@ -95,9 +136,33 @@ export default function SettingsScreen() {
         {
           icon: 'notifications-outline',
           title: '推送通知',
-          subtitle: '接收预约和支付通知',
-          value: notifications,
-          onToggle: setNotifications,
+          subtitle: hasPermissions ? '接收重要消息通知' : '需要开启系统权限',
+          value: notificationSettings.enabled && hasPermissions,
+          onToggle: handleNotificationToggle,
+          showSwitch: true,
+        },
+        {
+          icon: 'car-outline',
+          title: '停车通知',
+          subtitle: '停车即将过期提醒',
+          value: notificationSettings.parkingNotifications,
+          onToggle: handleParkingNotificationToggle,
+          showSwitch: true,
+        },
+        {
+          icon: 'card-outline',
+          title: '支付通知',
+          subtitle: '充值和扣费通知',
+          value: notificationSettings.paymentNotifications,
+          onToggle: handlePaymentNotificationToggle,
+          showSwitch: true,
+        },
+        {
+          icon: 'information-circle-outline',
+          title: '系统通知',
+          subtitle: '重要系统消息',
+          value: notificationSettings.systemNotifications,
+          onToggle: handleSystemNotificationToggle,
           showSwitch: true,
         },
         {

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { parkingAPI } from '../services/api';
 import { useNavigation } from '@react-navigation/native';
+import { useNotification, NotificationType, createTimeTrigger } from '../contexts/NotificationContext';
 
 interface ParkingUsage {
   id: number;
@@ -20,6 +21,7 @@ export default function ParkingTimerScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const navigation = useNavigation();
+  const { scheduleNotification, cancelNotification } = useNotification();
   
   const [usage, setUsage] = useState<ParkingUsage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,11 +29,57 @@ export default function ParkingTimerScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [estimatedCost, setEstimatedCost] = useState(0);
+  const [notificationIds, setNotificationIds] = useState<string[]>([]);
 
   // 隐藏默认Header，避免与自定义Header重复
   useLayoutEffect(() => {
     navigation.setOptions?.({ headerShown: false });
   }, [navigation]);
+
+  // 安排停车通知
+  const scheduleParkingNotifications = async (startTime: string, location: string) => {
+    try {
+      // 取消之前的通知
+      for (const id of notificationIds) {
+        await cancelNotification(id);
+      }
+
+      const start = new Date(startTime + 'Z');
+      const newNotificationIds: string[] = [];
+
+      // 安排不同时间点的通知
+      const notifications = [
+        { minutes: 50, title: '停车即将到期', body: `您在${location}的停车时间还有10分钟到期，请及时续费或结束使用` },
+        { minutes: 55, title: '停车即将到期', body: `您在${location}的停车时间还有5分钟到期，请立即处理` },
+        { minutes: 60, title: '停车时间已到期', body: `您在${location}的停车时间已到期，可能产生额外费用` },
+        { minutes: 90, title: '停车超时提醒', body: `您在${location}的停车已超时30分钟，请尽快结束使用` },
+      ];
+
+      for (const notification of notifications) {
+        const notifyTime = new Date(start.getTime() + notification.minutes * 60 * 1000);
+        
+        // 只安排未来的通知
+        if (notifyTime > new Date()) {
+          const notificationId = await scheduleNotification(
+            notification.title,
+            notification.body,
+            NotificationType.PARKING_EXPIRING,
+            { parkingLocation: location },
+            createTimeTrigger(notifyTime)
+          );
+          
+          if (notificationId) {
+            newNotificationIds.push(notificationId);
+          }
+        }
+      }
+
+      setNotificationIds(newNotificationIds);
+      console.log('停车通知已安排:', newNotificationIds.length, '个通知');
+    } catch (error) {
+      console.error('安排停车通知失败:', error);
+    }
+  };
 
   // 获取当前使用状态
   const fetchCurrentUsage = async () => {
@@ -41,6 +89,8 @@ export default function ParkingTimerScreen() {
       
       if (response.usage) {
         setUsage(response.usage);
+        // 安排通知
+        await scheduleParkingNotifications(response.usage.start_time, response.usage.location);
       } else {
         // 没有正在使用的停车位，跳转回主页
         Alert.alert('提示', '您当前没有正在使用的停车位', [
@@ -95,6 +145,16 @@ export default function ParkingTimerScreen() {
     }
   }, [currentTime, usage]);
 
+  // 清理通知效果
+  useEffect(() => {
+    return () => {
+      // 组件卸载时清理所有通知
+      notificationIds.forEach(id => {
+        cancelNotification(id).catch(console.error);
+      });
+    };
+  }, [notificationIds, cancelNotification]);
+
   const handleEndParking = async () => {
     if (!usage) return;
 
@@ -110,6 +170,20 @@ export default function ParkingTimerScreen() {
             try {
               setEnding(true);
               const response = await parkingAPI.endParking(usage.parking_spot_id.toString());
+              
+              // 取消所有停车相关通知
+              for (const id of notificationIds) {
+                await cancelNotification(id);
+              }
+              setNotificationIds([]);
+
+              // 发送停车结束通知
+              await scheduleNotification(
+                '停车结束',
+                `感谢您的使用！最终费用：¥${response.total_amount.toFixed(2)}`,
+                NotificationType.PARKING_EXPIRED,
+                { totalAmount: response.total_amount }
+              );
               
               Alert.alert('停车结束', `感谢您的使用！\n最终费用：¥${response.total_amount.toFixed(2)}`, [
                 { text: '好的', onPress: () => router.replace('/(tabs)' as any) }

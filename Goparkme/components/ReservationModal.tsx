@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { parkingAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification, NotificationType, createTimeTrigger } from '../contexts/NotificationContext';
 
 interface ReservationModalProps {
   visible: boolean;
@@ -34,6 +35,7 @@ export default function ReservationModal({
   onReservationCreated,
 }: ReservationModalProps) {
   const { user } = useAuth();
+  const { scheduleNotification } = useNotification();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date());
@@ -132,6 +134,52 @@ export default function ReservationModal({
       };
 
       await parkingAPI.createReservation(parkingSpot.id, reservationData);
+
+      // 安排预约通知
+      const reservationDateTime = new Date(selectedDate);
+      reservationDateTime.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+      
+      // 立即确认通知
+      await scheduleNotification(
+        '预约确认',
+        `您已成功预约${parkingSpot.location}的停车位，时间：${formatDate(selectedDate)} ${formatTime(startTime)}-${formatTime(endTime)}`,
+        NotificationType.RESERVATION_CONFIRMED,
+        { 
+          location: parkingSpot.location, 
+          date: formatDate(selectedDate),
+          startTime: formatTime(startTime),
+          endTime: formatTime(endTime)
+        }
+      );
+
+      // 提前30分钟提醒
+      const reminderTime = new Date(reservationDateTime.getTime() - 30 * 60 * 1000);
+      if (reminderTime > new Date()) {
+        await scheduleNotification(
+          '停车预约提醒',
+          `您在${parkingSpot.location}的停车预约将在30分钟后开始，请准时到达`,
+          NotificationType.RESERVATION_CONFIRMED,
+          { 
+            location: parkingSpot.location,
+            reminderType: 'before_start'
+          },
+          createTimeTrigger(reminderTime)
+        );
+      }
+
+      // 预约开始提醒
+      if (reservationDateTime > new Date()) {
+        await scheduleNotification(
+          '停车预约开始',
+          `您在${parkingSpot.location}的停车预约时间已到，请开始使用车位`,
+          NotificationType.RESERVATION_CONFIRMED,
+          { 
+            location: parkingSpot.location,
+            reminderType: 'start'
+          },
+          createTimeTrigger(reservationDateTime)
+        );
+      }
 
       Alert.alert('成功', '预约创建成功！', [
         {

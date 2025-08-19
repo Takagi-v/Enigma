@@ -5,12 +5,14 @@ import { StripeProvider, CardField, useStripe, CardFieldInput } from '@stripe/st
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { paymentAPI } from '../services/api';
+import { useNotification, NotificationType } from '../contexts/NotificationContext';
 
 type CardDetails = CardFieldInput.Details;
 
 function TopUpScreenContent() {
   const router = useRouter();
   const stripe = useStripe();
+  const { scheduleNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState('');
   const [cardDetails, setCardDetails] = useState<CardDetails | null>(null);
@@ -158,6 +160,15 @@ function TopUpScreenContent() {
         }
       } else {
         console.log('3. confirmPayment 成功！');
+        
+        // 发送支付成功通知
+        await scheduleNotification(
+          '充值成功',
+          `您的账户已成功充值 ¥${amt.toFixed(2)}${isFirstTopUp ? '，并获得首次充值奖励 ¥10.00' : ''}`,
+          NotificationType.PAYMENT_SUCCESS,
+          { amount: amt, isFirstTopUp }
+        );
+        
         Alert.alert('成功', '充值成功', [
           { text: '确定', onPress: () => router.back() }
         ]);
@@ -165,6 +176,15 @@ function TopUpScreenContent() {
       }
     } catch (err: any) {
       console.error('4. 充值流程捕获到未知错误:', err);
+      
+      // 发送支付失败通知
+      await scheduleNotification(
+        '充值失败',
+        `充值 ¥${amt.toFixed(2)} 失败：${err.message || '未知错误'}`,
+        NotificationType.PAYMENT_FAILED,
+        { amount: amt, error: err.message || '未知错误' }
+      );
+      
       // 避免重复弹窗
       if (!String(err.message).includes('支付失败')) {
         Alert.alert('错误', err.message || '充值过程中发生未知错误');

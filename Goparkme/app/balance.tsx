@@ -16,11 +16,13 @@ import { userAPI, paymentAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useProtectedRoute } from '../hooks/useProtectedRoute';
 import AuthModal from '../components/AuthModal';
+import { useNotification, NotificationType } from '../contexts/NotificationContext';
 
 export default function BalanceScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { isLoading: authLoading, showAuthModal, setShowAuthModal } = useProtectedRoute();
+  const { scheduleNotification } = useNotification();
   const [balance, setBalance] = useState(0);
   const [giftBalance, setGiftBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,28 @@ export default function BalanceScreen() {
     }, [user, authLoading])
   );
 
+  // 检查余额并发送通知
+  const checkLowBalance = async (totalBalance: number) => {
+    const lowBalanceThreshold = 20; // 余额低于20元发送通知
+    const criticalBalanceThreshold = 5; // 余额低于5元发送紧急通知
+
+    if (totalBalance <= criticalBalanceThreshold) {
+      await scheduleNotification(
+        '余额严重不足',
+        `您的账户余额仅剩 ¥${totalBalance.toFixed(2)}，请立即充值以免影响停车服务`,
+        NotificationType.LOW_BALANCE,
+        { balance: totalBalance, level: 'critical' }
+      );
+    } else if (totalBalance <= lowBalanceThreshold) {
+      await scheduleNotification(
+        '余额不足提醒',
+        `您的账户余额为 ¥${totalBalance.toFixed(2)}，建议及时充值`,
+        NotificationType.LOW_BALANCE,
+        { balance: totalBalance, level: 'warning' }
+      );
+    }
+  };
+
   const fetchBalanceData = async () => {
     if (!user) return;
 
@@ -61,9 +85,16 @@ export default function BalanceScreen() {
         paymentAPI.getTransactions(),
       ]);
       
-      setBalance(balanceData.balance || 0);
-      setGiftBalance(giftBalanceData.gift_balance || 0);
+      const newBalance = balanceData.balance || 0;
+      const newGiftBalance = giftBalanceData.gift_balance || 0;
+      const newTotalBalance = newBalance + newGiftBalance;
+      
+      setBalance(newBalance);
+      setGiftBalance(newGiftBalance);
       setTransactions(Array.isArray(txList) ? txList : []);
+      
+      // 检查余额并发送通知
+      await checkLowBalance(newTotalBalance);
     } catch (error) {
       console.error('获取余额信息失败:', error);
       Alert.alert('错误', '获取余额信息失败');
@@ -82,9 +113,6 @@ export default function BalanceScreen() {
     router.push('/top-up' as any);
   };
 
-  const handleWithdraw = () => {
-    Alert.alert('提现功能', '提现功能正在开发中...');
-  };
 
   if (authLoading || loading) {
     return (
@@ -134,11 +162,6 @@ export default function BalanceScreen() {
           <TouchableOpacity style={styles.actionButton} onPress={handleTopUp}>
             <Ionicons name="add-circle" size={24} color="#007AFF" />
             <Text style={styles.actionButtonText}>充值</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={handleWithdraw}>
-            <Ionicons name="remove-circle" size={24} color="#ff3b30" />
-            <Text style={styles.actionButtonText}>提现</Text>
           </TouchableOpacity>
         </View>
 
@@ -302,12 +325,9 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   actionButtons: {
-    flexDirection: 'row',
     margin: 16,
-    gap: 12,
   },
   actionButton: {
-    flex: 1,
     backgroundColor: 'white',
     padding: 16,
     borderRadius: 12,

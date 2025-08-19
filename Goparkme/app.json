@@ -2,7 +2,7 @@
   "expo": {
     "name": "Goparkme",
     "slug": "Goparkme",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "goparkme",
@@ -15,7 +15,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "This app uses the camera to scan card details or QR codes for parking-related features. 本应用使用相机用于扫描银行卡信息或二维码以完成停车相关功能。",
-        "NSLocationWhenInUseUsageDescription": "Your location helps us show nearby parking spots and provide navigation to destinations. 您的位置用于展示附近停车位并提供导航。"
+        "NSLocationWhenInUseUsageDescription": "Your location helps us show nearby parking spots and provide navigation to destinations. 您的位置用于展示附近停车位并提供导航。",
+        "NSUserNotificationsUsageDescription": "This app sends you important notifications about parking reservations, payment confirmations, and low balance alerts. 本应用向您发送重要的停车预约、支付确认和余额不足等通知。"
       }
     },
     "android": {
@@ -41,7 +42,15 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

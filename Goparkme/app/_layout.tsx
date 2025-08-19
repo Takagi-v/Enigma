@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '../contexts/AuthContext';
 import { LocationProvider } from '../contexts/LocationContext';
+import { NotificationProvider } from '../contexts/NotificationContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 // Prevent the splash screen from auto-hiding.
@@ -51,7 +52,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <LocationProvider>
-          <RootLayoutNav />
+          <NotificationProvider>
+            <RootLayoutNav />
+          </NotificationProvider>
         </LocationProvider>
       </AuthProvider>
     </GestureHandlerRootView>
