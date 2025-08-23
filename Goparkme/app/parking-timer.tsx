@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { parkingAPI } from '../services/api';
 import { useNavigation } from '@react-navigation/native';
 import { useNotification, NotificationType, createTimeTrigger } from '../contexts/NotificationContext';
+import LockStatusCard from '../components/LockStatusCard';
 
 interface ParkingUsage {
   id: number;
@@ -297,6 +298,12 @@ export default function ParkingTimerScreen() {
           </View>
         </View>
 
+        {/* 地锁状态显示 */}
+        <LockStatusCard 
+          spotId={usage.parking_spot_id} 
+          refreshInterval={15000}
+        />
+
         {/* 费用信息 */}
         <View style={styles.costCard}>
           <View style={styles.costHeader}>
@@ -406,7 +413,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 100, // Add padding to the bottom to avoid FAB overlap
+    paddingBottom: 120, // 增加底部内边距，留出更多空间给地锁状态卡片
   },
   timerCard: {
     backgroundColor: '#fff',

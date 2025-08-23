@@ -47,10 +47,23 @@ const parkingLockService = {
   getDeviceStatus: async (deviceSerial) => {
     try {
       const response = await lockApi.get(`/device_status/${deviceSerial}`);
-      return response.data;
+      const data = response.data;
+      
+      // 如果是成功响应，返回统一格式
+      if (data && data.success) {
+        return {
+          success: true,
+          data: {
+            ...data,
+            last_heartbeat: new Date().toISOString() // 添加当前时间作为获取时间
+          }
+        };
+      }
+      
+      return data;
     } catch (error) {
       console.error('获取设备状态失败:', error.message);
-      throw new Error('获取设备状态失败');
+      return { success: false, message: '获取设备状态失败: ' + error.message };
     }
   },
 

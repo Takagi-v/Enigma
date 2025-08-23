@@ -122,44 +122,45 @@ const ParkingLockControl = () => {
     try {
       setDetailLoading(true);
       const response = await parkingLockService.getDeviceStatus(deviceSerial);
-      if (response.success) {
+      if (response.success && response.data) {
+        const deviceData = response.data;
         // 将API返回的字段映射到组件中使用的字段
         const detailData = {
-          序列号: response.serialNumber,
-          最后心跳格式化时间: new Date().toLocaleString(), // 使用当前时间作为替代
+          序列号: deviceData.serialNumber,
+          最后心跳格式化时间: new Date(deviceData.last_heartbeat).toLocaleString(),
           设备状态: {
-            代码: response.deviceStatus.code,
-            描述: response.deviceStatus.description
+            代码: deviceData.deviceStatus.code,
+            描述: deviceData.deviceStatus.description
           },
           车辆状态: {
-            代码: response.carStatus.code,
-            描述: response.carStatus.description
+            代码: deviceData.carStatus.code,
+            描述: deviceData.carStatus.description
           },
           常控状态: {
-            代码: response.controlStatus.code,
-            描述: response.controlStatus.description
+            代码: deviceData.controlStatus.code,
+            描述: deviceData.controlStatus.description
           },
           电池: {
-            '3.7v': response.battery['3.7v'],
-            '12v': response.battery['12v']
+            '3.7v': deviceData.battery['3.7v'],
+            '12v': deviceData.battery['12v']
           },
-          信号强度: response.signalStrength,
-          流水号: response.flowNumber,
+          信号强度: deviceData.signalStrength,
+          流水号: deviceData.flowNumber,
           错误: {
-            代码: response.error.code,
-            描述列表: response.error.descriptions,
-            有错误: response.error.hasError
+            代码: deviceData.error.code,
+            描述列表: deviceData.error.descriptions,
+            有错误: deviceData.error.hasError
           },
           地感参数: {
-            当前频率: response.groundSensor.currentFrequency,
-            无车基准: response.groundSensor.noCarBase,
-            有车基准: response.groundSensor.carBase,
-            有车万分比: response.groundSensor.carRatio,
-            无车万分比: response.groundSensor.noCarRatio
+            当前频率: deviceData.groundSensor.currentFrequency,
+            无车基准: deviceData.groundSensor.noCarBase,
+            有车基准: deviceData.groundSensor.carBase,
+            有车万分比: deviceData.groundSensor.carRatio,
+            无车万分比: deviceData.groundSensor.noCarRatio
           },
           进水检测: {
-            代码: response.waterDetection.code,
-            描述: response.waterDetection.description
+            代码: deviceData.waterDetection.code,
+            描述: deviceData.waterDetection.description
           }
         };
         

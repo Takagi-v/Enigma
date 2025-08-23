@@ -45,9 +45,14 @@ fs.mkdir(serverConfig.uploadDir, { recursive: true }, (err) => {
 // 连接数据库
 connectDB();
 
+// 引入地锁状态同步服务
+const lockStatusSyncService = require('./services/lockStatusSyncService');
+
 // 优雅关闭
 const gracefulShutdown = () => {
   console.info('Received shutdown signal.');
+  // 停止地锁同步服务
+  lockStatusSyncService.stopSync();
   server.close(() => {
     console.log('Server closed.');
     closeDB();
@@ -65,6 +70,16 @@ server.listen(serverConfig.port, '0.0.0.0', () => {
 - WebSocket: ws://${serverConfig.domain}:${serverConfig.port}
 - Environment: ${process.env.NODE_ENV || 'development'}
 - Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5050'}`);
+  
+  // 启动地锁状态同步服务
+  setTimeout(() => {
+    try {
+      lockStatusSyncService.startSync();
+      console.log('地锁状态同步服务已启动');
+    } catch (error) {
+      console.error('启动地锁状态同步服务失败:', error);
+    }
+  }, 5000); // 5秒后启动，等待数据库连接完成
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${serverConfig.port} is already in use.`);

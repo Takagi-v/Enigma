@@ -97,6 +97,9 @@ async function createTables(createTestData = false) {
       rating INTEGER CHECK (rating >= 1 AND rating <= 5),
       review_comment TEXT,
       review_time DATETIME,
+      lock_open_status TEXT DEFAULT 'not_applicable',
+      lock_close_status TEXT DEFAULT 'not_applicable',
+      lock_error_message TEXT,
       FOREIGN KEY (parking_spot_id) REFERENCES parking_spots(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )`,

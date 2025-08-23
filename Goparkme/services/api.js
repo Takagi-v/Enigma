@@ -135,6 +135,13 @@ export const parkingAPI = {
       requireAuth: true,
     });
   },
+
+  // 获取停车位地锁状态
+  getLockStatus: async (spotId) => {
+    return await apiRequest(`/parking-locks/spot/${spotId}/status`, {
+      requireAuth: true,
+    });
+  },
 };
 
 // 用户相关API

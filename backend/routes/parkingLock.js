@@ -5,10 +5,23 @@
 const express = require('express');
 const router = express.Router();
 const parkingLockService = require('../services/parkingLockService');
+const lockStatusSyncService = require('../services/lockStatusSyncService');
 const { authenticateToken, authenticateAdmin } = require('../middleware/auth');
 
 // 使用验证中间件，确保只有已登录用户可以访问地锁API
 router.use(authenticateToken);
+
+// 获取停车位地锁状态 - 普通用户也可查看
+router.get('/spot/:spotId/status', async (req, res) => {
+  try {
+    const { spotId } = req.params;
+    const result = await lockStatusSyncService.checkSpotLockStatus(spotId);
+    res.json(result);
+  } catch (error) {
+    console.error('检查停车位地锁状态失败:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // 获取服务器状态
 router.get('/status', async (req, res) => {
@@ -114,6 +127,63 @@ router.post('/sync_time', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('同步时间失败:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 检查停车位地锁状态
+router.get('/spot/:spotId/status', async (req, res) => {
+  try {
+    const { spotId } = req.params;
+    const result = await lockStatusSyncService.checkSpotLockStatus(spotId);
+    res.json(result);
+  } catch (error) {
+    console.error('检查停车位地锁状态失败:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 强制同步停车位状态
+router.post('/spot/:spotId/sync', async (req, res) => {
+  try {
+    const { spotId } = req.params;
+    const result = await lockStatusSyncService.forceSyncSpotStatus(spotId);
+    res.json(result);
+  } catch (error) {
+    console.error('强制同步停车位状态失败:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 启动地锁状态同步服务
+router.post('/sync/start', async (req, res) => {
+  try {
+    lockStatusSyncService.startSync();
+    res.json({ success: true, message: '地锁状态同步服务已启动' });
+  } catch (error) {
+    console.error('启动同步服务失败:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 停止地锁状态同步服务
+router.post('/sync/stop', async (req, res) => {
+  try {
+    lockStatusSyncService.stopSync();
+    res.json({ success: true, message: '地锁状态同步服务已停止' });
+  } catch (error) {
+    console.error('停止同步服务失败:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 手动执行一次全量同步
+router.post('/sync/run', async (req, res) => {
+  try {
+    await lockStatusSyncService.syncAllLockStatus();
+    res.json({ success: true, message: '手动同步已完成' });
+  } catch (error) {
+    console.error('手动同步失败:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

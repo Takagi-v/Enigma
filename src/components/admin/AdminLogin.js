@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '../styles/AdminLogin.css';
+import '../styles/ModernAdmin.css';
 import config from '../../config';
 
 const AdminLogin = () => {
@@ -52,35 +52,147 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="admin-login-container">
-      <div className="admin-login-box">
-        <h2>管理员登录</h2>
-        {error && <div className="error-message">{error}</div>}
-        <form onSubmit={handleSubmit}>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 'var(--spacing-lg)'
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: 'var(--radius-xl)',
+        padding: 'var(--spacing-2xl)',
+        boxShadow: 'var(--shadow-heavy)',
+        width: '100%',
+        maxWidth: '400px',
+        textAlign: 'center'
+      }}>
+        {/* 品牌标识 */}
+        <div style={{
+          marginBottom: 'var(--spacing-2xl)'
+        }}>
+          <div style={{
+            width: '80px',
+            height: '80px',
+            background: 'linear-gradient(135deg, #007AFF, #5856D6)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto var(--spacing-lg)',
+            fontSize: '32px',
+            color: 'white'
+          }}>
+            🔒
+          </div>
+          <h1 style={{
+            fontSize: '28px',
+            fontWeight: '700',
+            color: 'var(--text-primary)',
+            margin: '0 0 var(--spacing-xs) 0'
+          }}>
+            GoParkMe
+          </h1>
+          <p style={{
+            color: 'var(--text-secondary)',
+            fontSize: '16px',
+            margin: 0
+          }}>
+            管理员控制台
+          </p>
+        </div>
+
+        {/* 错误消息 */}
+        {error && (
+          <div className="alert alert-error" style={{
+            textAlign: 'left',
+            marginBottom: 'var(--spacing-lg)'
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {/* 登录表单 */}
+        <form onSubmit={handleSubmit} className="modern-form">
           <div className="form-group">
-            <label>用户名:</label>
+            <label className="form-label" style={{textAlign: 'left'}}>
+              👤 管理员账号
+            </label>
             <input
               type="text"
+              className="form-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={loading}
+              placeholder="请输入管理员用户名"
               required
+              style={{
+                fontSize: '16px',
+                padding: 'var(--spacing-md)'
+              }}
             />
           </div>
+          
           <div className="form-group">
-            <label>密码:</label>
+            <label className="form-label" style={{textAlign: 'left'}}>
+              🔑 登录密码
+            </label>
             <input
               type="password"
+              className="form-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
+              placeholder="请输入登录密码"
               required
+              style={{
+                fontSize: '16px',
+                padding: 'var(--spacing-md)'
+              }}
             />
           </div>
-          <button type="submit" disabled={loading}>
-            {loading ? '登录中...' : '登录'}
+          
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="btn btn-primary"
+            style={{
+              width: '100%',
+              fontSize: '18px',
+              fontWeight: '700',
+              padding: 'var(--spacing-md) var(--spacing-lg)',
+              marginTop: 'var(--spacing-lg)',
+              background: loading ? 'var(--border-medium)' : 'linear-gradient(135deg, #007AFF, #5856D6)',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? (
+              <>
+                <div className="loading-spinner" style={{marginRight: 'var(--spacing-sm)'}} />
+                登录中...
+              </>
+            ) : (
+              <>
+                🚀 立即登录
+              </>
+            )}
           </button>
         </form>
+
+        {/* 底部信息 */}
+        <div style={{
+          marginTop: 'var(--spacing-2xl)',
+          paddingTop: 'var(--spacing-lg)',
+          borderTop: '1px solid var(--border-light)',
+          color: 'var(--text-tertiary)',
+          fontSize: '14px'
+        }}>
+          <p style={{margin: 0}}>
+            🛡️ 安全登录 · 数据加密
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -300,9 +300,12 @@ router.post("/:spotId/start", authenticateToken, async (req, res) => {
             start_time,
             vehicle_plate,
             status,
-            lock_closure_status
-          ) VALUES (?, ?, datetime('now', 'utc'), ?, 'active', ?)`,
-          [spotId, userId, vehicle_plate, spot.lock_serial_number ? 'pending_open' : 'not_applicable'],
+            lock_open_status,
+            lock_close_status
+          ) VALUES (?, ?, datetime('now', 'utc'), ?, 'active', ?, ?)`,
+          [spotId, userId, vehicle_plate, 
+           spot.lock_serial_number ? 'pending' : 'not_applicable',
+           spot.lock_serial_number ? 'pending' : 'not_applicable'],
           function (err) {
             if (err) reject(err);
             else resolve(this);
@@ -328,23 +331,49 @@ router.post("/:spotId/start", authenticateToken, async (req, res) => {
         console.log(`正在为停车位 ${spotId} 的地锁 ${spot.lock_serial_number} 发送开锁指令`);
         try {
           const lockResult = await parkingLockService.openLock(spot.lock_serial_number);
-          if (!lockResult.success) {
-            // 如果开锁失败，回滚所有操作
-            throw new Error(lockResult.message || '开锁指令执行失败');
-          }
-          console.log(`地锁 ${spot.lock_serial_number} 开锁成功`);
-        } catch (lockError) {
-          console.error('开锁失败，回滚事务:', lockError);
-          await new Promise((resolve, reject) => {
-            db().run("ROLLBACK", (err) => {
-              if (err) reject(err);
-              else resolve();
+          if (lockResult && lockResult.success) {
+            // 更新开锁状态为成功
+            await new Promise((resolve, reject) => {
+              db().run(
+                "UPDATE parking_usage SET lock_open_status = 'success' WHERE id = ?",
+                [usageId],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
             });
+            console.log(`地锁 ${spot.lock_serial_number} 开锁成功`);
+          } else {
+            // 开锁失败，更新状态并记录错误信息
+            await new Promise((resolve, reject) => {
+              db().run(
+                "UPDATE parking_usage SET lock_open_status = 'failed', lock_error_message = ? WHERE id = ?",
+                [lockResult?.message || '开锁指令执行失败', usageId],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
+            });
+            // 开锁失败但不阻止停车，不回滚事务
+            console.warn(`地锁 ${spot.lock_serial_number} 开锁失败: ${lockResult?.message || '未知错误'}`);
+          }
+        } catch (lockError) {
+          console.error('开锁操作异常:', lockError);
+          // 更新开锁状态为失败
+          await new Promise((resolve, reject) => {
+            db().run(
+              "UPDATE parking_usage SET lock_open_status = 'failed', lock_error_message = ? WHERE id = ?",
+              [lockError.message || '开锁服务异常', usageId],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
           });
-          return res.status(500).json({ 
-            message: `无法打开地锁: ${lockError.message}`,
-            code: 'LOCK_OPEN_FAILED'
-          });
+          // 开锁异常但不阻止停车，不回滚事务
+          console.warn(`地锁 ${spot.lock_serial_number} 开锁异常但停车继续: ${lockError.message}`);
         }
       }
 
@@ -429,13 +458,40 @@ router.post("/:spotId/end", authenticateToken, async (req, res) => {
         if (deviceStatus && deviceStatus.success && deviceStatus.carStatus && deviceStatus.carStatus.code === 2) {
           console.log(`车辆已离开，发送关锁指令...`);
           // 2b. 车辆已离开，发送关锁指令
-          const closeResult = await parkingLockService.closeLock(usage.lock_serial_number);
+          try {
+            const closeResult = await parkingLockService.closeLock(usage.lock_serial_number);
 
-          if (!closeResult || !closeResult.success) {
-            throw new Error(closeResult.message || '关闭地锁的指令未能成功执行');
+            if (closeResult && closeResult.success) {
+              console.log(`地锁 ${usage.lock_serial_number} 已成功关闭。`);
+              // 更新关锁状态
+              await new Promise((resolve, reject) => {
+                db().run(
+                  "UPDATE parking_usage SET lock_close_status = 'success' WHERE id = ?",
+                  [usage.id],
+                  (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  }
+                );
+              });
+            } else {
+              throw new Error(closeResult?.message || '关闭地锁的指令未能成功执行');
+            }
+          } catch (closeError) {
+            console.error(`关锁操作失败: ${closeError.message}`);
+            // 更新关锁状态为失败
+            await new Promise((resolve, reject) => {
+              db().run(
+                "UPDATE parking_usage SET lock_close_status = 'failed', lock_error_message = ? WHERE id = ?",
+                [closeError.message, usage.id],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
+            });
+            throw closeError; // 继续抛出错误，阻止停车结束
           }
-
-          console.log(`地锁 ${usage.lock_serial_number} 已成功关闭。`);
           
         } else {
           // 2c. 车辆未离开或状态查询失败
@@ -477,9 +533,12 @@ router.post("/:spotId/end", authenticateToken, async (req, res) => {
                total_amount = ?,
                status = 'completed',
                payment_status = 'unpaid',
-               lock_closure_status = ?
+               lock_close_status = CASE 
+                 WHEN lock_close_status = 'pending' THEN 'success'
+                 ELSE lock_close_status
+               END
            WHERE id = ?`,
-          [totalAmount, usage.lock_serial_number ? 'completed' : 'not_applicable', usage.id],
+          [totalAmount, usage.id],
           (err) => {
             if (err) reject(err);
             else resolve();
@@ -507,7 +566,24 @@ router.post("/:spotId/end", authenticateToken, async (req, res) => {
         });
       });
 
-      console.log('成功结束使用停车位:', { usage_id: usage.id, totalAmount });
+      // 检查是否有地锁错误需要通知用户
+      const finalUsage = await new Promise((resolve, reject) => {
+        db().get(
+          'SELECT lock_open_status, lock_close_status, lock_error_message FROM parking_usage WHERE id = ?',
+          [usage.id],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
+
+      let lockWarning = '';
+      if (finalUsage.lock_open_status === 'failed' || finalUsage.lock_close_status === 'failed') {
+        lockWarning = `\n注意: 地锁操作失败 - ${finalUsage.lock_error_message || '未知错误'}`;
+      }
+      
+      console.log('成功结束使用停车位:', { usage_id: usage.id, totalAmount, lockStatus: { open: finalUsage.lock_open_status, close: finalUsage.lock_close_status } });
       // 尝试后台自动扣款（不阻塞响应）
       try {
         setImmediate(() => {
@@ -520,10 +596,15 @@ router.post("/:spotId/end", authenticateToken, async (req, res) => {
       }
 
       res.json({
-        message: "已结束使用，请支付费用",
+        message: "已结束使用，请支付费用" + lockWarning,
         usage_id: usage.id,
         total_amount: totalAmount,
-        code: 'SUCCESS'
+        code: 'SUCCESS',
+        lock_status: {
+          open_status: finalUsage.lock_open_status,
+          close_status: finalUsage.lock_close_status,
+          error_message: finalUsage.lock_error_message
+        }
       });
 
     } catch (innerError) {

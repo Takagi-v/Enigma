@@ -219,16 +219,38 @@ router.put("/users/:id", authenticateAdmin, async (req, res) => {
 // 修改停车位信息
 router.put("/parking-spots/:id", authenticateAdmin, async (req, res) => {
   const { id } = req.params;
-  const { location, price, status, description, coordinates } = req.body;
+  const { location, price, status, description, coordinates, lock_serial_number } = req.body;
 
   try {
+    // 先获取现有停车位信息
+    const existingSpot = await new Promise((resolve, reject) => {
+      db().get("SELECT * FROM parking_spots WHERE id = ?", [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+
+    if (!existingSpot) {
+      return res.status(404).json({ success: false, message: "停车位不存在" });
+    }
+
+    // 使用现有值填充undefined的字段
+    const updateData = {
+      location: location !== undefined ? location : existingSpot.location,
+      price: price !== undefined ? price : existingSpot.price,
+      status: status !== undefined ? status : existingSpot.status,
+      description: description !== undefined ? description : existingSpot.description,
+      coordinates: coordinates !== undefined ? coordinates : existingSpot.coordinates,
+      lock_serial_number: lock_serial_number !== undefined ? lock_serial_number : existingSpot.lock_serial_number
+    };
+
     const result = await new Promise((resolve, reject) => {
       db().run(
         `UPDATE parking_spots 
          SET location = ?, price = ?, status = ?, description = ?,
-         coordinates = ?, updated_at = DATETIME('now', 'utc')
+         coordinates = ?, lock_serial_number = ?, updated_at = DATETIME('now', 'utc')
          WHERE id = ?`,
-        [location, price, status, description, coordinates, id],
+        [updateData.location, updateData.price, updateData.status, updateData.description, updateData.coordinates, updateData.lock_serial_number, id],
         function(err) {
           if (err) reject(err);
           else resolve(this.changes);
