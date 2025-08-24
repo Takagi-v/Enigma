@@ -165,14 +165,24 @@ export default function MapScreen() {
               description={`¥${spot.hourly_rate}/小时`}
               pinColor={spot.status === 'available' ? 'green' : 'red'}
             >
-              <Callout onPress={() => handleCalloutPress(spot)}>
+              <Callout tooltip onPress={() => handleCalloutPress(spot)}>
                 <View style={styles.calloutContainer}>
                   <Text style={styles.calloutTitle}>{spot.location}</Text>
-                  <Text style={styles.calloutPrice}>¥{spot.hourly_rate}/小时</Text>
-                  <Text style={styles.calloutStatus}>
-                    状态: {spot.status === 'available' ? '可用' : '已占用'}
-                  </Text>
-                  <Text style={{color: '#007AFF', marginTop: 8}}>点击查看详情</Text>
+                  <View style={styles.calloutBody}>
+                    <View style={styles.infoRow}>
+                      <Ionicons name="cash-outline" size={14} color="#007AFF" />
+                      <Text style={styles.calloutPrice}>¥{spot.hourly_rate}/小时</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                       <Ionicons name={spot.status === 'available' ? "checkmark-circle" : "close-circle"} size={14} color={spot.status === 'available' ? '#28a745' : '#dc3545'} />
+                      <Text style={[styles.calloutStatus, { color: spot.status === 'available' ? '#28a745' : '#dc3545' }]}>
+                         {spot.status === 'available' ? '可用' : '已占用'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.calloutAction}>
+                     <Text style={styles.calloutActionText}>查看详情 &gt;</Text>
+                  </View>
                 </View>
               </Callout>
             </Marker>
@@ -245,22 +255,50 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   calloutContainer: {
-    width: 200,
-    padding: 10,
+    width: 220,
+    padding: 12,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
   calloutTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 8,
+    color: '#333',
+  },
+  calloutBody: {
+    marginBottom: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   calloutPrice: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#007AFF',
-    marginBottom: 3,
+    marginLeft: 5,
   },
   calloutStatus: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 14,
+    marginLeft: 5,
+  },
+  calloutAction: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 8,
+    marginTop: 4,
+  },
+  calloutActionText: {
+    color: '#007AFF',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   floatingButtonsContainer: {
     position: 'absolute',

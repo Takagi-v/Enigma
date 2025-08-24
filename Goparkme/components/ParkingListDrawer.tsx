@@ -4,6 +4,8 @@ import BottomSheet, { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { parkingAPI } from '../services/api'; // 确保路径正确
 import { ParkingSpot } from '../types'; // 引入共享的类型
 import { useLocation, getDistanceFromLatLonInKm } from '../contexts/LocationContext';
+import { Ionicons } from '@expo/vector-icons';
+
 
 interface ParkingListDrawerProps {
   onSpotSelect: (spot: ParkingSpot) => void;
@@ -67,18 +69,34 @@ const ParkingListDrawer = forwardRef<BottomSheet, ParkingListDrawerProps>(({ onS
       }
     }
 
+    const statusText = item.status === 'available' ? '空闲' : '已占用';
+    const statusColor = item.status === 'available' ? '#28a745' : '#dc3545';
+
     return (
-      <TouchableOpacity style={styles.itemContainer} onPress={() => onSpotSelect(item)}>
-        <View style={styles.itemTextContainer}>
-          <Text style={styles.itemLocation}>{item.location}</Text>
-          <Text style={styles.itemPrice}>¥{item.hourly_rate}/小时</Text>
-          {distance !== null && (
-            <Text style={styles.itemDistance}>
-              距离: {distance.toFixed(2)} km
-            </Text>
-          )}
+      <TouchableOpacity style={styles.card} onPress={() => onSpotSelect(item)}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.locationText}>{item.location}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+            <Text style={styles.statusText}>{statusText}</Text>
+          </View>
         </View>
-        <View style={[styles.statusIndicator, { backgroundColor: item.status === 'available' ? '#28a745' : '#dc3545' }]} />
+
+        <View style={styles.cardBody}>
+          <View style={styles.infoRow}>
+            <Ionicons name="cash-outline" size={16} color="#666" style={styles.icon} />
+            <Text style={styles.infoText}>¥{item.hourly_rate}/小时</Text>
+          </View>
+          {distance !== null && (
+            <View style={styles.infoRow}>
+              <Ionicons name="location-outline" size={16} color="#666" style={styles.icon} />
+              <Text style={styles.infoText}>距离 {distance.toFixed(2)} km</Text>
+            </View>
+          )}
+          <View style={styles.infoRow}>
+             <Ionicons name="time-outline" size={16} color="#666" style={styles.icon} />
+             <Text style={styles.infoText}>{item.opening_hours}</Text>
+          </View>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -114,9 +132,17 @@ ParkingListDrawer.displayName = 'ParkingListDrawer';
 
 const styles = StyleSheet.create({
   drawerContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#f7f7f7',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -3,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 10,
   },
   handleIndicator: {
     backgroundColor: '#ccc',
@@ -127,6 +153,9 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   headerTitle: {
     fontSize: 20,
@@ -137,35 +166,55 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingHorizontal: 16,
   },
-  itemContainer: {
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  locationText: {
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1, 
+  },
+  statusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cardBody: {
+    // No specific styles needed here for now
+  },
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginTop: 6,
   },
-  itemTextContainer: {
-    flex: 1,
+  icon: {
+    marginRight: 8,
   },
-  itemLocation: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  itemPrice: {
+  infoText: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  itemDistance: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 4,
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginLeft: 15,
+    color: '#333',
   },
 });
 

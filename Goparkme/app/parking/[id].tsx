@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, Button, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { parkingAPI } from '../../services/api'; // 确保路径正确
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons'; // 使用Expo的图标库
 import { useLocation, getDistanceFromLatLonInKm } from '../../contexts/LocationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -191,7 +191,6 @@ export default function ParkingDetailScreen() {
       {/* 地图 */}
       <View style={styles.mapContainer}>
         <MapView
-          provider={PROVIDER_GOOGLE}
           style={styles.map}
           initialRegion={{
             latitude: lat,
