@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, useLocation } from "react-router-dom";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import "./components/styles/App.css";
 import Home from "./components/Home";
@@ -26,6 +26,55 @@ import StripeProvider from './components/StripeProvider';
 import PaymentSetup from './components/PaymentSetup';
 import TopUp from './components/TopUp';
 import config from './config';
+
+const AppContent = () => {
+  const location = useLocation();
+  const isAdminPage = location.pathname.startsWith('/admin');
+
+  return (
+    <div className="App">
+      <Header isAdminPage={isAdminPage} />
+      {!isAdminPage && <Sidebar />}
+      <main className="content">
+        <Routes>
+          <Route path="/" element={<Map />} />
+          <Route path="/parking-lots" element={<Home />} />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } />
+          <Route path="/edit-profile" element={
+            <ProtectedRoute>
+              <EditProfile />
+            </ProtectedRoute>
+          } />
+          <Route path="/messages" element={<Messages token={null} />} />
+          <Route path="/auth" element={<Auth />}/>
+          <Route path="/publish" element={<ParkingSpotForm />} />
+          <Route path="/parking/:id" element={<ParkingDetail />} />
+          <Route path="/parking/:id/use" element={<ParkingUsage />} />
+          <Route path="/search" element={<ParkingSearch />} />
+          <Route path="/parking-record/:id" element={
+            <ProtectedRoute>
+              <ParkingRecord />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/add-parking" element={<AddParkingSpot />} />
+          <Route path="/contact-us" element={<ContactUs />} />
+          <Route path="/payment-setup" element={<PaymentSetup />} />
+          <Route path="/top-up" element={
+            <ProtectedRoute>
+              <TopUp />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </main>
+    </div>
+  );
+};
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -68,63 +117,13 @@ function App() {
       document.head.removeChild(viewport);
     };
   }, []);
-
-  const [token, setToken] = useState(null);
   
   return (
     <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
       <AuthProvider>
         <StripeProvider>
           <Router>
-            <div className="App">
-              <Header />
-              <Sidebar />
-              <main className="content">
-                <Routes>
-                  <Route path="/" element={<Map />} />
-                  <Route path="/parking-lots" element={<Home />} />
-                  <Route path="/profile" element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/edit-profile" element={
-                    <ProtectedRoute>
-                      <EditProfile />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/messages" element={<Messages token={token} />} />
-                  <Route path="/auth" element={<Auth />}/>
-                  <Route path="/publish" element={<ParkingSpotForm />} />
-                  <Route path="/parking/:id" element={<ParkingDetail />} />
-                  <Route path="/parking/:id/use" element={<ParkingUsage />} />
-                  <Route path="/search" element={<ParkingSearch />} />
-                  <Route path="/parking-record/:id" element={
-                    <ProtectedRoute>
-                      <ParkingRecord />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/login" element={<AdminLogin />} />
-                  <Route path="/admin/dashboard" element={
-                    <ProtectedRoute>
-                      <AdminDashboard />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/add-parking" element={
-                    <ProtectedRoute>
-                      <AddParkingSpot />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/contact-us" element={<ContactUs />} />
-                  <Route path="/payment-setup" element={<PaymentSetup />} />
-                  <Route path="/top-up" element={
-                    <ProtectedRoute>
-                      <TopUp />
-                    </ProtectedRoute>
-                  } />
-                </Routes>
-              </main>
-            </div>
+            <AppContent />
           </Router>
         </StripeProvider>
       </AuthProvider>

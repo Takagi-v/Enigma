@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './styles/Header.css';
 
-function Header() {
+function Header({ isAdminPage }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -11,6 +11,10 @@ function Header() {
     await logout();
     navigate('/auth');
   };
+
+  if (isAdminPage) {
+    return null; // Don't render the header on admin pages
+  }
 
   return (
     <header className="header">

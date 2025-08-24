@@ -1,13 +1,12 @@
  
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import '../styles/ModernAdmin.css';
+import config from '../../config';
 
 const AddParkingSpot = () => {
-    const { user } = useAuth();
     const [formData, setFormData] = useState({
-        owner_username: user ? user.username : '',
+        owner_username: 'admin', // Default to admin, can be changed if needed
         location: '',
         price: '',
         description: '',
@@ -20,6 +19,24 @@ const AddParkingSpot = () => {
     const [success, setSuccess] = useState('');
     const navigate = useNavigate();
 
+    useEffect(() => {
+        const adminToken = localStorage.getItem('adminToken');
+        if (!adminToken) {
+            navigate('/admin/login');
+            return;
+        }
+        try {
+            const tokenData = JSON.parse(atob(adminToken.split('.')[1]));
+            if (tokenData.exp * 1000 < Date.now()) {
+                localStorage.removeItem('adminToken');
+                navigate('/admin/login');
+            }
+        } catch (error) {
+            localStorage.removeItem('adminToken');
+            navigate('/admin/login');
+        }
+    }, [navigate]);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -30,15 +47,9 @@ const AddParkingSpot = () => {
         setError('');
         setSuccess('');
 
-        if (!user) {
-            setError('您需要登录才能添加停车位。');
-            return;
-        }
-
         try {
-            // 在formData中强制设置owner_username
-            const dataToSend = { ...formData, owner_username: user.username };
-            const response = await fetch(`${window.location.origin.replace(/:\d+$/, '')}${process.env.REACT_APP_API_PATH || ''}/admin/parking-spots`, {
+            const dataToSend = { ...formData };
+            const response = await fetch(`${config.API_URL}/admin/parking-spots`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -52,7 +63,7 @@ const AddParkingSpot = () => {
             }
             setSuccess('停车位添加成功！');
             setFormData({
-                owner_username: user.username,
+                owner_username: 'admin',
                 location: '',
                 price: '',
                 description: '',
@@ -66,7 +77,7 @@ const AddParkingSpot = () => {
                 navigate('/admin/dashboard'); 
             }, 1500);
         } catch (err) {
-            setError(err.response?.data?.message || '添加停车位失败，请稍后再试。');
+            setError(err.message || '添加停车位失败，请稍后再试。');
         }
     };
     

@@ -52,74 +52,26 @@ const AdminLogin = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 'var(--spacing-lg)'
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: 'var(--radius-xl)',
-        padding: 'var(--spacing-2xl)',
-        boxShadow: 'var(--shadow-heavy)',
-        width: '100%',
-        maxWidth: '400px',
-        textAlign: 'center'
-      }}>
-        {/* 品牌标识 */}
-        <div style={{
-          marginBottom: 'var(--spacing-2xl)'
-        }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            background: 'linear-gradient(135deg, #007AFF, #5856D6)',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto var(--spacing-lg)',
-            fontSize: '32px',
-            color: 'white'
-          }}>
+    <div className="admin-login-page">
+      <div className="admin-login-panel">
+        <div className="login-header">
+          <div className="login-brand-icon">
             🔒
           </div>
-          <h1 style={{
-            fontSize: '28px',
-            fontWeight: '700',
-            color: 'var(--text-primary)',
-            margin: '0 0 var(--spacing-xs) 0'
-          }}>
-            GoParkMe
-          </h1>
-          <p style={{
-            color: 'var(--text-secondary)',
-            fontSize: '16px',
-            margin: 0
-          }}>
-            管理员控制台
-          </p>
+          <h1 className="login-title">GoParkMe</h1>
+          <p className="login-subtitle">管理员控制台</p>
         </div>
 
-        {/* 错误消息 */}
         {error && (
-          <div className="alert alert-error" style={{
-            textAlign: 'left',
-            marginBottom: 'var(--spacing-lg)'
-          }}>
-            ⚠️ {error}
+          <div className="alert alert-error">
+            <span className="alert-icon">⚠️</span> 
+            {error}
           </div>
         )}
 
-        {/* 登录表单 */}
-        <form onSubmit={handleSubmit} className="modern-form">
+        <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
-            <label className="form-label" style={{textAlign: 'left'}}>
-              👤 管理员账号
-            </label>
+            <label className="form-label">👤 管理员账号</label>
             <input
               type="text"
               className="form-input"
@@ -128,17 +80,11 @@ const AdminLogin = () => {
               disabled={loading}
               placeholder="请输入管理员用户名"
               required
-              style={{
-                fontSize: '16px',
-                padding: 'var(--spacing-md)'
-              }}
             />
           </div>
           
           <div className="form-group">
-            <label className="form-label" style={{textAlign: 'left'}}>
-              🔑 登录密码
-            </label>
+            <label className="form-label">🔑 登录密码</label>
             <input
               type="password"
               className="form-input"
@@ -147,51 +93,27 @@ const AdminLogin = () => {
               disabled={loading}
               placeholder="请输入登录密码"
               required
-              style={{
-                fontSize: '16px',
-                padding: 'var(--spacing-md)'
-              }}
             />
           </div>
           
           <button 
             type="submit" 
             disabled={loading}
-            className="btn btn-primary"
-            style={{
-              width: '100%',
-              fontSize: '18px',
-              fontWeight: '700',
-              padding: 'var(--spacing-md) var(--spacing-lg)',
-              marginTop: 'var(--spacing-lg)',
-              background: loading ? 'var(--border-medium)' : 'linear-gradient(135deg, #007AFF, #5856D6)',
-              cursor: loading ? 'not-allowed' : 'pointer'
-            }}
+            className="btn btn-primary login-button"
           >
             {loading ? (
               <>
-                <div className="loading-spinner" style={{marginRight: 'var(--spacing-sm)'}} />
-                登录中...
+                <div className="loading-spinner" />
+                <span>登录中...</span>
               </>
             ) : (
-              <>
-                🚀 立即登录
-              </>
+              <span>🚀 立即登录</span>
             )}
           </button>
         </form>
 
-        {/* 底部信息 */}
-        <div style={{
-          marginTop: 'var(--spacing-2xl)',
-          paddingTop: 'var(--spacing-lg)',
-          borderTop: '1px solid var(--border-light)',
-          color: 'var(--text-tertiary)',
-          fontSize: '14px'
-        }}>
-          <p style={{margin: 0}}>
-            🛡️ 安全登录 · 数据加密
-          </p>
+        <div className="login-footer">
+          <p>🛡️ 安全登录 · 数据加密</p>
         </div>
       </div>
     </div>

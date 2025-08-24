@@ -217,86 +217,80 @@ async function createTables(createTestData = false) {
   }
 
   // 检查并添加缺失的列 (数据库迁移)
-  try {
+  const runMigrations = async () => {
     const dbInstance = getDB();
 
-    // 1. 检查 users 表
-    const usersColumns = await new Promise((resolve, reject) => {
-      dbInstance.all("PRAGMA table_info(users)", (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows ? rows.map(r => r.name) : []);
-      });
-    });
-
-    if (!usersColumns.includes('vehicle_model')) {
-      console.log('Migrating users: adding column vehicle_model');
-      await new Promise((resolve, reject) => {
-        dbInstance.run("ALTER TABLE users ADD COLUMN vehicle_model TEXT", (err) => {
+    const checkAndAddColumn = async (tableName, columnName, columnDefinition) => {
+      const columns = await new Promise((resolve, reject) => {
+        dbInstance.all(`PRAGMA table_info(${tableName})`, (err, rows) => {
           if (err) reject(err);
-          else resolve();
+          else resolve(rows ? rows.map(r => r.name) : []);
         });
       });
-    }
 
-    if (!usersColumns.includes('updated_at')) {
-      console.log('Migrating users: adding column updated_at');
-      await new Promise((resolve, reject) => {
-        dbInstance.run("ALTER TABLE users ADD COLUMN updated_at DATETIME", (err) => {
-          if (err) reject(err);
-          else resolve();
+      if (!columns.includes(columnName)) {
+        console.log(`Migrating ${tableName}: adding column ${columnName}`);
+        await new Promise((resolve, reject) => {
+          dbInstance.run(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
         });
-      });
+      }
+    };
+
+    try {
+      // users table
+      await checkAndAddColumn('users', 'vehicle_model', 'TEXT');
+      await checkAndAddColumn('users', 'updated_at', 'DATETIME');
+      await checkAndAddColumn('users', 'balance', 'REAL DEFAULT 0');
+      await checkAndAddColumn('users', 'google_id', 'TEXT UNIQUE');
+      await checkAndAddColumn('users', 'bio', 'TEXT DEFAULT "该用户很神秘"');
+      await checkAndAddColumn('users', 'address', 'TEXT');
+      await checkAndAddColumn('users', 'vehicle_plate', 'TEXT UNIQUE');
+
+      // parking_spots table
+      await checkAndAddColumn('parking_spots', 'updated_at', 'DATETIME');
+      await checkAndAddColumn('parking_spots', 'opening_hours', 'TEXT DEFAULT "00:00-23:59"');
+      await checkAndAddColumn('parking_spots', 'lock_serial_number', 'TEXT');
+      await checkAndAddColumn('parking_spots', 'average_rating', 'REAL DEFAULT NULL');
+      
+      // parking_usage table
+      await checkAndAddColumn('parking_usage', 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
+      await checkAndAddColumn('parking_usage', 'vehicle_plate', 'TEXT');
+      await checkAndAddColumn('parking_usage', 'vehicle_type', 'TEXT');
+      await checkAndAddColumn('parking_usage', 'payment_method', 'TEXT');
+      await checkAndAddColumn('parking_usage', 'payment_time', 'DATETIME');
+      await checkAndAddColumn('parking_usage', 'transaction_id', 'TEXT');
+      await checkAndAddColumn('parking_usage', 'notes', 'TEXT');
+      await checkAndAddColumn('parking_usage', 'rating', 'INTEGER CHECK (rating >= 1 AND rating <= 5)');
+      await checkAndAddColumn('parking_usage', 'review_comment', 'TEXT');
+      await checkAndAddColumn('parking_usage', 'review_time', 'DATETIME');
+      await checkAndAddColumn('parking_usage', 'lock_open_status', 'TEXT DEFAULT "not_applicable"');
+      await checkAndAddColumn('parking_usage', 'lock_close_status', 'TEXT DEFAULT "not_applicable"');
+      await checkAndAddColumn('parking_usage', 'lock_error_message', 'TEXT');
+
+      // coupons table
+      await checkAndAddColumn('coupons', 'description', 'TEXT');
+
+      // reservations table
+      await checkAndAddColumn('reservations', 'total_amount', 'REAL');
+      await checkAndAddColumn('reservations', 'payment_status', 'TEXT DEFAULT "pending"');
+      await checkAndAddColumn('reservations', 'notes', 'TEXT');
+
+      // transactions table
+      await checkAndAddColumn('transactions', 'error_message', 'TEXT');
+
+      // disputes table
+      await checkAndAddColumn('disputes', 'resolved_at', 'DATETIME');
+
+      console.log('数据库迁移检查完成');
+    } catch (error) {
+      console.error('数据库迁移失败:', error);
     }
+  };
 
-    // 2. 检查 parking_spots 表
-    const parkingSpotsColumns = await new Promise((resolve, reject) => {
-      dbInstance.all("PRAGMA table_info(parking_spots)", (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows ? rows.map(r => r.name) : []);
-      });
-    });
-
-    if (!parkingSpotsColumns.includes('updated_at')) {
-      console.log('Migrating parking_spots: adding column updated_at');
-      await new Promise((resolve, reject) => {
-        dbInstance.run("ALTER TABLE parking_spots ADD COLUMN updated_at DATETIME", (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    }
-    
-    if (!parkingSpotsColumns.includes('lock_serial_number')) {
-      console.log('Migrating parking_spots: adding column lock_serial_number');
-      await new Promise((resolve, reject) => {
-        dbInstance.run("ALTER TABLE parking_spots ADD COLUMN lock_serial_number TEXT", (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    }
-
-    // 3. 检查 parking_usage 表
-    const parkingUsageColumns = await new Promise((resolve, reject) => {
-      dbInstance.all("PRAGMA table_info(parking_usage)", (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows ? rows.map(r => r.name) : []);
-      });
-    });
-
-    if (!parkingUsageColumns.includes('lock_closure_status')) {
-      console.log('Migrating parking_usage: adding column lock_closure_status');
-      await new Promise((resolve, reject) => {
-        dbInstance.run("ALTER TABLE parking_usage ADD COLUMN lock_closure_status TEXT DEFAULT 'not_applicable'", (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    }
-  } catch (error) {
-    console.error('数据库迁移失败:', error);
-  }
-
+  await runMigrations();
 
   // 创建默认管理员账号
   await createDefaultAdmin();
@@ -307,8 +301,6 @@ async function createTables(createTestData = false) {
     await createTestUsers();
     // 创建测试停车场数据
     await createTestParkingSpots();
-    // 创建测试评论数据
-    await createTestReviews();
   }
 }
 
@@ -386,30 +378,52 @@ async function createTestUsers() {
 
 // 创建测试停车场数据
 async function createTestParkingSpots() {
+  const users = await all("SELECT username FROM users");
+  if (users.length === 0) {
+    console.log("没有用户数据，无法创建测试停车位");
+    return;
+  }
+  const owners = users.map(u => u.username);
+
+  const shanghai = { 
+    name: '上海', 
+    lat: 31.2304, 
+    lng: 121.4737, 
+    districts: ['黄浦区', '徐汇区', '长宁区', '静安区', '普陀区', '虹口区', '杨浦区', '浦东新区'] 
+  };
+  
+  const openingHoursOptions = ['00:00-23:59', '08:00-22:00', '09:00-21:00', '24小时营业'];
+  const descriptions = [
+    '市中心黄金地段，交通便利，购物方便。',
+    '安静小区内，适合长期租用，安全性高。',
+    '靠近地铁站，出行方便，适合上班族。',
+    '大型商场地下停车场，车位充足，监控覆盖。',
+    '写字楼专属车位，管理规范，环境整洁。'
+  ];
+
   const testSpots = [];
-  const baseLat = 31.2304;
-  const baseLng = 121.4737;
 
   for (let i = 0; i < 20; i++) {
-    const deltaLat = (Math.random() - 0.5) * 0.1;
-    const deltaLng = (Math.random() - 0.5) * 0.1;
+    const district = shanghai.districts[Math.floor(Math.random() * shanghai.districts.length)];
+    const deltaLat = (Math.random() - 0.5) * 0.05; // 缩小范围，更集中于上海市区
+    const deltaLng = (Math.random() - 0.5) * 0.05;
+
     testSpots.push({
-      owner_username: 'owner1', // 所有车位都归属于 owner1
-      location: `上海市黄浦区-测试车位-${i + 1}`,
-      coordinates: `${(baseLat + deltaLat).toFixed(6)},${(baseLng + deltaLng).toFixed(6)}`,
+      owner_username: owners[Math.floor(Math.random() * owners.length)],
+      location: `${shanghai.name}市${district}-测试车位-${i + 1}`,
+      coordinates: `${(shanghai.lat + deltaLat).toFixed(6)},${(shanghai.lng + deltaLng).toFixed(6)}`,
       price: parseFloat((8 + Math.random() * 12).toFixed(2)),
-      description: `这是一个位于上海市中心的示例停车位 #${i + 1}，方便测试使用。`,
-      status: 'available',
+      description: descriptions[Math.floor(Math.random() * descriptions.length)],
+      status: 'available', // 所有车位状态均为 aponvailable
       hourly_rate: parseFloat((10 + Math.random() * 5).toFixed(2)),
-      contact: '13800138004',
-      opening_hours: '00:00-23:59',
-      lock_serial_number: i % 4 === 0 ? `SH-LOCK-${1000 + i}` : null // 每4个车位有一个地锁
+      contact: '138' + Math.floor(10000000 + Math.random() * 90000000), // 随机手机号
+      opening_hours: openingHoursOptions[Math.floor(Math.random() * openingHoursOptions.length)],
+      lock_serial_number: null 
     });
   }
 
   for (const spot of testSpots) {
     try {
-      // 检查是否已存在
       const existingSpot = await get("SELECT id FROM parking_spots WHERE location = ?", [spot.location]);
       if (!existingSpot) {
           await runQuery(
@@ -429,106 +443,6 @@ async function createTestParkingSpots() {
     }
   }
    console.log("测试停车位数据生成完毕。");
-}
-
-// 创建测试评论数据
-async function createTestReviews() {
-  try {
-    // 首先检查是否已有评论数据
-    const existingReviews = await new Promise((resolve, reject) => {
-      db.get("SELECT COUNT(*) as count FROM reviews", (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-
-    // 如果已有数据，则不重新创建
-    if (existingReviews && existingReviews.count > 0) {
-      console.log(`数据库中已有${existingReviews.count}条评论数据，跳过创建测试数据`);
-      return;
-    }
-
-    // 清空现有评论数据
-    await runQuery("DELETE FROM reviews");
-    await runQuery("DELETE FROM sqlite_sequence WHERE name='reviews'");
-
-    // 获取前10个停车场ID
-    const parkingSpots = await new Promise((resolve, reject) => {
-      db.all("SELECT id FROM parking_spots LIMIT 10", (err, rows) => {
-        if (err) reject(err);
-        resolve(rows);
-      });
-    });
-
-    // 获取用户列表（用于随机分配评论者）
-    const users = await new Promise((resolve, reject) => {
-      db.all("SELECT id FROM users", (err, rows) => {
-        if (err) reject(err);
-        resolve(rows);
-      });
-    });
-
-    if (users.length === 0) {
-      console.log("没有用户数据，跳过创建测试评论");
-      return;
-    }
-
-    const comments = [
-      '位置很好找，停车方便',
-      '价格合理，周边设施齐全',
-      '保安很负责，停车很安全',
-      '干净整洁，采光很好',
-      '位置很好，交通便利',
-      '服务态度很好，会再来',
-      '停车位宽敞，好停车',
-      '环境不错，性价比高',
-      '位置很好，下次还会选择',
-      '整体体验不错'
-    ];
-
-    const reviews = [];
-    // 为每个停车场创建1-2条评论
-    for (const spot of parkingSpots) {
-      const reviewCount = 1 + Math.floor(Math.random() * 2); // 1或2条评论
-      
-      for (let i = 0; i < reviewCount; i++) {
-        const userId = users[Math.floor(Math.random() * users.length)].id;
-        const rating = Math.floor(Math.random() * 3) + 3; // 3-5星
-        const comment = comments[Math.floor(Math.random() * comments.length)];
-        
-        reviews.push({
-          parking_spot_id: spot.id,
-          user_id: userId,
-          rating,
-          comment
-        });
-      }
-    }
-
-    // 批量插入评论
-    for (const review of reviews) {
-      await runQuery(
-        `INSERT INTO reviews (parking_spot_id, user_id, rating, comment) 
-         VALUES (?, ?, ?, ?)`,
-        [review.parking_spot_id, review.user_id, review.rating, review.comment]
-      );
-    }
-
-    // 更新停车场的平均评分
-    await runQuery(`
-      UPDATE parking_spots 
-      SET average_rating = (
-        SELECT AVG(rating) 
-        FROM reviews 
-        WHERE parking_spot_id = parking_spots.id
-      )
-      WHERE id IN (SELECT DISTINCT parking_spot_id FROM reviews)
-    `);
-
-    console.log(`成功创建${reviews.length}条测试评论数据`);
-  } catch (error) {
-    console.error("创建测试评论数据失败:", error);
-  }
 }
 
 // 关闭数据库连接

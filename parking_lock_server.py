@@ -237,9 +237,9 @@ class ParkingLockProtocol:
                     command_info = "设备故障"
                 elif command == 0x60:
                     command_info = "车状态改变"
-                elif command == 0x84:
+                elif command == 0x70:
                     command_info = "远程开锁"
-                elif command == 0x85:
+                elif command == 0x71:
                     command_info = "远程关锁"
                 elif command == 0x8E:
                     command_info = "设置锁状态"
@@ -667,9 +667,9 @@ class ParkingLockServer:
             
             # 获取命令名称
             command_name = ""
-            if command == 0x84:
+            if command == 0x70:
                 command_name = "远程开锁"
-            elif command == 0x85:
+            elif command == 0x71:
                 command_name = "远程关锁"
             elif command == 0x8E:
                 command_name = "设置锁状态"
@@ -693,14 +693,14 @@ class ParkingLockServer:
         # 构建流水号（4字节）
         flow_number = struct.pack("<I", int(time.time()) % 10000)
         payload = device_serial + flow_number
-        return self.send_command_to_device(device_serial, 0x84, payload)
+        return self.send_command_to_device(device_serial, 0x70, payload)
     
     def remote_close_lock(self, device_serial):
         """远程关锁"""
         # 构建流水号（4字节）
         flow_number = struct.pack("<I", int(time.time()) % 10000)
         payload = device_serial + flow_number
-        return self.send_command_to_device(device_serial, 0x85, payload)
+        return self.send_command_to_device(device_serial, 0x71, payload)
     
     def set_lock_state(self, device_serial, state):
         """设置锁状态（0:正常, 1:保持开, 2:保持关）"""
