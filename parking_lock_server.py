@@ -8,6 +8,13 @@ import logging
 import binascii
 import struct
 from datetime import datetime
+import requests
+import os
+
+# 从环境变量加载配置，提供默认值
+NODE_WEBHOOK_URL = os.environ.get('NODE_WEBHOOK_URL', 'http://localhost:3002/api/parking-locks/webhook/status-update')
+WEBHOOK_SECRET = os.environ.get('LOCK_WEBHOOK_SECRET', 'a_very_secret_string_for_lock_webhook')
+
 
 # 配置日志
 logging.basicConfig(
@@ -280,6 +287,62 @@ class ParkingLockProtocol:
             except Exception as e:
                 logger.error(f"Error analyzing frame structure: {e}")
 
+def send_heartbeat_to_webhook(hb):
+    """将心跳数据格式化为驼峰命名法并发送给 Node.js Webhook"""
+    # 转换为与Node.js后端一致的驼峰命名法
+    webhook_payload = {
+        "serialNumber": binascii.hexlify(hb['serial_number']).decode('utf-8'),
+        "deviceStatus": {
+            "code": hb['device_status'],
+            "description": hb['device_status_description']
+        },
+        "carStatus": {
+            "code": hb['car_status'],
+            "description": hb['car_status_description']
+        },
+        "controlStatus": {
+            "code": hb['control_status'],
+            "description": hb['control_status_description']
+        },
+        "battery": {
+            "3.7v": hb['battery_3_7v'],
+            "12v": hb['battery_12v']
+        },
+        "signalStrength": hb['signal_strength'],
+        "flowNumber": hb['flow_number'],
+        "error": {
+            "code": hb['error_code'],
+            "descriptions": hb.get('error_descriptions', []),
+            "hasError": hb['error_code'] > 0
+        },
+        "groundSensor": {
+            "currentFrequency": hb['current_frequency'],
+            "noCarBase": hb['no_car_base'],
+            "carBase": hb['car_base'],
+            "carRatio": hb['car_ratio'],
+            "noCarRatio": hb['no_car_ratio']
+        },
+        "waterDetection": {
+            "code": hb['water_detection'],
+            "description": "有水" if hb['water_detection'] == 1 else "无水"
+        },
+        "lastHeartbeat": hb.get("last_heartbeat", time.time())
+    }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Webhook-Secret': WEBHOOK_SECRET
+    }
+    
+    try:
+        response = requests.post(NODE_WEBHOOK_URL, json=webhook_payload, headers=headers, timeout=5)
+        if response.status_code == 202:
+            logger.info(f"成功发送心跳到Webhook: {hb['serial_number'].hex()}")
+        else:
+            logger.error(f"发送心跳到Webhook失败: {response.status_code} {response.text}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"发送心跳到Webhook异常: {e}")
+
 class ParkingLockServer:
     """车位锁控制服务器"""
     
@@ -514,6 +577,9 @@ class ParkingLockServer:
                         if serial_number in connected_devices:
                             connected_devices[serial_number]["last_heartbeat"] = time.time()
                             connected_devices[serial_number]["heartbeat_data"] = heartbeat_data
+                            
+                            # 异步发送心跳数据到 Node.js Webhook
+                            threading.Thread(target=send_heartbeat_to_webhook, args=(heartbeat_data,)).start()
                             
                             # 记录关键状态变化
                             if "previous_status" in connected_devices[serial_number]:

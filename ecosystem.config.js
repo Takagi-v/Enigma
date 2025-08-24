@@ -22,5 +22,16 @@ module.exports = {
     out_file: './logs/out.log',
     log_file: './logs/combined.log',
     time: true
+  },
+  {
+    name: 'parking-lock-api',
+    script: './parking_lock_api.py',
+    interpreter: './venv/bin/python',
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '128M',
+    error_file: './logs/lock-api-err.log',
+    out_file: './logs/lock-api-out.log',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss'
   }]
 }; 

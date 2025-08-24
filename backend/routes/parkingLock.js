@@ -8,6 +8,37 @@ const parkingLockService = require('../services/parkingLockService');
 const lockStatusSyncService = require('../services/lockStatusSyncService');
 const { authenticateToken, authenticateAdmin } = require('../middleware/auth');
 
+// Webhook 密钥验证中间件
+const validateWebhookSecret = (req, res, next) => {
+  const secret = req.headers['x-webhook-secret'];
+  if (secret !== process.env.LOCK_WEBHOOK_SECRET) {
+    console.warn('收到无效的 Webhook 请求，密钥不匹配');
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  next();
+};
+
+// Webhook 接口，用于接收来自 Python 服务器的地锁状态更新
+router.post('/webhook/status-update', validateWebhookSecret, async (req, res) => {
+  try {
+    const deviceStatus = req.body;
+    console.log('[Webhook] 收到地锁状态更新:', deviceStatus.serialNumber);
+    
+    // 使用 setImmediate 异步处理，立即响应Webhook请求方
+    setImmediate(() => {
+      lockStatusSyncService.handleHeartbeatUpdate(deviceStatus).catch(err => {
+        console.error('[Webhook] 异步处理心跳更新失败:', err);
+      });
+    });
+
+    res.status(202).json({ success: true, message: 'Accepted' });
+  } catch (error) {
+    console.error('[Webhook] 处理地锁状态更新失败:', error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+});
+
+
 // 使用验证中间件，确保只有已登录用户可以访问地锁API
 router.use(authenticateToken);
 

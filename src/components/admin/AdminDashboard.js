@@ -194,7 +194,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard-layout">
-      {/* 侧边栏导航 */}
+      {/* Sidebar Navigation */}
       <aside className="admin-sidebar">
         <div className="sidebar-brand">
           <div className="brand-icon">🅿️</div>
@@ -224,7 +224,7 @@ const AdminDashboard = () => {
                 >
                   <span className="nav-icon">👥</span>
                   <span className="nav-text">用户管理</span>
-                  <span className="nav-badge">{totalUsers}</span>
+                  <span className="nav-badge">{users.length}</span>
                 </button>
               </li>
               <li>
@@ -234,7 +234,7 @@ const AdminDashboard = () => {
                 >
                   <span className="nav-icon">🅿️</span>
                   <span className="nav-text">停车位管理</span>
-                  <span className="nav-badge">{totalSpots}</span>
+                  <span className="nav-badge">{parkingSpots.length}</span>
                 </button>
               </li>
               <li>
@@ -280,9 +280,9 @@ const AdminDashboard = () => {
         </div>
       </aside>
 
-      {/* 主内容区域 */}
+      {/* Main Content Area */}
       <main className="admin-main">
-        {/* 页面标题栏 */}
+        {/* Page Header */}
         <header className="page-header">
           <div className="header-left">
             <h1 className="page-title">
@@ -312,7 +312,7 @@ const AdminDashboard = () => {
           </div>
         </header>
 
-        {/* 错误提示 */}
+        {/* Error Display */}
         {error && (
           <div className="alert alert-error">
             <span className="alert-icon">⚠️</span>
@@ -320,135 +320,134 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* 数据概览页面 */}
-        {activeTab === 'overview' && (
-          <div className="dashboard-content">
-            {/* KPI 卡片网格 */}
-            <div className="kpi-grid">
-              <div className="kpi-card primary">
-                <div className="kpi-header">
-                  <div className="kpi-icon">👥</div>
-                  <div className="kpi-trend up">↗</div>
-                </div>
-                <div className="kpi-body">
-                  <div className="kpi-value">{totalUsers}</div>
-                  <div className="kpi-label">注册用户</div>
-                  <div className="kpi-desc">系统总用户数</div>
-                </div>
-              </div>
-              
-              <div className="kpi-card success">
-                <div className="kpi-header">
-                  <div className="kpi-icon">🅿️</div>
-                  <div className="kpi-trend up">↗</div>
-                </div>
-                <div className="kpi-body">
-                  <div className="kpi-value">{totalSpots}</div>
-                  <div className="kpi-label">停车位</div>
-                  <div className="kpi-desc">已添加的停车位</div>
-                </div>
-              </div>
-              
-              <div className="kpi-card warning">
-                <div className="kpi-header">
-                  <div className="kpi-icon">🟢</div>
-                  <div className="kpi-trend stable">→</div>
-                </div>
-                <div className="kpi-body">
-                  <div className="kpi-value">{availableSpots}</div>
-                  <div className="kpi-label">可用车位</div>
-                  <div className="kpi-desc">当前可预订车位</div>
-                </div>
-              </div>
-              
-              <div className="kpi-card danger">
-                <div className="kpi-header">
-                  <div className="kpi-icon">🚗</div>
-                  <div className="kpi-trend down">↘</div>
-                </div>
-                <div className="kpi-body">
-                  <div className="kpi-value">{occupiedSpots}</div>
-                  <div className="kpi-label">占用车位</div>
-                  <div className="kpi-desc">正在使用的车位</div>
-                </div>
-              </div>
-            </div>
-
-            {/* 使用率展示 */}
-            <div className="content-grid">
-              <div className="content-card">
-                <div className="card-header">
-                  <h3 className="card-title">车位使用率</h3>
-                  <div className="card-actions">
-                    <button className="btn btn-outline btn-sm">详细</button>
+        {/* Unified Tab Content Wrapper */}
+        <div className="dashboard-content">
+          {activeTab === 'overview' && (
+            <>
+              {/* KPI Grid */}
+              <div className="kpi-grid">
+                <div className="kpi-card primary">
+                  <div className="kpi-header">
+                    <div className="kpi-icon">👥</div>
+                    <div className="kpi-trend up">↗</div>
+                  </div>
+                  <div className="kpi-body">
+                    <div className="kpi-value">{totalUsers}</div>
+                    <div className="kpi-label">注册用户</div>
+                    <div className="kpi-desc">系统总用户数</div>
                   </div>
                 </div>
-                <div className="card-body">
-                  <div className="usage-chart">
-                    <div className="usage-bar">
-                      <div 
-                        className="usage-fill available" 
-                        style={{width: `${totalSpots > 0 ? (availableSpots / totalSpots) * 100 : 0}%`}}
-                      ></div>
-                      <div 
-                        className="usage-fill occupied" 
-                        style={{width: `${totalSpots > 0 ? (occupiedSpots / totalSpots) * 100 : 0}%`}}
-                      ></div>
-                    </div>
-                    <div className="usage-legend">
-                      <div className="legend-item">
-                        <span className="legend-dot available"></span>
-                        <span>可用 ({availableSpots})</span>
-                      </div>
-                      <div className="legend-item">
-                        <span className="legend-dot occupied"></span>
-                        <span>占用 ({occupiedSpots})</span>
-                      </div>
+                
+                <div className="kpi-card success">
+                  <div className="kpi-header">
+                    <div className="kpi-icon">🅿️</div>
+                    <div className="kpi-trend up">↗</div>
+                  </div>
+                  <div className="kpi-body">
+                    <div className="kpi-value">{totalSpots}</div>
+                    <div className="kpi-label">停车位</div>
+                    <div className="kpi-desc">已添加的停车位</div>
+                  </div>
+                </div>
+                
+                <div className="kpi-card warning">
+                  <div className="kpi-header">
+                    <div className="kpi-icon">🟢</div>
+                    <div className="kpi-trend stable">→</div>
+                  </div>
+                  <div className="kpi-body">
+                    <div className="kpi-value">{availableSpots}</div>
+                    <div className="kpi-label">可用车位</div>
+                    <div className="kpi-desc">当前可预订车位</div>
+                  </div>
+                </div>
+                
+                <div className="kpi-card danger">
+                  <div className="kpi-header">
+                    <div className="kpi-icon">🚗</div>
+                    <div className="kpi-trend down">↘</div>
+                  </div>
+                  <div className="kpi-body">
+                    <div className="kpi-value">{occupiedSpots}</div>
+                    <div className="kpi-label">占用车位</div>
+                    <div className="kpi-desc">正在使用的车位</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 使用率展示 */}
+              <div className="content-grid">
+                <div className="content-card">
+                  <div className="card-header">
+                    <h3 className="card-title">车位使用率</h3>
+                    <div className="card-actions">
+                      <button className="btn btn-outline btn-sm">详细</button>
                     </div>
                   </div>
+                  <div className="card-body">
+                    <div className="usage-chart">
+                      <div className="usage-bar">
+                        <div 
+                          className="usage-fill available" 
+                          style={{width: `${totalSpots > 0 ? (availableSpots / totalSpots) * 100 : 0}%`}}
+                        ></div>
+                        <div 
+                          className="usage-fill occupied" 
+                          style={{width: `${totalSpots > 0 ? (occupiedSpots / totalSpots) * 100 : 0}%`}}
+                        ></div>
+                      </div>
+                      <div className="usage-legend">
+                        <div className="legend-item">
+                          <span className="legend-dot available"></span>
+                          <span>可用 ({availableSpots})</span>
+                        </div>
+                        <div className="legend-item">
+                          <span className="legend-dot occupied"></span>
+                          <span>占用 ({occupiedSpots})</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="content-card">
-                <div className="card-header">
-                  <h3 className="card-title">快速操作</h3>
-                </div>
-                <div className="card-body">
-                  <div className="quick-actions">
-                    <button 
-                      onClick={() => setActiveTab('users')} 
-                      className="quick-action-btn"
-                    >
-                      <span className="action-icon">👥</span>
-                      <span className="action-text">管理用户</span>
-                      <span className="action-arrow">→</span>
-                    </button>
-                    <button 
-                      onClick={() => setActiveTab('parking')} 
-                      className="quick-action-btn"
-                    >
-                      <span className="action-icon">🅿️</span>
-                      <span className="action-text">管理停车位</span>
-                      <span className="action-arrow">→</span>
-                    </button>
-                    <button 
-                      onClick={() => navigate('/admin/add-parking')} 
-                      className="quick-action-btn primary"
-                    >
-                      <span className="action-icon">➕</span>
-                      <span className="action-text">添加停车位</span>
-                      <span className="action-arrow">→</span>
-                    </button>
+                
+                <div className="content-card">
+                  <div className="card-header">
+                    <h3 className="card-title">快速操作</h3>
+                  </div>
+                  <div className="card-body">
+                    <div className="quick-actions">
+                      <button 
+                        onClick={() => setActiveTab('users')} 
+                        className="quick-action-btn"
+                      >
+                        <span className="action-icon">👥</span>
+                        <span className="action-text">管理用户</span>
+                        <span className="action-arrow">→</span>
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('parking')} 
+                        className="quick-action-btn"
+                      >
+                        <span className="action-icon">🅿️</span>
+                        <span className="action-text">管理停车位</span>
+                        <span className="action-arrow">→</span>
+                      </button>
+                      <button 
+                        onClick={() => navigate('/admin/add-parking')} 
+                        className="quick-action-btn primary"
+                      >
+                        <span className="action-icon">➕</span>
+                        <span className="action-text">添加停车位</span>
+                        <span className="action-arrow">→</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* 用户管理页面 */}
-        {activeTab === 'users' && (
-          <div className="dashboard-content">
+          {activeTab === 'users' && (
             <div className="content-card full-width">
               <div className="card-header">
                 <h3 className="card-title">用户列表</h3>
@@ -539,12 +538,9 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* 停车位管理页面 */}
-        {activeTab === 'parking' && (
-          <div className="dashboard-content">
+          {activeTab === 'parking' && (
             <div className="content-card full-width">
               <div className="card-header">
                 <h3 className="card-title">停车位列表</h3>
@@ -652,18 +648,15 @@ const AdminDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* 地锁控制页面 */}
-        {activeTab === 'locks' && (
-          <div className="dashboard-content">
+          {activeTab === 'locks' && (
             <ParkingLockControl />
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
-      {/* 编辑停车位弹窗 */}
+      {/* Edit Spot Modal */}
       {editingSpot && (
         <div className="modal-overlay" onClick={() => setEditingSpot(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

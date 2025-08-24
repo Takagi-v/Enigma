@@ -452,10 +452,11 @@ router.post("/:spotId/end", authenticateToken, async (req, res) => {
         
         // 2a. 检查地锁状态，确认车辆是否已离开
         console.log(`检查地锁 ${usage.lock_serial_number} 状态...`);
-        const deviceStatus = await parkingLockService.getDeviceStatus(usage.lock_serial_number);
+        const deviceStatusResponse = await parkingLockService.getDeviceStatus(usage.lock_serial_number);
+        const deviceStatus = deviceStatusResponse?.data || null;
 
         // carStatus.code: 1=有车, 2=无车
-        if (deviceStatus && deviceStatus.success && deviceStatus.carStatus && deviceStatus.carStatus.code === 2) {
+        if (deviceStatus && deviceStatusResponse.success && deviceStatus.carStatus && deviceStatus.carStatus.code === 2) {
           console.log(`车辆已离开，发送关锁指令...`);
           // 2b. 车辆已离开，发送关锁指令
           try {

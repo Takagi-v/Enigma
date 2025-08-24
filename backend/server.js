@@ -71,7 +71,8 @@ server.listen(serverConfig.port, '0.0.0.0', () => {
 - Environment: ${process.env.NODE_ENV || 'development'}
 - Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5050'}`);
   
-  // 启动地锁状态同步服务
+  // 启动地锁状态同步服务 (已被新的 Webhook 机制取代)
+  /*
   setTimeout(() => {
     try {
       lockStatusSyncService.startSync();
@@ -80,6 +81,7 @@ server.listen(serverConfig.port, '0.0.0.0', () => {
       console.error('启动地锁状态同步服务失败:', error);
     }
   }, 5000); // 5秒后启动，等待数据库连接完成
+  */
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`Port ${serverConfig.port} is already in use.`);

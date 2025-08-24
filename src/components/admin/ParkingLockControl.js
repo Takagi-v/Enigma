@@ -66,21 +66,19 @@ const ParkingLockControl = () => {
     }
   };
 
-  // 获取所有设备的详细状态
-  const fetchAllDeviceStatuses = async () => {
+  // 获取所有设备的详细状态 (实现无感刷新)
+  const fetchAllDeviceStatuses = async (isInitialLoad = false) => {
     try {
-      const isRunning = await fetchServerStatus();
-      if (!isRunning) {
-        setDeviceStatuses([]);
-        return;
-      }
+      if (isInitialLoad) setLoading(true);
 
       const response = await parkingLockService.getAllDeviceStatuses();
+
       if (response.success) {
-        // 将API返回的设备数据映射到组件中使用的格式
-        const mappedDevices = (response.devices || []).map(device => ({
+        const devices = response.devices || (response.data && response.data.devices) || [];
+        
+        const mappedDevices = devices.map(device => ({
           序列号: device.serialNumber,
-          最后心跳格式化时间: new Date().toLocaleString(), // 使用当前时间作为替代
+          最后心跳格式化时间: device.lastHeartbeat ? new Date(device.lastHeartbeat * 1000).toLocaleString() : 'N/A',
           设备状态: {
             代码: device.deviceStatus.code,
             描述: device.deviceStatus.description
@@ -106,7 +104,23 @@ const ParkingLockControl = () => {
           错误数量: device.error.descriptions ? device.error.descriptions.length : 0
         }));
         
-        setDeviceStatuses(mappedDevices);
+        // 智能合并数据，实现无感刷新
+        setDeviceStatuses(prevStatuses => {
+          const newStatusesMap = new Map(mappedDevices.map(d => [d.序列号, d]));
+          const mergedStatuses = prevStatuses.map(oldDevice => 
+            newStatusesMap.has(oldDevice.序列号) ? newStatusesMap.get(oldDevice.序列号) : oldDevice
+          );
+          
+          // 添加 prevStatuses 中不存在的新设备
+          mappedDevices.forEach(newDevice => {
+            if (!prevStatuses.some(oldDevice => oldDevice.序列号 === newDevice.序列号)) {
+              mergedStatuses.push(newDevice);
+            }
+          });
+
+          return mergedStatuses;
+        });
+
         setError('');
       } else {
         setError(response.message || '获取设备状态列表失败');
@@ -114,6 +128,8 @@ const ParkingLockControl = () => {
     } catch (error) {
       console.error('获取设备状态列表失败:', error);
       setError('获取设备状态列表时发生错误。请稍后再试。');
+    } finally {
+      if (isInitialLoad) setLoading(false);
     }
   };
 
@@ -181,21 +197,31 @@ const ParkingLockControl = () => {
 
   // 刷新数据
   const refreshData = async () => {
-    setLoading(true);
     if (viewMode === 'basic') {
+      setLoading(true);
       await fetchDevices();
+      setLoading(false);
     } else {
-      await fetchAllDeviceStatuses();
+      await fetchAllDeviceStatuses(true); // 首次加载或手动刷新时显示 loading
     }
-    setLoading(false);
   };
 
   // 定期刷新设备信息
   useEffect(() => {
-    refreshData();
+    // 首次加载时，根据视图模式获取数据
+    if (viewMode === 'basic') {
+      fetchDevices();
+    } else {
+      fetchAllDeviceStatuses(true);
+    }
 
+    // 设置定时器进行后台刷新
     const interval = setInterval(() => {
-      refreshData();
+      if (viewMode === 'basic') {
+        fetchDevices(); // 假设 fetchDevices 也是无感的
+      } else {
+        fetchAllDeviceStatuses(false); // 后台静默刷新
+      }
     }, refreshInterval * 1000);
 
     return () => clearInterval(interval);
